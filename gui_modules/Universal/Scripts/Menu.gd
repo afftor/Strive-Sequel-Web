@@ -27,7 +27,6 @@ func _ready():
 	for i in range(0,6):
 		$VBoxContainer.get_child(i).connect("toggled",self,buttonlist[i], [$VBoxContainer.get_child(i)])
 		#input_handler.ConnectSound($VBoxContainer.get_child(i), 'button_click', 'button_up')
-	$VBoxContainer/quitbutton.connect("pressed", self, "quit")
 	$VBoxContainer/gallery.connect("pressed", self, "gallery")
 	newgame_node.get_node("BackButton").connect("pressed", self, "open_newgame")
 	#$char_sprite.texture = images.sprites[images.sprites.keys()[randi() %images.sprites.keys().size()]]
@@ -58,7 +57,6 @@ func _ready():
 	newgame_node.get_node("NGPButton").connect("pressed", self, 'switch_ng_bonuses')
 	$Credits/Background/RichTextLabel.bbcode_text = tr("MENUCREDITSDESC")
 	call_deferred("show_mod_list_safety_message")
-	$UpdateNotice.start_update_check()
 	cycle_backgrounds()
 
 func show_mod_list_safety_message():
@@ -148,13 +146,6 @@ func credits(pressed, pressed_button):
 	self.current_pressed_btn = pressed_button
 	$Credits.visible = pressed
 
-
-
-func quit():
-#	input_handler.globalsettings.window_size = OS.window_size
-#	input_handler.globalsettings.window_pos = OS.window_position
-#	get_tree().quit()
-	input_handler.quit()
 
 
 func mods(pressed, pressed_button):

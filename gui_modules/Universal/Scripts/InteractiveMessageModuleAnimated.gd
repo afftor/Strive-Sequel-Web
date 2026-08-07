@@ -204,7 +204,7 @@ func open(scene):
 	
 	clear_character_images()
 	$BackgroundT1/ImagePanel.hide()
-	handle_scene_backgrounds(scene)
+	yield(handle_scene_backgrounds(scene), "completed")
 	handle_characters_sprites(scene)
 	handle_loots(scene)
 	update_scene_characters()
@@ -1100,7 +1100,7 @@ func clear_character_images():
 func handle_scene_backgrounds(scene):
 	var node = $CustomBackground
 	if scene.has("custom_background"):
-		var newtexture = images.get_background(scene.custom_background)
+		var newtexture = yield(images.get_background_async(scene.custom_background), "completed")
 		if !node.visible:
 			node.texture = newtexture
 			node.modulate.a = 0
@@ -1122,6 +1122,7 @@ func handle_scene_backgrounds(scene):
 		yield(get_tree().create_timer(0.2), "timeout")
 		shading.set_meta("fading", false)
 		shading.hide()
+	yield(get_tree(), "idle_frame")
 
 func try_hide_scene_backgrounds(scene, time):
 	var node = $CustomBackground
@@ -1185,7 +1186,7 @@ func handle_characters_sprites(scene):
 		$CharacterImage.hide()
 		if scene.has('image') && scene.image != '' && scene.image != null:
 			image_panel.show()
-			image_panel.get_node("SceneImage").texture = images.get_scene(scene.image)
+			image_panel.get_node("SceneImage").texture = yield(images.get_scene_async(scene.image), "completed")
 			input_handler.update_progress_data("monochrome", scene.image)
 			if dialogue_window_type == 1:
 				hide_long_text()

@@ -93,7 +93,10 @@ func build_gallery(page):
 					node.get_node("QuestionMark").visible = true
 					globals.connectgallerytooltip(node.get_node("QuestionMark"), Gallery.scene_tooltips[src[i]])
 		else:
-			node.get_node("Image").texture = get_texture_by_name(src[i])
+			var texture = get_texture_by_name(src[i])
+			node.get_node("Image").texture = texture
+			if texture == null:
+				load_gallery_thumbnail(node, src[i])
 			if state == "scenes":
 				node.connect("pressed", Gallery, "play_scene", [src[i]])
 			else:
@@ -108,6 +111,24 @@ func get_texture_by_name(image_name):
 		return images.get_scene(image_name)
 	elif state == "char":
 		return images.get_sprite(image_name)
+
+func get_texture_by_name_async(image_name):
+	if state == "scenes":
+		return yield(images.get_background_async(Gallery.get_image_for_seq(image_name)), "completed")
+	elif state == "ero" or state == "story":
+		return yield(images.get_background_async(image_name), "completed")
+	elif state == "mono":
+		return yield(images.get_scene_async(image_name), "completed")
+	elif state == "char":
+		yield(get_tree(), "idle_frame")
+		return images.get_sprite(image_name)
+	yield(get_tree(), "idle_frame")
+	return null
+
+func load_gallery_thumbnail(node, image_name):
+	var texture = yield(get_texture_by_name_async(image_name), "completed")
+	if is_instance_valid(node):
+		node.get_node("Image").texture = texture
 
 #possibly obsolete
 func load_images(scene_type):
@@ -153,13 +174,20 @@ func show_fullscreen(image): # image:string
 		FS_node.stretch_mode = FS_node.STRETCH_KEEP_ASPECT_COVERED
 	if state == "mono":
 		FS_node.texture = null
-		MS_node.texture = get_texture_by_name(image)
+		MS_node.texture = null
 	else:
-		FS_node.texture = get_texture_by_name(image)
+		FS_node.texture = null
 		MS_node.texture = null
 	ResourceScripts.core_animations.UnfadeAnimation(FS_node)
 	if !gui_controller.windows_opened.has(FS_node):
 		gui_controller.windows_opened.append(FS_node)
+	var texture = yield(get_texture_by_name_async(image), "completed")
+	if Collection != image:
+		return
+	if state == "mono":
+		MS_node.texture = texture
+	else:
+		FS_node.texture = texture
 
 
 func open_gallery():
@@ -216,7 +244,7 @@ func FindNextImagesInPlayer():
 		Collection = newimagename
 		return
 	#
-	$FullScreenImage.texture = images.get_background(newimagename)
+	$FullScreenImage.texture = yield(images.get_background_async(newimagename), "completed")
 	Collection = newimagename
 
 

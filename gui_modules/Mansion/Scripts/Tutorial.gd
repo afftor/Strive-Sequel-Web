@@ -132,7 +132,7 @@ var tattoo_text = {
 
 
 var breakdown_images = {
-	0: load("res://assets/images/scenes/abuse.png"),
+	0: "res://assets/images/scenes/abuse.png",
 }
 
 var breakdown_text = {
@@ -240,7 +240,13 @@ func show_tutorial(img, size, idx = 0):
 		return
 	$Back.disabled = idx == 0
 	$Forward.disabled = idx == size
-	$TutorialImage.texture = img[idx]
+	var texture = img[idx]
+	if typeof(texture) == TYPE_STRING:
+		if WebCgAssets.is_streamed_path(texture):
+			texture = yield(WebCgAssets.load_texture(texture), "completed")
+		else:
+			texture = load(texture)
+	$TutorialImage.texture = texture
 	$TutorialText.bbcode_text = globals.TextEncoder(text_dict[idx])
 
 func change_index(value):

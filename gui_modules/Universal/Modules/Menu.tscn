@@ -70,7 +70,6 @@
 [ext_resource path="res://assets/Fonts_v2/Noto_Sans_SC/NotoSansSC-Medium.otf" type="DynamicFontData" id=68]
 [ext_resource path="res://assets/images/buttons/mainmenu/X1.png" type="Texture" id=69]
 [ext_resource path="res://assets/images/buttons/mainmenu/X.png" type="Texture" id=70]
-[ext_resource path="res://gui_modules/Universal/Modules/UpdateNotice.tscn" type="PackedScene" id=71]
 
 [sub_resource type="DynamicFont" id=5]
 size = 64
@@ -353,26 +352,6 @@ custom_styles/focus = SubResource( 3 )
 custom_styles/normal = SubResource( 4 )
 toggle_mode = true
 text = "MENUGALLERY"
-__meta__ = {
-"_editor_description_": ""
-}
-
-[node name="quitbutton" type="Button" parent="VBoxContainer"]
-margin_left = 115.0
-margin_top = 686.0
-margin_right = 537.0
-margin_bottom = 776.0
-size_flags_horizontal = 4
-size_flags_vertical = 4
-custom_colors/font_color = Color( 0.913725, 0.894118, 0.737255, 1 )
-custom_colors/font_color_pressed = Color( 0.733333, 0.74902, 0.545098, 1 )
-custom_fonts/font = SubResource( 5 )
-custom_styles/hover = SubResource( 1 )
-custom_styles/pressed = SubResource( 2 )
-custom_styles/focus = SubResource( 3 )
-custom_styles/normal = SubResource( 4 )
-toggle_mode = true
-text = "MENUQUIT"
 __meta__ = {
 "_editor_description_": ""
 }
@@ -1195,8 +1174,3 @@ __meta__ = {
 [node name="Gallery" parent="." instance=ExtResource( 22 )]
 visible = false
 
-[node name="UpdateNotice" parent="." instance=ExtResource( 71 )]
-margin_left = 35.0
-margin_top = 65.0
-margin_right = 371.0
-margin_bottom = 321.0
