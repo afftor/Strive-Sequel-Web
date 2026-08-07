@@ -1,0 +1,2117 @@
+extends Node
+
+var pregen_characters = load("res://assets/data/pregen_characters_data.gd").new().pregen_characters
+var pregen_character_sprites = load("res://assets/data/pregen_characters_data.gd").new().unique_sprites
+var fixed_relations = load("res://assets/data/pregen_characters_data.gd").new().fixed_relations
+
+var questdata = load("res://assets/data/repeatablequestdata.gd").new().questdata
+
+var lands = {
+	plains = {
+		code = 'plains',
+		name = tr("AREAPLAINS"),
+		enabled = true,
+		races = [['Human', 25], ['halfbeast', 5], ['Elf', 3]], #races define chance of the race appearing in location, when selected randomly from local races
+		policies = [], #not used yet
+		travel_time = [0,0], #how long it gonna take to travel to region
+		disposition = 100, #reputation, not currently used
+		start_settlements_number = {settlement_plains1 = [1,1],settlement_plains2 = [1,1]}, #will generate said locations on first generation
+		start_locations_number = 2, #will generate this number of smaller locations like dungeons
+		locations = {}, #array to fill up with settlements and dungeons
+		locationpool = ['dungeon_bandit_den','dungeon_goblin_cave'], #array of allowed locations to generate
+		starting_locations = ['dungeon_bandit_den','dungeon_goblin_cave'],# 'dungeon_infinite_example'],#['dungeon_bandit_fort'],
+		guilds = ['workers','servants','fighters','mages','slavemarket','exotic_slave_trader'],
+		events = [],
+		tags = [],
+		capital_options = ['quest_board'],#,'location_purchase'],
+		area_shop_items = 'plains_area_shop',
+		capital_background = 'aliron',
+		capital_icon = 'aliron',
+		capital_dynamic_background = 'aliron',
+		capital_background_noise = 'aliron_noise',
+		capital_background_music = 'aliron',
+		capital_name = tr("CAPITALALIRON"),
+		capital_code = 'aliron',
+	},
+	forests = {
+		code = 'forests',
+		name = tr("AREAFORESTS"),
+		enabled = true,
+		races = [['Elf', 100], ['TribalElf',10],['halfbeast', 10], ['Fairy', 15], ['Dryad',5]],
+		policies = [],
+		travel_time = [1,1],#[6,6],
+		disposition = 25,
+		start_settlements_number = {settlement_forest1 = [1,1]},
+		locations = {},
+		locationpool = ['dungeon_bandit_den','dungeon_goblin_cave'],
+		starting_locations = ['dungeon_grove'],
+		guilds = ['elvish_slave_trader'],
+		events = [],
+		tags = [],
+		capital_options = [],
+		area_shop_items = 'forests_area_shop',
+		capital_background = 'elf_capital',
+		capital_icon = 'elf_capital',
+		capital_name = tr("CAPITALELVEN"),
+		capital_code = 'elf_capital',
+		capital_dynamic_background = 'elf_capital',
+		capital_background_noise = 'elf_noise',
+		capital_background_music = 'frostford',
+	},
+	mountains = {
+		code = 'mountains',
+		name = tr("AREAMOUNTAINS"),
+		races = [['Dwarf', 100], ['Gnome',10],['Kobold', 10]],
+		enabled = true,
+		lead_race = 'Dwarf',
+		secondary_races = [],
+		policies = [],
+		travel_time = [1,1],#[10,10],
+		disposition = 15,
+		start_settlements_number = {settlement_mountains1 = [1,1]},
+		starting_locations = ['dungeon_undead_crypt'],
+		locations = {},
+		locationpool = ['dungeon_undead_crypt'],
+		guilds = [],
+		tags = [],
+		capital_options = [],
+		area_shop_items = 'mountain_area_shop',
+		capital_background = 'dwarfs_city',
+		capital_icon = 'dwarfs_city',
+		capital_name = tr("CAPITALDWARVEN"),
+		capital_code = 'dwarf_capital',
+		capital_dynamic_background = 'dwarfs_city',
+#		capital_background_noise = '',
+		capital_background_music = 'dwarf_cap',
+	},
+	empire = {
+		code = 'empire',
+		name = tr("AREAEMPIRE"),
+		enabled = true,
+		races = [['Human', 25], ['halfbeast', 5], ['Elf', 3]], #fix
+		lead_race = 'Human',
+		secondary_races = [],
+		policies = [],
+		travel_time = [3,3],
+		disposition = 15,
+		start_settlements_number = {},
+		starting_locations = [],
+		locations = {},
+		locationpool = [],
+		guilds = [],
+		area_shop_items = 'empire_area_shop',
+		capital_options = [],
+		capital_background = 'empire',
+		capital_icon = 'empire',
+		capital_name = tr("CAPITALEMPIRE"),
+		capital_code = 'empire_capital',
+		capital_dynamic_background = 'empire',
+#		capital_background_noise = '',
+		capital_background_music = 'empire_capital',
+		preplanned_capital_events = ['emp_city_enter_0']
+	},
+	 beastkin_tribe = {
+		code = 'beastkin_tribe',
+		name = tr("AREABEASTKIN_TRIBE"),
+		enabled = true,
+		races = [['Elf', 100], ['TribalElf',10],['halfbeast', 10], ['Fairy', 15], ['Dryad',5]],
+		policies = [],
+		travel_time = [2,2],
+		disposition = 25,
+		start_settlements_number = {},
+		locations = {},
+		locationpool = [],
+		starting_locations = [],
+		guilds = ['beastkin_slave_trader'],
+		events = [],
+		capital_options = [],
+		area_shop_items = 'beastkin_area_shop',
+		capital_background = 'beastkin_capital',
+		capital_icon = 'beastkin_capital',
+		capital_name = tr("CAPITALBEASTKIN"),
+		capital_code = 'beastkin_capital',
+		capital_dynamic_background = 'beastkin_capital',
+		capital_background_noise = 'elf_noise',
+		capital_background_music = 'beastkin_village',
+	},
+}
+
+
+
+
+var guild_upgrades = {
+	slavenumberupgrade = {
+		code = 'slavenumberupgrade',
+		descript = "SLAVENUMBERUPGRADE_DISC",
+		name = "SLAVENUMBERUPGRADE_NAME",
+		cost = [100,500,1000,2000],
+		reqs = [],
+		maxlevel = 4,
+		effects = [{code = 'slavenumber', operant = '+', value = 1}],
+	},
+	slavequality = {
+		code = 'slavequality',
+		descript = "SLAVEQUALITY_DISC",
+		name = "SLAVEQUALITY_NAME",
+		cost = [100,500,1000,2000],
+		reqs = [],
+		maxlevel = 4,
+		effects = [{code = 'slavelevel', operant = '+', value = 1}],
+	},
+	slaveraces = {
+		code = 'slaveraces',
+		descript = "SLAVERACES_DISC",
+		name = "SLAVERACES_NAME",
+		cost = [1000,2000,3000],
+		reqs = [],
+		maxlevel = 3,
+		effects = [],
+	},
+	# questnumberupgrade = {
+	# 	code = 'questnumberupgrade',
+	# 	descript = 'Increases the amount of available quests at once by 1.',
+	# 	name = 'Quest Number',
+	# 	cost = [100,500,1000,2000],
+	# 	reqs = [],
+	# 	maxlevel = 4,
+	# 	effects = [{code = 'questsetting:total', operant = '+', value = 1}],
+	# },
+	workers_disassamby_upgrade = {
+		code = 'workers_disassamby_upgrade',
+		descript = tr("WORKERS_DISASSAMBY_UPGRADE_DISC"),
+		name = tr("WORKERS_DISASSAMBY_UPGRADE_NAME"),
+		cost = [100,500,1000,2000],
+		reqs = [{type = "current_guild", check = true, value = "workers"}],
+		maxlevel = 4,
+		effects = [],
+	},
+
+}
+
+var factiondata = {
+	fighters = {
+		code = 'fighters',
+		name = tr("FIGHTERS"),
+		description = '',
+		actions = ['hire','upgrade', 'guild_shop'],
+		bonus_actions = [],
+		events = [
+			'fighters_init', 'fighters_sap'
+			],
+		quests_easy = ['fighters_monster_hunt_easy','fighters_dungeon_easy','fighters_threat_easy','fighters_task_easy','fighters_slave_easy'],
+		quests_medium = ['fighters_craft_gear_medium','fighters_threat_medium', 'fighters_dungeon_medium','fighters_monster_hunt_medium','fighters_task_medium', 'fighters_slave_medium'],
+		quests_hard = ['fighters_dungeon_hard','fighters_monster_hunt_hard','fighters_craft_gear_hard','fighters_task_hard','fighters_slave_hard'],
+		tags = [],
+		slavenumber = [2,2],
+		questnumber = [4,4],
+		icon = load("res://assets/Textures_v2/CITY/Icons/icon_fighters.png"),
+		background = "fighters_guild",
+		reputation_shop = {
+			classes = {knight = 500, paladin = 500, sniper = 750, assassin = 1000, ninja = 750},
+			items = {bandage = [1,10], skillbook_holy_lance = [1,1000]},
+		},
+		hireable_characters = [
+			{code = 'type1',
+			preference = ['combat'],
+			classes = ['fighter', 'rogue', 'archer', 'attendant'],
+			slavelevel = 0,
+			character_types = [['servant',1]],
+			character_bonuses = {},
+			slave_races = [],
+			tags = [],
+			traits = ['training_s_combat','training_s_working'],
+			slavenumber = [2, 2],
+			no_traits = ['whimp','pacifist','coward'],
+			fame = [0, 2]
+			}
+		],
+	},
+	
+	mages = {
+		code = 'mages',
+		name = tr("MAGES"),
+		description = '',
+		actions = ['hire','upgrade', 'guild_shop'],
+		bonus_actions = [],
+		events = [
+			'mages_init',
+			],
+		quests_easy = ['mages_materials_easy','mages_craft_potions_easy','mages_threat_easy','mages_task_easy'],
+		quests_medium = ['mages_materials_medium','mages_craft_potions_medium','mages_task_medium'],
+		quests_hard = ['mages_materials_hard','mages_task_hard'],
+		tags = [],
+		slavenumber = [2,2],
+		questnumber = [1,1],
+		icon = load("res://assets/Textures_v2/CITY/Icons/icon_mages.png"),
+		background = "mages_guild",
+		reputation_shop = {
+			classes = {caster = 500, archmage = 1000, dominator = 1500, witch = 750, warlock = 750},
+			items = {oblivion_potion = [1,300],unstable_concoction = [10,100], energygem = [1, 75], skillbook_hyperborea = [1,1500], skillbook_dark_flame = [1,1000]},
+		},
+		hireable_characters = [
+			{code = 'type1',
+			preference = ['magic'],
+			classes = ['apprentice', 'scholar', 'acolyte'],
+			slavelevel = 0,
+			character_types = [['servant',1]],
+			character_bonuses = {},
+			slave_races = [],
+			tags = [],
+			slavenumber = [2,2],
+			traits = ['training_s_combat','training_s_working'],
+			no_traits = ['whimp','m_inept','coward'],
+			fame = [0, 2]
+			}
+		],
+	},
+	
+	workers = {
+		code = 'workers',
+		name = tr("WORKERS"),# Guild',
+		description = '',
+		actions = ['hire','upgrade', 'guild_shop'],
+		bonus_actions = [
+			{
+				code = 'disassemble',
+				name = 'WORKERSDISASSEMBLE',
+				reqs = [
+					{
+						type = "has_faction_upgrade",
+						check = true,
+						value = "workers_disassamby_upgrade"
+					},
+				],
+			},
+		],
+		events = [
+			'workers_init', 'workers_limnrov', 'heleviel_christmas',
+			],
+		quests_easy = ["workers_craft_tools_easy",'workers_task_easy','workers_slave_easy'],
+		quests_medium = ['workers_resources_medium','workers_food_medium','workers_craft_tools_medium','workers_task_medium','workers_slave_medium'],
+		quests_hard = ['workers_resources_hard','workers_food_hard','workers_task_hard','workers_slave_hard'],
+		slavenumber = [2,2],
+		questnumber = [1,1],
+		tags = [],
+		icon = load("res://assets/Textures_v2/CITY/Icons/icon_workers.png"),
+		background = "workers_guild",
+		reputation_shop = {
+			classes = {smith = 500, foreman = 500, engineer = 750, alchemist = 750},
+			items = {leatherdragon = [1,500], obsidian = [1,60], skillbook_poison_vapors = [1,500], skillbook_meteor = [1,1250]},
+		},
+		hireable_characters = [
+			{code = 'type1',
+			preference = ['labor'],
+			classes = ['worker', 'hunter', 'smith', 'tailor', 'chef', 'farmer'],
+			slavelevel = 0,
+			character_types = [['servant',1]],
+			character_bonuses = {},# authority = [70,90], obedience = [48,48]},
+			slave_races = [],
+			tags = [],
+			slavenumber = [2,2],
+			traits = ['training_s_combat','training_s_working'],
+			no_traits = ['crude','blundering','inept','clumsy'],
+			fame = [0, 2]
+			}
+		],
+	},
+	
+	servants = {
+		code = 'servants',
+		name = tr("SERVANTS"),
+		description = '',
+		actions = ['hire','upgrade', 'guild_shop'],
+		bonus_actions = [],
+		events = [
+			'servants_init',
+			],
+		quests_easy = ['servants_slave_easy','servants_craft_items_easy','servants_task_easy'],
+		quests_medium = ['servants_craft_items_medium','servants_slave_medium','servants_slave_medium','servants_slave_rare_medium'],
+		quests_hard = ['servants_craft_items_hard','servants_task_hard','servants_slave_hard','servants_slave_rare_hard'],
+		tags = [],
+		slavenumber = [2,3],
+		questnumber = [2,2],
+		icon = load("res://assets/Textures_v2/CITY/Icons/icon_servants.png"),
+		background = "servants_guild",
+		reputation_shop = {
+			classes = {headgirl = 500, director = 1000, sextoy = 750},
+			items = {writ_of_exemption = [1,300], skillbook_abyss_gaze = [1,1500]},
+		},
+		hireable_characters = [
+			{code = 'type1',
+			preference = ['sexual','social'],
+			classes = ['harlot', 'maid', 'bard', 'dancer', 'thief'],
+			slavelevel = 0,
+			character_types = [['servant',1]],
+			character_bonuses = {},
+			slave_races = [],
+			tags = [],
+			slavenumber = [2,3],
+			traits = ['training_s_combat','training_s_working','training_s_sexservice'],
+			no_traits = ['chaste','frigid'],
+			fame = [0, 2]
+			}
+		],
+	},
+	
+	slavemarket = {
+		code = 'slavemarket',
+		name = tr("SLAVEMARKET"),
+		description = '',
+		actions = ['hire','sellslaves','services'],
+		tags = [],
+		quests_easy = [],
+		quests_medium = [],
+		quests_hard = [],
+		slavenumber = [3,5],
+		questnumber = [],
+		bonus_actions = [],
+		hireable_characters = [
+			{code = 'type1',
+			preference = [],
+			slavelevel = 0,
+			character_types = [['slave',1]],
+			character_bonuses = {},
+			slave_races = [['rare',3]],
+			tags = [],
+			slavenumber = [3,5],
+			traits = ['training_broke_in'],
+			}
+		],
+	},
+	
+	beastkin_slave_trader = {
+		code = 'beastkin_slave_trader',
+		name = tr("BEASTKIN_SLAVE_TRADER"),
+		description = '',
+		conditions = [{type = 'quest_completed', name = 'sword_artifact_quest', check = true}],
+		actions = ['hire'],
+		quests_easy = [],
+		quests_medium = [],
+		quests_hard = [],
+		slavenumber = [4,5],
+		questnumber = [],
+		bonus_actions = [],
+		hireable_characters = [
+			{code = 'type1',
+			preference = [],
+			slavelevel = 2,
+			character_types = [['slave',1]],
+			character_bonuses = {price_add_part2 = 1.3},
+			slave_races = [['beast',3]],
+			tags = ['unique_slave_races'],
+			slavenumber = [3,4],
+			},
+			{code = 'type2',
+			preference = [],
+			slavelevel = 2,
+			character_types = [['slave',1]],
+			character_bonuses = {price_add_part2 = 1.3},
+			slave_races = [['halfbeast',1]],
+			tags = ['unique_slave_races'],
+			traits = ['training_broke_in'],
+			slavenumber = [1,1],
+			}
+		],
+	},
+	
+	elvish_slave_trader = {
+		code = 'elvish_slave_trader',
+		name = tr("ELVISH_SLAVE_TRADER"),
+		description = '',
+		conditions = [{type = 'quest_completed', name = 'test', check = false}],
+		actions = ['hire','sellslaves','services'],
+
+		tags = [],
+		quests_easy = [],
+		quests_medium = [],
+		quests_hard = [],
+		slavenumber = [3,4],
+		questnumber = [],
+		bonus_actions = [],
+		hireable_characters = [
+			{code = 'type1',
+			preference = [],
+			slavelevel = 1,
+			character_types = [['slave',1]],
+			character_bonuses = {price_add_part2 = 1.1},#authority = [30,50], obedience = [48,48], 
+			slave_races = [['Elf',5],['TribalElf',1]],
+			traits = ['training_broke_in'],
+			tags = [],
+			slavenumber = [2,3],
+			},
+			{code = 'type2',
+			preference = [],
+			slavelevel = 1,
+			character_types = [['slave',1]],
+			character_bonuses = {price_add_part2 = 1.1},#authority = [30,50], obedience = [48,48], 
+			slave_races = [['TribalElf',1]],
+			tags = [],
+			slavenumber = [1,1],
+			traits = ['training_broke_in'],
+			}
+		],
+	},
+	
+	exotic_slave_trader = {
+		code = 'exotic_slave_trader',
+		name = tr("EXOTIC_SLAVE_TRADER"),
+		description = '',
+		actions = ['hire'],
+		hireable_characters = [
+			{code = 'type1',
+			preference = [],
+			slavelevel = 0,
+			character_types = [['slave',1]],
+			character_bonuses = {price_add_part2 = 5},# authority = [0,10], obedience = [12,18], 
+			slave_races = [['top', 1]],
+			tags = ['unique_slave_races'],
+			traits = [],
+			slavenumber = [1,1],
+			},
+			{code = 'type2',
+			preference = [],
+			slavelevel = 0,
+			character_types = [['slave',1]],
+			character_bonuses = {price_add_part2 = 3},# authority = [0,10], obedience = [12,18], 
+			slave_races = [['monster',2],['rare',3]],
+			tags = ['unique_slave_races'],
+			traits = [],
+			slavenumber = [3,4],
+			},
+		],
+		questnumber = [],
+		quests_easy = [],
+		quests_medium = [],
+		quests_hard = [],
+		slavenumber = [4,5],
+		preference = [],
+		bonus_actions = [],
+	},
+	
+	aliron_church = {
+		code = 'aliron_church',
+		name = tr("ALIRON_CHURCH"),
+		description = '',
+		actions = [],
+#		preference = [],
+#		character_types = [],
+#		character_bonuses = {submission = [10,20], authority = [0,10], obedience = [12,18], price_add_part = 4},
+#		slave_races = [],
+		tags = [],
+		quests_easy = [],
+		quests_medium = [],
+		quests_hard = [],
+		slavenumber = [],
+		questnumber = [],
+		bonus_actions = [],
+		hireable_characters = [
+			{code = 'type1',
+			preference = [],
+			slavelevel = 0,
+			character_types = [],
+			character_bonuses = {price_add_part2 = 4},# authority = [0,10], obedience = [12,18], 
+			slave_races = [],
+			tags = [],
+			slavenumber = [],
+			}
+		],
+	},
+}
+
+
+var locations = {
+	settlement_plains1 = {
+		code = 'settlement_plains1',
+		type = 'settlement',
+		classname = 'settlement_small',
+		name = tr("VILLAGE_HUMAN_QUEST1"),
+		races = [],
+		leader = '',
+		captured = false, #disable button to travel, button has tooltip saying it's untravable
+		locked = false,
+		character_data = {
+			diff_roll = 15,
+			races = [['local', 50], ['common',5], ['uncommon',1]]
+		},
+		tasks = ['gather'],
+		actions = ['local_shop'],
+		tags = ['recruit_easy'],
+		event_pool = [['event_good_recruit', 0.5], ['event_good_loot_small', 1], ['event_nothing_found', 2],['exotic_slave_trader',0.5], ['event_good_slavers_woods',1], ['event_good_rebels_beastkin',1]],
+		background_pool = ['village1'],
+		bgm = 'exploration',
+		travel_time = [1,1],
+		gather_resources = 'settlement_plains1_res', #Number of allowed slaves per task at no upgrades
+		area_shop_items = 'settlement_plains1_shop'
+	},
+	settlement_plains2 = {
+		code = 'settlement_plains2',
+		type = 'settlement',
+		classname = 'settlement_small',
+		name = tr("VILLAGE_HUMAN_QUEST2"),
+		races = [],
+		leader = '',
+		character_data = {
+			chance_mod = 1.2,
+			races = [['local', 40], ['common',5], ['uncommon',2]]
+		},
+		tasks = ['gather'],
+		actions = ['local_shop'],
+		tags = ['recruit_easy'],
+		event_pool = [],
+		background_pool = ['village2'],
+		bgm = 'exploration',
+		travel_time = [1,1],
+		gather_resources = 'settlement_plains2_res',
+		area_shop_items = 'settlement_plains2_shop',
+	},
+	settlement_forest1 = {
+		code = 'settlement_forest1',
+		type = 'settlement',
+		classname = 'settlement_small',
+		name = tr("VILLAGE_FOREST_QUEST1"),
+		races = [],
+		leader = '',
+		character_data = {
+			chance_mod = 1,
+			races = [['local', 30], ['common',1], ['uncommon',1]]
+		},
+		tasks = ['gather','elven_forest'],
+		actions = [],
+		tags = ['recruit_hard'],
+		event_pool = [],
+		background_pool = ['forest1'],
+		bgm = 'exploration',
+		travel_time = [1,1],
+		gather_resources = 'settlement_forest1_res',
+		area_shop_items = '',
+	},
+	settlement_mountains1 = {
+		code = 'settlement_mountains1',
+		type = 'settlement',
+		classname = 'settlement_small',
+		name = tr("VILLAGE_MOUNTAIN_QUEST1"),
+		races = [],
+		leader = '',
+		tasks = ['gather'],
+		tags = ['recruit_hard'],
+		actions = [],
+		event_pool = [],
+		background_pool = ['cave_3'],
+		bgm = 'exploration',
+		travel_time = [1,1],
+		gather_resources = 'settlement_mountains1_res',
+		area_shop_items = '',
+	},
+}
+
+
+
+var locationnames = {
+	settlement_plains11 = [tr("VILLAGE_HUMAN1"),tr("VILLAGE_HUMAN2"),tr("VILLAGE_HUMAN3"),tr("VILLAGE_HUMAN4"),tr("VILLAGE_HUMAN5"),tr("VILLAGE_HUMAN6"),tr("VILLAGE_HUMAN7"),tr("VILLAGE_HUMAN8"),tr("VILLAGE_HUMAN9"),tr("VILLAGE_HUMAN10"),tr("VILLAGE_HUMAN11")],
+	settlement_plains12 = [tr("VILLAGE_HUMAN2_1"),tr("VILLAGE_HUMAN2_2"),tr("VILLAGE_HUMAN2_3"),tr("VILLAGE_HUMAN2_4"),tr("VILLAGE_HUMAN2_5"),tr("VILLAGE_HUMAN2_6"),tr("VILLAGE_HUMAN2_7"),tr("VILLAGE_HUMAN2_8"),tr("VILLAGE_HUMAN2_9")],
+	village_human_quest = [tr("VILLAGE_HUMAN_QUEST1")],
+	bandit_fort_nouns = [tr("BANDIT_FORT_NOUNS1"),tr("BANDIT_FORT_NOUNS2"),tr("BANDIT_FORT_NOUNS3"),tr("BANDIT_FORT_NOUNS4"),tr("BANDIT_FORT_NOUNS5"),tr("BANDIT_FORT_NOUNS6")],
+	bandit_fort_adjs = [tr("BANDIT_FORT_ADJS1"),tr("BANDIT_FORT_ADJS2"),tr("BANDIT_FORT_ADJS3"),tr("BANDIT_FORT_ADJS4"),tr("BANDIT_FORT_ADJS5")],
+	rebel_redoubt_nouns = [tr("BANDIT_FORT_NOUNS1"),tr("BANDIT_FORT_NOUNS2"),tr("BANDIT_FORT_NOUNS3"),tr("BANDIT_FORT_NOUNS4"),tr("BANDIT_FORT_NOUNS5"),tr("BANDIT_FORT_NOUNS6")],
+	rebel_redoubt_adjs = [tr("BANDIT_FORT_ADJS1"),tr("BANDIT_FORT_ADJS2"),tr("BANDIT_FORT_ADJS3"),tr("BANDIT_FORT_ADJS4"),tr("BANDIT_FORT_ADJS5")],
+	goblin_stronghold_nouns = [tr("GOBLIN_STRONGHOLD_NOUNS1"),tr("GOBLIN_STRONGHOLD_NOUNS2"),tr("GOBLIN_STRONGHOLD_NOUNS3"),tr("GOBLIN_STRONGHOLD_NOUNS4"),tr("GOBLIN_STRONGHOLD_NOUNS5"),tr("GOBLIN_STRONGHOLD_NOUNS6"),tr("GOBLIN_STRONGHOLD_NOUNS7"),tr("GOBLIN_STRONGHOLD_NOUNS8"),tr("GOBLIN_STRONGHOLD_NOUNS9"),tr("GOBLIN_STRONGHOLD_NOUNS10")],
+	goblin_stronghold_adjs = [tr("GOBLIN_STRONGHOLD_ADJS1"),tr("GOBLIN_STRONGHOLD_ADJS2"),tr("GOBLIN_STRONGHOLD_ADJS3"),tr("GOBLIN_STRONGHOLD_ADJS4"),tr("GOBLIN_STRONGHOLD_ADJS5"),tr("GOBLIN_STRONGHOLD_ADJS6"),tr("GOBLIN_STRONGHOLD_ADJS7"),tr("GOBLIN_STRONGHOLD_ADJS8"),tr("GOBLIN_STRONGHOLD_ADJS9"),tr("GOBLIN_STRONGHOLD_ADJS10"),tr("GOBLIN_STRONGHOLD_ADJS11"),tr("GOBLIN_STRONGHOLD_ADJS12")],
+	goblin_cave_nouns = [tr("GOBLIN_CAVE_NOUNS1"),tr("GOBLIN_CAVE_NOUNS2"),tr("GOBLIN_CAVE_NOUNS3"),tr("GOBLIN_CAVE_NOUNS4"),tr("GOBLIN_CAVE_NOUNS5")],
+	goblin_cave_adjs = [tr("GOBLIN_CAVE_ADJS1"),tr("GOBLIN_CAVE_ADJS2"),tr("GOBLIN_CAVE_ADJS3"),tr("GOBLIN_CAVE_ADJS4"),tr("GOBLIN_CAVE_ADJS5"),tr("GOBLIN_CAVE_ADJS6"),tr("GOBLIN_CAVE_ADJS7")],
+	spider_lair_nouns = [tr("GOBLIN_CAVE_NOUNS1"),tr("GOBLIN_CAVE_NOUNS2"),tr("GOBLIN_CAVE_NOUNS3"),tr("GOBLIN_CAVE_NOUNS4"),tr("GOBLIN_CAVE_NOUNS5")],
+	spider_lair_adjs = [tr("GOBLIN_CAVE_ADJS1"),tr("GOBLIN_CAVE_ADJS2"),tr("GOBLIN_CAVE_ADJS3"),tr("GOBLIN_CAVE_ADJS4"),tr("GOBLIN_CAVE_ADJS5"),tr("GOBLIN_CAVE_ADJS6"),tr("GOBLIN_CAVE_ADJS7")],
+	bandit_den_nouns = [],
+	bandit_den_adjs = [],
+	grove_nouns = [tr("GROVE_NOUNS1"),tr("GROVE_NOUNS2"),tr("GROVE_NOUNS3"),tr("GROVE_NOUNS4"),tr("GROVE_NOUNS5"),tr("GROVE_NOUNS6"),tr("GROVE_NOUNS7"),tr("GROVE_NOUNS8"),tr("GROVE_NOUNS9"),tr("GROVE_NOUNS10"),tr("GROVE_NOUNS11")],
+	grove_adjs = [tr("GROVE_ADJS1"), tr("GROVE_ADJS2"), tr("GROVE_ADJS3"), tr("GROVE_ADJS4"), tr("GROVE_ADJS5"), tr("GROVE_ADJS6"), tr("GROVE_ADJS7"), tr("GROVE_ADJS8"), tr("GROVE_ADJS9"), tr("GROVE_ADJS10"), tr("GROVE_ADJS11")],
+	crypt_nouns = [tr("CRYPT_NOUNS1"),tr("CRYPT_NOUNS2"),tr("CRYPT_NOUNS3"),tr("CRYPT_NOUNS4"),tr("CRYPT_NOUNS5"),tr("CRYPT_NOUNS6"),tr("CRYPT_NOUNS7"),tr("CRYPT_NOUNS8")],
+	crypt_adjs = [tr("CRYPT_ADJS1"),tr("CRYPT_ADJS2"),tr("CRYPT_ADJS3"),tr("CRYPT_ADJS4"),tr("CRYPT_ADJS5"),tr("CRYPT_ADJS6"),tr("CRYPT_ADJS7"),tr("CRYPT_ADJS8"),tr("CRYPT_ADJS9"),tr("CRYPT_ADJS10"),tr("CRYPT_ADJS11"),tr("CRYPT_ADJS12"),tr("CRYPT_ADJS13"),tr("CRYPT_ADJS14")],
+	mountains_nouns = [tr("MOUNTAINS_NOUNS1"),tr("MOUNTAINS_NOUNS2"),tr("MOUNTAINS_NOUNS3"),tr("MOUNTAINS_NOUNS4"),tr("MOUNTAINS_NOUNS5"),tr("MOUNTAINS_NOUNS6"),tr("MOUNTAINS_NOUNS7"),tr("MOUNTAINS_NOUNS8")],
+	mountains_adjs = [tr("MOUNTAINS_ADJS1"),tr("MOUNTAINS_ADJS2"),tr("MOUNTAINS_ADJS3"),tr("MOUNTAINS_ADJS4"),tr("MOUNTAINS_ADJS5"),tr("MOUNTAINS_ADJS6"),tr("MOUNTAINS_ADJS7"),tr("MOUNTAINS_ADJS8"),tr("MOUNTAINS_ADJS9"),tr("MOUNTAINS_ADJS10")],
+	fire_depths_nouns = [tr("FIRE_DEPTHS_NOUNS1"),tr("FIRE_DEPTHS_NOUNS2"),tr("FIRE_DEPTHS_NOUNS3"),tr("FIRE_DEPTHS_NOUNS4"),tr("FIRE_DEPTHS_NOUNS5"),tr("FIRE_DEPTHS_NOUNS6")],
+	fire_depths_adjs = [],
+	city_nouns = [tr("CITY_NOUNS1"),tr("CITY_NOUNS2"),tr("CITY_NOUNS3"),tr("CITY_NOUNS4"),tr("CITY_NOUNS5")],
+	city_adjs =  [tr("CITY_ADJS1"),tr("CITY_ADJS2"),tr("CITY_ADJS3"),tr("CITY_ADJS4"),tr("CITY_ADJS5"),tr("CITY_ADJS6"),tr("CITY_ADJS7"),tr("CITY_ADJS8"),tr("CITY_ADJS9"),tr("CITY_ADJS10")],
+	ancient_jungle_nouns = [tr("ANCIENT_JUNGLES_NOUNS1"),tr("ANCIENT_JUNGLES_NOUNS2"),tr("ANCIENT_JUNGLES_NOUNS3"),tr("ANCIENT_JUNGLES_NOUNS4"),tr("ANCIENT_JUNGLES_NOUNS5"),tr("ANCIENT_JUNGLES_NOUNS6"),tr("ANCIENT_JUNGLES_NOUNS7"),tr("ANCIENT_JUNGLES_NOUNS8"),tr("ANCIENT_JUNGLES_NOUNS9")],
+	ancient_jungle_adjs = [tr("ANCIENT_JUNGLES_ADJS1"),tr("ANCIENT_JUNGLES_ADJS2"),tr("ANCIENT_JUNGLES_ADJS3"),tr("ANCIENT_JUNGLES_ADJS4"),tr("ANCIENT_JUNGLES_ADJS5"),tr("ANCIENT_JUNGLES_ADJS6"),tr("ANCIENT_JUNGLES_ADJS7"),tr("ANCIENT_JUNGLES_ADJS8"),tr("ANCIENT_JUNGLES_ADJS9"),tr("ANCIENT_JUNGLES_ADJS10"),tr("ANCIENT_JUNGLES_ADJS11"),tr("ANCIENT_JUNGLES_ADJS12")],
+}
+
+
+var dungeonnoun = [tr("DUNGEONNOUN1"),tr("DUNGEONNOUN2"),tr("DUNGEONNOUN3"),tr("DUNGEONNOUN4"),tr("DUNGEONNOUN5"),tr("DUNGEONNOUN6"),tr("DUNGEONNOUN7"),tr("DUNGEONNOUN8"),tr("DUNGEONNOUN9"),tr("DUNGEONNOUN10"),tr("DUNGEONNOUN11"),tr("DUNGEONNOUN12"),tr("DUNGEONNOUN13"),tr("DUNGEONNOUN14"),tr("DUNGEONNOUN15")]
+var dungeonadj = [tr("DUNGEONADJ1"),tr("DUNGEONADJ2"),tr("DUNGEONADJ3"),tr("DUNGEONADJ4"),tr("DUNGEONADJ5"),tr("DUNGEONADJ6"),tr("DUNGEONADJ7"),tr("DUNGEONADJ8"),tr("DUNGEONADJ9"),tr("DUNGEONADJ10"),tr("DUNGEONADJ11"),tr("DUNGEONADJ12"),tr("DUNGEONADJ13"),tr("DUNGEONADJ14"),tr("DUNGEONADJ15"),tr("DUNGEONADJ16")]
+
+
+var eventscrits = { #not used
+
+	bandits_threat_quest = {
+		reqs = [],
+		event_start = [
+			{
+				effects = [],
+				action = 'choice_event',
+				text = tr("BANDITS_THREAT_QUEST_TEXT1"),
+				reqs = [],
+				options = [
+					{text = tr("BANDITS_THREAT_QUEST_TEXT2"), reqs = [], follow_up = 'event_fight'},
+				],
+			},
+			],
+		event_fight = [
+			{
+				action = 'start_fight',
+				value = 'bandits_group',
+				wineffects = [{code = 'quest_complete'}],
+			}
+			]
+	},
+	meet_adventurer_at_dungeon_event = {
+		reqs = [],
+		event_start = [
+			{
+				effects = [{code = 'generate_event_stranger'}],
+				action = 'choice_event',
+				text = tr("MEET_ADVENTURER_AT_DUNGEON_EVENT_TEXT1"),
+				reqs = [],
+				options = [
+					{text = tr("MEET_ADVENTURER_AT_DUNGEON_EVENT_TEXT2"), reqs = [], follow_up = 'event_fight'},
+				],
+			}
+
+		],
+
+
+	}
+
+}
+
+
+
+var random_dungeon_events = {
+	cali_intro_event = {
+		event = 'cali_intro',
+		reqs = [{type = 'dialogue_seen', check = false, value = 'CALI_INTRO'}],
+		dungeons = ["dungeon_bandit_den"],
+		chance = 0.75
+	},
+	lira_elven_capital = {
+		event = 'lira_lost_start',
+		reqs = [{type = 'event_seen', check = false, value = 'lira_lost_start'}],#probably not necessary
+		dungeons = ["dungeon_grove"],
+		chance = 0.75
+	},
+	event_nixx_hideout = {
+		event = 'kuro3_dungeon_1',
+		reqs = [{type = 'event_seen', check = false, value = 'kuro3_dungeon_1'}],#probably not necessary
+		dungeons = ["quest_dungeon_kuro3"],
+		chance = 1,
+		levels = [-1]
+	},
+#	event1 = {
+#		event = 'eventname',#event code to launch
+#		reqs = [],#checks before event could spawn
+#		dungeons = ['dungeon_bandit_den'],#dungeons, which might have this event added on generation
+#		levels = [1,2,3], #optional
+#		}
+}
+
+var fixed_location_options = { #override serialized data
+	aliron = [
+		{
+			text = tr("ACT4_SEBASTIAN_ALIRON_OPTION_REPORT_KHARZUG"),
+			reqs = [{type = 'active_quest_stage', value = 'sebastian_railroad_quest', stage = 'report_kharzug'}],
+			args = [{code = 'start_event', data = 'act4_sebastian_report_kharzug_1', args = []}]
+		},
+		{
+			text = tr("ACT4_SEBASTIAN_ALIRON_OPTION_SEBASTIAN"),
+			reqs = [{type = 'active_quest_stage', value = 'sebastian_railroad_quest', stage = 'return_ginny_refusal'}],
+			args = [{code = 'start_event', data = 'act4_sebastian_return_ginny_refusal_1', args = []}]
+		},
+		{
+			text = tr("ACT4_SEBASTIAN_ALIRON_OPTION_NEW_CHURCH"),
+			reqs = [{type = 'active_quest_stage', value = 'sebastian_railroad_quest', stage = 'new_church_site'}],
+			args = [{code = 'start_event', data = 'act4_sebastian_new_church_opening_1', args = []}]
+		},
+		{
+			text = tr("ACT4_SEBASTIAN_ALIRON_OPTION_WAREHOUSE"),
+			reqs = [{type = 'active_quest_stage', value = 'sebastian_railroad_quest', stage = 'find_warehouse_owner'}],
+			args = [{code = 'start_event', data = 'act4_sebastian_find_warehouse_owner_1', args = []}]
+		},
+		{
+			text = tr("ACT4_SEBASTIAN_ALIRON_OPTION_WAREHOUSE"),
+			reqs = [{type = 'active_quest_stage', value = 'sebastian_railroad_quest', stage = 'buy_warehouse'}],
+			args = [{code = 'start_event', data = 'act4_sebastian_revisit_warehouse_owner', args = []}]
+		},
+		{
+			text = tr("LIRA_QUEST2_CITY_OPTION"),
+			reqs = [{type = 'active_quest_stage', value = 'lira_quest_2', stage = 'fair', state = true}],
+			args = [{code = 'start_event', data = 'lira_quest2_fair_arrival', args = []}]
+		},
+		{
+			text = tr("LIRA_QUEST3_ALIRON_TRADER_OPTION"),
+			reqs = [{type = 'active_quest_stage', value = 'lira_quest_3', stage = 'trader', state = true}],
+			args = [{code = 'start_event', data = 'lira_quest3_trader_1', args = []}]
+		},
+#		{
+#			text = tr('ARENA_NAME'),
+#			reqs = [],
+#			args = [{code = 'open_arena'}]
+#		},
+		{
+			text = tr("ALIRON1"), 
+			reqs = [
+				{type = 'event_seen', check = false, value = 'daisy_meet'},
+				{type = 'active_quest_stage', value = 'guilds_introduction', stage = 'start', state = false}, 
+				{type = "date", operant = 'gte', value = 3}
+			], 
+			args = [{code = 'start_event', data = 'daisy_meet', args = []}]
+		},
+		{
+			text = tr("ALIRON2"), 
+			reqs = [
+				{type = 'event_seen', check = false, value = 'reim_encounter'},
+				{type = 'active_quest_stage', value = 'workers_election_quest', stage = 'stage1'}
+			], 
+			args = [{code = 'start_event', data = 'reim_encounter', args = []}]
+		},
+		{
+			text = tr("ALIRON3"), 
+			reqs = [
+				{type = 'event_seen', check = false, value = 'fred_intro'},
+				{type = 'active_quest_stage', value = 'civil_war_start', stage = 'stage2'}
+			], 
+			args = [{code = 'start_event', data = 'fred_intro', args = []}]
+		},
+		{
+			text = tr("ALIRON4"), 
+			reqs = [
+				{type = 'event_seen', check = false, value = 'fred_bribe_take'},
+				{type = 'decision', value = 'fred_bribe_taken', check = true}
+			], 
+			args = [{code = 'start_event', data = 'fred_bribe_take', args = []}]
+		},
+		{
+			text = tr("ALIRON5"), 
+			reqs = [
+				{type = 'decision', value = 'ginny_visit', check = true}, 
+				{type = 'dialogue_seen', check = false, value = 'ALIRONCHURCHFIRSTCOME'},
+				{type = 'active_quest_stage', value = 'jean_ruins_quest', stage = 'stage1', state = false},
+				{type = 'active_quest_stage', value = 'jean_sylas_quest', stage = 'stage13', state = false},
+			], 
+			args = [{code = 'start_event', data = 'aliron_church_firstcome', args = []}]
+		},
+		{ #cause document's wording is 'trigger: enter church', not 'church option'
+			text = tr("ALIRON6"), 
+			reqs = [
+				{type = 'active_quest_stage', value = 'jean_ruins_quest', stage = 'stage1', state = true}
+			], 
+			args = [{code = 'start_event', data = 'jean_q2_church', args = []}]
+		},
+		{ #i think of this as the same as above 
+			text = tr("ALIRON6"), 
+			reqs = [
+				{type = 'active_quest_stage', value = 'jean_sylas_quest', stage = 'stage13', state = true}
+			], 
+			args = [{code = 'start_event', data = 'jean_sylas_church_event_1', args = []}]
+		},
+		{
+			text = tr("ALIRON6"), 
+			reqs = [
+				{type = 'dialogue_seen', check = true, value = 'ALIRONCHURCHFIRSTCOME'},
+				{type = 'active_quest_stage', value = 'jean_ruins_quest', stage = 'stage1', state = false},
+				{type = 'active_quest_stage', value = 'jean_sylas_quest', stage = 'stage13', state = false},
+			], 
+			args = [{code = 'start_event', data = 'aliron_church_enter', args = []}]
+		},
+		{
+			text = tr("ALIRON7"), 
+			reqs = [{type = 'active_quest_stage', value = 'lead_convoy_quest', stage = 'stage2'}], 
+			args = [{code = 'start_event', data = 'after_mines_convoy_1', args = []}]
+		},
+		{
+			text = tr("ALIRON8"), 
+			reqs = [
+				{type = 'active_quest_stage', value = 'princess_search', stage = 'stage2'},
+				{type = 'dialogue_seen', check = true, value = 'SEARCH_FIGHTERS_3'},
+				{type = 'dialogue_seen', check = false, value = 'SEARCH_DUNGEON_1'}
+			], 
+			args = [{code = 'start_event', data = 'princess_search_dungeon_1', args = []}]
+		},
+		{
+			text = tr("ALIRON9"), 
+			reqs = [
+				{type = 'active_quest_stage', value = 'princess_persuasion', stage = 'stage1'}, 
+				{type = 'decision', value = 'AnastasiaPersuasionNextday', check = false},
+				{type = 'decision', value = 'persuade_1_completed', check = false}
+			],
+			args = [{code = 'start_event', data = 'princess_persuation_init', args = []}]
+		},
+		{
+			text = tr("ALIRON10"), 
+			reqs = [
+				{type = 'active_quest_stage', value = 'princess_persuasion', stage = 'stage1'}, 
+				{type = 'decision', value = 'AnastasiaPersuasionNextday', check = true}
+			], 
+			args = [{code = 'start_event', data = 'princess_persuation_2_init', args = []}]
+		},
+		{
+			text = tr("ALIRON11"), 
+			reqs = [
+				{type = 'active_quest_stage', value = 'gryphon_quest', stage = 'stage2'},
+				{type = 'dialogue_seen', check = false, value = 'GRYPHON_HUNTER_START'}
+			], 
+			args = [{code = 'start_event', data = 'gryphon_hunter_start', args = []}]
+		},
+		{
+			text = tr("ALIRON12"),
+			reqs = [{type = 'active_quest_stage', value = 'pre_sword_artifact_quest', stage = 'stage1', state = true},
+				{type = 'decision', value = 'ZephyraRefused', check = false}],
+			args = [{code = 'start_event', data = 'zephyra_recruitment_1', args = []}]
+		},
+		{
+			text = tr("ALIRON13"), 
+			reqs = [{type = 'active_quest_stage', value = 'cali_heirloom_quest', stage = 'stage4', state = true}], 
+			args = [{code = 'start_event', data = 'cali_william_init', args = []}]
+		},
+		{
+			text = tr("ALIRON14"), 
+			reqs = [{type = 'active_quest_stage', value = 'cali_heirloom_quest', stage = 'stage5', state = true}], 
+			args = [{code = 'start_event', data = 'cali_william_1', args = []}]
+		},
+		{
+			text = tr("ALIRON15"), 
+			reqs = [{type = 'active_quest_stage', value = 'cali_heirloom_quest', stage = 'stage6', state = true}], 
+			args = [{code = 'start_event', data = 'cali_william_3', args = []}]
+		},
+		{
+			text = tr("ALIRON16"), 
+			reqs = [{type = 'active_quest_stage', value = 'cali_taming_quest', stage = 'stage12', state = true}], 
+			args = [{code = 'start_event', data = 'cali_act4_merchant_1', args = []}]
+		},
+		{
+			text = tr("ALIRON17"), 
+			reqs = [{type = 'active_quest_stage', value = 'cali_taming_quest', stage = 'stage13', state = true}], 
+			args = [{code = 'start_event', data = 'cali_act4_merchant_5', args = []}]
+		},
+		{
+			text =tr("ALIRON18"), 
+			reqs = [{type = 'active_quest_stage', value = 'cali_taming_quest', stage = 'stage15', state = true}], 
+			args = [{code = 'start_event', data = 'cali_act5_pet_1', args = []}]
+		},
+		{
+			text = tr("ALIRON19"), 
+			reqs = [
+				{code = 'value_check', type = 'event_seen', check = false, value = 'lilia_search_start'},
+				{code = 'value_check', type = 'dialogue_seen', check = true, value = 'PRIESTESS_SWORD_TALK_1_1'}
+			], 
+			args = [{code = 'start_event', data = 'lilia_search_start', args = []}]
+		},
+		{
+			text = tr("ALIRON24"),
+			reqs = [
+					{type = 'decision', value = 'start_corruptive_essence_reward', check = false},
+					{type = 'decision', value = 'aliron_corruptive_essence_event_seen', check = false}
+			],
+			args = [{code = 'start_event', data = 'aliron_corruptive_essence_event', args = []}]
+		},
+		#Legacy event after act 3
+#		{ 
+#			text = tr("ALIRON20"), 
+#			reqs = [
+#				{code = 'value_check', type = 'dialogue_seen', check = false, value = 'GOBLIN_QUEST_HARA_1'},
+#				{type = 'quest_completed', name = 'goblin_quest', check = true}
+#			], 
+#			args = [{code = 'start_event', data = 'goblin_quest_hara_1', args = []}]
+#		},
+		{
+			text = tr("ALIRON21"), 
+			reqs = [
+				{type = 'active_quest_stage', value = 'zephyra_disappearance_quest', stage = 'stage1', state = true}
+			], 
+			args = [{code = 'start_event', data = 'zephyra_disappearance_2', args = []}]
+		},{
+			text = tr("ALIRON22"), 
+			reqs = [
+				{type = 'active_quest_stage', value = 'zephyra_disappearance_quest', stage = 'stage3', state = true}, {type = 'dialogue_seen', check = true, value = 'ZEPHYRA_DISAPPEARANCE_KETCH_1'}
+			], 
+			args = [{code = 'start_event', data = 'zephyra_disappearance_ketch_2', args = []}]
+		},
+		{
+			text = tr("ALIRON23"), #change
+			reqs = [
+				{type = 'active_quest_stage', value = 'amelia_main_quest', stage = 'stage2', state = true}
+			], 
+			args = [{code = 'start_event', data = 'amelia_slave1_1', args = []}]
+		},
+		{
+			text = tr("ALIRON23"), #change
+			reqs = [
+				{type = 'active_quest_stage', value = 'amelia_main_quest', stage = 'stage4', state = true}
+			], 
+			args = [{code = 'start_event', data = 'amelia_slave2_1', args = []}]
+		},
+		{
+			text = tr("ALIRON23"), #change
+			reqs = [
+				{type = 'active_quest_stage', value = 'amelia_main_quest', stage = 'stage6', state = true}
+			], 
+			args = [{code = 'start_event', data = 'amelia_slave3_1', args = []}]
+		},
+		{
+			text = tr("ALIRON_KURO_CHURCH"),
+			reqs = [
+				{type = 'active_quest_stage', value = 'kuro_errand_quest', stage = 'church'}
+			], 
+			args = [{code = 'start_event', data = 'kuro_church_note', args = []}]
+		},
+		{
+			text = tr("MEET_LIORA"),
+			reqs = [
+				{type = 'active_quest_stage', value = 'anastasia_quest', stage = 'stage2'}
+			], 
+			args = [{code = 'start_event', data = 'liora_1', args = []}]
+		},
+		{
+			text = tr("MEET_LIORA"),
+			reqs = [
+				{type = 'active_quest_stage', value = 'anastasia_quest', stage = 'stage5'}
+			], 
+			args = [{code = 'start_event', data = 'liora_return', args = []}]
+		},
+		{
+			text = tr("MAE_MARKET_OPTION"),
+			reqs = [
+				{type = 'active_quest_stage', value = 'mae_city_quest', stage = 'stage0'}
+			], 
+			args = [{code = 'start_event', data = 'mae_market_start', args = []}]
+		},
+		{
+			text = tr("MAE_SHELIA_OPTION"),
+			reqs = [
+				{type = 'active_quest_stage', value = 'mae_city_quest', stage = 'stage1'}
+			], 
+			args = [{code = 'start_event', data = 'mae_friend_visit_1', args = []}]
+		},
+		{
+			text = tr("MAE_POTION_OPTION"),
+			reqs = [
+				{type = 'active_quest_stage', value = 'mae_city_quest', stage = 'stage3'}
+			], 
+			args = [{code = 'start_event', data = 'mae_friend_visit_2_start', args = []}]
+		},
+	],
+	elf_capital = [
+		{
+			text = tr("LIRA_QUEST3_ELF_TEMPLE_OPTION"),
+			reqs = [
+				{type = 'active_quest_stage', value = 'lira_quest_3', stage = 'temple', state = true},
+				{type = "decision", value = "lira3canVisitTemple", check = true}
+			],
+			args = [{code = 'start_event', data = 'lira_quest3_temple_1', args = []}]
+		},
+		{
+			text = tr("ELF_CAPITAL1"), 
+			reqs = [
+				{type = 'active_quest_stage', value = 'princess_search', stage = 'stage3'},
+				{type = 'decision', value = 'PrincessDead', check = false}, 
+				{type = 'decision', value = 'PrincessObtained', check = false}
+			], 
+			args = [{code = 'start_event', data = 'looking_for_princess_elven_1', args = []}]
+		},
+		{
+			text =  tr("ELF_CAPITAL2"), 
+			reqs = [
+				{type = 'active_quest_stage', value = 'amelia_herbs_quest', stage = 'stage2'}, 
+				{type = 'quest_completed', name = 'getting_lira_quest', check = false}
+			],
+			args = [{code = 'start_event', data = 'amelia_herbs_elf_start_1', args = []}]
+		},
+		{
+			text =  tr("ELF_CAPITAL3"), 
+			reqs = [
+				{type = 'active_quest_stage', value = 'amelia_herbs_quest', stage = 'stage2'}, 
+				{type = 'quest_completed', name = 'getting_lira_quest', check = true}, 
+				{type = 'decision', value = 'LiraPriestess', check = true}
+			], 
+			args = [{code = 'start_event', data = 'amelia_herbs_elf_quest1', args = []}]
+		},
+		{
+			text =  tr("ELF_CAPITAL4"), 
+			reqs = [
+				{type = 'active_quest_stage', value = 'amelia_herbs_quest', stage = 'stage2'}, 
+				{type = 'quest_completed', name = 'getting_lira_quest', check = true}, {type = 'decision', value = 'HelevielPriestess', check = true}
+			], 
+			args = [{code = 'start_event', data = 'amelia_herbs_elf_quest2_1', args = []}]
+		},
+		{
+			text =  tr("ELF_CAPITAL5"), 
+			reqs = [{type = 'active_quest_stage', value = 'sword_artifact_quest', stage = 'stage2', state = true}], 
+			args = [{code = 'start_event', data = 'priestess_sword_talk_1', args = []}]
+		},
+		{
+			 text =  tr("ELF_CAPITAL6"), 
+			reqs = [
+				{type = 'active_quest_stage', value = 'sword_artifact_quest', stage = 'stage16', check = true}, 
+				{code = 'value_check', type = 'dialogue_seen', check = false, value = 'PRIESTESS_TALK_START'}
+			], 
+			args = [{code = 'start_event', data = 'priestess_talk_start', args = []}]
+		},
+		{
+			text =  tr("ELF_CAPITAL7"), 
+			reqs = [
+				{code = 'value_check', type = 'dialogue_seen', check = true, value = 'PRIESTESS_TALK_START'}, 
+				{type = 'active_quest_stage', value = 'temple_quest', stage = 'stage1', state = true}
+			], 
+			args = [{code = 'start_event', data = 'after_temple_priestess_1', args = []}]
+		},
+		{
+			text =  tr("ELF_CAPITAL8"), 
+			reqs = [{type = 'active_quest_stage', value = 'temple_quest', stage = 'stage2', state = true}], 
+			args = [{code = 'start_event', data = 'after_temple_priestess_3', args = []}]
+		},
+		{
+			text = tr("MAE_LORIEN_OPTION"),
+			reqs = [
+				{type = "decision", value = "mae_druid_lorien_unlocked", check = true},
+				{type = "decision", value = "mae_druid_offer_pending", check = true},
+				{type = "unique_available", name = "mae", check = true}
+			],
+			args = [{code = "start_event", data = "mae_druid_lorien_reinitiate", args = []}]
+		},
+		{
+			text = tr("MAE_LORIEN_OPTION"),
+			reqs = [
+				{type = "decision", value = "mae_druid_lorien_unlocked", check = true},
+				{type = "decision", value = "mae_druid_offer_pending", check = false},
+				{type = "unique_available", name = "mae", check = true}
+			],
+			args = [{code = "start_event", data = "mae_druid_lorien_intro", args = []}]
+		},
+		{
+			text =  tr("ELF_CAPITAL9"), 
+			reqs = [
+				{type = 'active_quest_stage', value = 'getting_lira_quest', stage = 'stage2', state = true}, 
+				{code = 'value_check', type = 'dialogue_seen', check = false, value = 'LIRA_ENCOUNTER_1'}
+			], 
+			args = [{code = 'start_event', data = 'lira_encounter_1', args = []}]
+		},
+		{
+			text =  tr("ELF_CAPITAL10"), 
+			reqs = [
+				#TODO: recheck this reqs! orflag here means ((1 and 2) or 3)
+				{code = 'value_check', type = 'dialogue_seen', check = true, value = 'LIRA_ENCOUNTER_1'},
+				{type = 'active_quest_stage', value = 'getting_lira_quest', stage = 'stage2', state = true}, 
+				{type = 'active_quest_stage', value = 'getting_lira_quest', stage = 'stage3', state = true, orflag = true}
+			], 
+			args = [{code = 'start_event', data = 'lira_encounter_4', args = []}]
+		},
+		{
+			text =  tr("ELF_CAPITAL11"), 
+			reqs = [{type = 'active_quest_stage', value = 'getting_lira_quest', stage = 'stage5', state = true}], 
+			args = [{code = 'start_event', data = 'erlen_leon_1', args = []}]
+		},
+		{
+			text =  tr("ZEPHYRA_COSTUME_1_OPTION_1"), 
+			reqs = [{type = "quest_completed", name = "sword_artifact_quest", check = true},
+			{code = 'value_check', type = 'dialogue_seen', check = false, value = 'ZEPHYRA_COSTUME_2'}], 
+			args = [{code = 'start_event', data = 'zephyra_costume_1', args = []}]
+		},
+		{
+			text =  tr("ELF_CAPITAL_SACRED_SAP"),
+			reqs = [
+				{type = 'active_quest_stage', value = 'hara_scales_quest', stage = 'get_sap'},
+				{type = 'decision', value = 'HelevielPriestess', check = true}
+			],
+			args = [{code = 'start_event', data = 'sacred_sap_heleviel_start', args = []}]
+		},
+		{
+			text =  tr("ELF_CAPITAL_SACRED_SAP"),
+			reqs = [
+				{type = 'active_quest_stage', value = 'hara_scales_quest', stage = 'get_sap'},
+				{type = 'decision', value = 'LiraPriestess', check = true}
+			],
+			args = [{code = 'start_event', data = 'sacred_sap_erlen_start', args = []}]
+		},
+		{
+			text =  tr("ELF_CAPITAL_SACRED_SAP"),
+			reqs = [
+				{type = 'active_quest_stage', value = 'hara_scales_quest', stage = 'l_price'}
+			],
+			args = [{code = 'start_event', data = 'sacred_sap_lira_3', args = []}]
+		},
+		{
+			text =  tr("ELF_CAPITAL_DRUIDS_LOUNGE"),
+			reqs = [
+				{type = 'has_active_quest', name = 'meteorite_quest', check = false},
+				{type = 'quest_completed', name = 'meteorite_quest', check = false}
+			],
+			args = [{code = 'start_event', data = 'meteor_lounge_start', args = []}]
+		},
+		{
+			text =  tr("ELF_CAPITAL_DRUIDS_LOUNGE"),
+			reqs = [
+				{type = 'active_quest_stage', value = 'meteorite_quest', stage = 'return_meteor'}
+			],
+			args = [{code = 'start_event', data = 'meteor_lounge_return', args = []}]
+		},
+		{
+			text = tr("HELEVIEL_CITY_OPTION_3"), 
+			reqs = [{type = 'active_quest_stage', value = 'heleviel_quest3', stage = 'stage5'}], 
+			args = [{code = 'start_event', data = 'heleviel_slave_ritual_erlen', args = []}]
+		},
+		{
+			text = tr("HELEVIEL_CITY_OPTION_4"), 
+			reqs = [
+				{type = 'active_quest_stage', value = 'heleviel_quest3', stage = 'stage5_3'},
+				{type = "has_money", value = 2500}
+			], 
+			args = [{code = 'start_event', data = 'heleviel_slave_ritual_pay_after', args = []}]
+		},
+		{
+			text = tr("HELEVIEL_CITY_OPTION_5"),
+			reqs = [{type = 'active_quest_stage', value = 'heleviel_quest3', stage = 'stage6'}],
+			args = [{code = 'start_event', data = 'heleviel_slave_ritual_ceremony_intro', args = []}]
+		},
+		{
+			text = tr("ACT4_ERDYNA_ELF_CAPITAL_OPT_LINEAGE"),
+			reqs = [{type = 'active_quest_stage', value = 'erdyna_quest', stage = 'dragonhunters'}],
+			args = [{code = 'start_event', data = 'act4_erdyna_lineage_1', args = []}]
+		},
+	],
+	dwarf_capital = [
+		{
+			text = tr("ACT4_SEBASTIAN_DWARF_CAPITAL_OPTION_HARA"),
+			reqs = [
+				{type = 'active_quest_stage', value = 'sebastian_railroad_quest', stage = 'find_technician'},
+				{type = 'decision', value = 'TempRecruitHara', check = true}
+			],
+			args = [{code = 'start_event', data = 'act4_sebastian_hara_capital_1', args = []}]
+		},
+		{
+			text = tr("ACT4_SEBASTIAN_DWARF_CAPITAL_OPTION_KARGUN"),
+			reqs = [
+				{type = 'active_quest_stage', value = 'sebastian_railroad_quest', stage = 'find_technician'},
+				{type = 'decision', value = 'TempRecruitHara', check = false},
+				{type = 'decision', value = 'Act4SebastianKargunRefused', check = false}
+			],
+			args = [{code = 'start_event', data = 'act4_sebastian_kargun_intro_1', args = []}]
+		},
+		{
+			text = tr("ACT4_SEBASTIAN_DWARF_CAPITAL_OPTION_KARGUN_RETURN"),
+			reqs = [
+				{type = 'active_quest_stage', value = 'sebastian_railroad_quest', stage = 'find_technician'},
+				{type = 'decision', value = 'Act4SebastianKargunRefused', check = true}
+			],
+			args = [{code = 'start_event', data = 'act4_sebastian_kargun_return', args = []}]
+		},
+		{
+			text = tr("ACT4_SEBASTIAN_DWARF_CAPITAL_OPTION_TECHNICIAN"),
+			reqs = [
+				{type = 'active_quest_stage', value = 'sebastian_railroad_quest', stage = 'investigate_trouble'},
+				{type = 'decision', value = 'Act4SebastianTechnicianHara', check = true}
+			],
+			args = [{code = 'start_event', data = 'act4_sebastian_trouble_hara_1', args = []}]
+		},
+		{
+			text = tr("ACT4_SEBASTIAN_DWARF_CAPITAL_OPTION_TECHNICIAN"),
+			reqs = [
+				{type = 'active_quest_stage', value = 'sebastian_railroad_quest', stage = 'investigate_trouble'},
+				{type = 'decision', value = 'Act4SebastianTechnicianKargun', check = true}
+			],
+			args = [{code = 'start_event', data = 'act4_sebastian_trouble_kargun_1', args = []}]
+		},
+		{
+			text = tr("ACT4_SEBASTIAN_DWARF_CAPITAL_OPTION_TECHNICIAN"),
+			reqs = [
+				{type = 'active_quest_stage', value = 'sebastian_railroad_quest', stage = 'return_to_technician'},
+				{type = 'decision', value = 'Act4SebastianTechnicianHara', check = true}
+			],
+			args = [{code = 'start_event', data = 'act4_sebastian_return_hara', args = []}]
+		},
+		{
+			text = tr("ACT4_SEBASTIAN_DWARF_CAPITAL_OPTION_TECHNICIAN"),
+			reqs = [
+				{type = 'active_quest_stage', value = 'sebastian_railroad_quest', stage = 'return_to_technician'},
+				{type = 'decision', value = 'Act4SebastianTechnicianKargun', check = true}
+			],
+			args = [{code = 'start_event', data = 'act4_sebastian_return_kargun', args = []}]
+		},
+		{
+			text = tr("DWARF_PALACE"),
+			reqs = [{type = 'any_quest_stage', value = 'visit_dwarfs_quest', stages = ['audience', 'jean']}],
+			args = [{code = 'start_event', data = 'dwarf_palace_first', args = []}]
+		},{
+			text = tr("INFINITEDUNGEONUNLOCK"),
+			reqs = [{code = 'value_check', type = 'event_seen', check = false, value = 'unlock_infinite_dungeon'}],
+			args = [{code = 'start_event', data = 'unlock_infinite_dungeon', args = []}]
+		}, {
+			text = tr("DWARF_PALACE"),
+			reqs = [{type = 'active_quest_stage', value = 'dking_hara_quest', stage = 'visit'}],
+			args = [{code = 'start_event', data = 'dking_second_task_start', args = []}]
+		},{
+			text = tr("DWARF_PALACE"),
+			reqs = [{type = 'active_quest_stage', value = 'hara_scales_quest', stage = 'visit'}],
+			args = [{code = 'start_event', data = 'dwarf_ceremony_intro', args = []}]
+		},{
+			text = tr("DWARF_PALACE"),
+			reqs = [{type = "has_active_quest", name = "jean_free_quest", check = true}],
+			args = [{code = 'start_event', data = 'dwarf_aftermatch_jean_return', args = []}]
+		},{
+			text = tr("DWARF_CAPITAL_JEAN"),
+			reqs = [{type = 'decision', value = 'TempRecruitJean', check = true}],
+			args = [{code = 'start_event', data = 'jean_recruit_start', args = []}]
+		},{
+			text = tr("DWARF_CAPITAL_SHIMORE"),
+			reqs = [{type = 'any_quest_stage', value = 'hara_scales_quest', stages = ['get_ore','get_gold']}],
+			args = [{code = 'start_event', data = 'shimmering_ore_start', args = []}]
+		},{
+			text = tr("DWARF_WORKSHOP"),
+			reqs = [
+				{type = "quest_completed", name = "hara_scales_quest", check = false}
+			],
+			args = [{code = 'start_event', data = 'dwarf_workshop', args = []}]
+		},{
+			text = tr("DWARF_WORKSHOP"),
+			reqs = [{type = 'decision', value = 'TempRecruitHara', check = true}],
+			args = [{code = 'start_event', data = 'hara_recruit_start', args = []}]
+		},{
+			text = tr("DWARF_TAVERN"),
+			reqs = [
+				{type = 'any_quest_stage', value = 'visit_dwarfs_quest', stages = ['tavern', 'jean']},
+				{type = 'event_seen', check = false, value = 'dwarf_tavern_bark_after_fight'},
+				{type = 'event_seen', check = false, value = 'dwarf_tavern_bark_leave'},
+			],
+			args = [{code = 'start_event', data = 'dwarf_tavern', args = []}]
+		},{
+			text = tr("DWARF_TAVERN"),
+			reqs = [
+				{type = 'quest_completed', name = 'visit_dwarfs_quest', check = true}
+#				{type = 'active_quest_stage', value = 'dking_hara_quest', stage = 'rebeltavern'}
+			],
+			args = [{code = 'start_event', data = 'dwarf_tavern', args = []}]
+		},{
+			text = tr("DWARF_PRISON"),
+			reqs = [{type = 'active_quest_stage', value = 'dking_hara_quest', stage = 'info'}],
+			args = [{code = 'start_event', data = 'dwarf_prison_start', args = []}]
+		},{
+			text = tr("DWARF_PRISON"),
+			reqs = [{type = 'decision', value = 'TempRecruitKuro', check = true}],
+			args = [{code = 'start_event', data = 'kuro_recruit_start', args = []}]
+		},{
+			text = tr("DWARF_CAPITAL_SEARCH"),
+			reqs = [
+				{type = 'active_quest_stage', value = 'dking_hara_quest', stage = 'tracks'},
+				{type = 'event_seen', check = false, value = 'dwarf_search'}
+			],
+			args = [{code = 'start_event', data = 'dwarf_search', args = []}]
+		},{
+			text = tr("DWARF_CAPITAL_WHISKEY"),
+			reqs = [{type = 'active_quest_stage', value = 'kuro_tome_quest', stage = 'capital'}],
+			args = [{code = 'start_event', data = 'kuro_whiskey_market', args = []}]
+		},{
+			text = tr("DWARF_CAPITAL_WHISKEY2"),
+			reqs = [{type = 'active_quest_stage', value = 'kuro_tome_quest', stage = 'bottle'}],
+			args = [{code = 'start_event', data = 'kuro_whiskey_homebrew', args = []}]
+		},{
+			text = tr("DWARF_CAPITAL_DURIM"),
+			reqs = [{type = 'active_quest_stage', value = 'meteorite_quest', stage = 'search_durim'}],
+			args = [{code = 'start_event', data = 'meteor_durim_start', args = []}]
+		}
+	],
+	quest_kharzug_deep = [
+		{
+			text = tr("ACT4_SEBASTIAN_DWARF_CAPITAL_OPTION_KHARZUG"),
+			reqs = [{type = 'active_quest_stage', value = 'sebastian_railroad_quest', stage = 'investigate_kharzug'}],
+			args = [{code = 'start_event', data = 'act4_sebastian_kharzug_arrive_1', args = []}]
+		},
+		{
+			text = tr("ACT4_SEBASTIAN_DWARF_CAPITAL_OPTION_TOMB"),
+			reqs = [{type = 'active_quest_stage', value = 'sebastian_railroad_quest', stage = 'clear_lower_tomb'}],
+			args = [{code = 'start_event', data = 'act4_sebastian_kharzug_tomb_1', args = []}]
+		}
+	],
+	beastkin_capital = [
+		{
+			text = tr("BEASTKIN_CAPITAL1"), 
+			reqs = [{type = 'active_quest_stage', value = 'sword_artifact_quest', stage = 'stage3', state = true}], 
+			args = [{code = 'start_event', data = 'chieftain_meeting_1', args = []}]
+		},
+		{
+			text = tr("BEASTKIN_CAPITAL2"), 
+			reqs = [{type = 'active_quest_stage', value = 'sword_artifact_quest', stage = 'stage4', state = true}], 
+			args = [{code = 'start_event', data = 'mae_meeting_1', args = []}]
+		},
+		{
+			text = tr("BEASTKIN_CAPITAL3"), 
+			reqs = [{type = 'active_quest_stage', value = 'sword_artifact_quest', stage = 'stage5', state = true}], 
+			args = [{code = 'start_event', data = 'savra_supplies_start', args = []}]
+		},
+		{
+			text = tr("BEASTKIN_CAPITAL4"), 
+			reqs = [
+				{type = 'active_quest_stage', value = 'sword_artifact_quest', stage = 'stage6', state = true}, 
+				{type = 'decision', value = 'canStartRitualPrep', check = true}
+			], 
+			args = [{code = 'start_event', data = 'savra_ritual_start', args = []}]
+		},
+		{
+			text = tr("BEASTKIN_CAPITAL5"), 
+			reqs = [
+				{type = 'active_quest_stage', value = 'sword_artifact_quest', stage = 'stage77', state = true}, 
+				{type = 'decision', value = 'canStartRitual', check = true}
+			], 
+			args = [{code = 'start_event', data = 'ritual_start', args = []}]
+		},
+		{
+			text = tr("BEASTKIN_CAPITAL6"), 
+			reqs = [
+				{type = 'active_quest_stage', value = 'sword_artifact_quest', stage = 'stage8', state = true}, 
+				{type = 'decision', value = 'canVisitLeon', check = true}
+			], 
+			args = [{code = 'start_event', data = 'leon_visit_start', args = []}]
+		},
+		{
+			text = tr("BEASTKIN_CAPITAL7"), 
+			reqs = [{type = 'active_quest_stage', value = 'sword_artifact_quest', stage = 'stage9', state = true}], 
+			args = [{code = 'start_event', data = 'leon_visit_1_2', args = []}]
+		},
+		{
+			text = tr("BEASTKIN_CAPITAL8"), 
+			reqs = [{type = 'active_quest_stage', value = 'sword_artifact_quest', stage = 'stage9', state = true}], 
+			args = [{code = 'start_event', data = 'ritual_ask_around', args = []}]
+		},
+		{
+			text = tr("BEASTKIN_CAPITAL9"), 
+			reqs = [{type = 'active_quest_stage', value = 'sword_artifact_quest', stage = 'stage11', state = true}], 
+			args = [{code = 'start_event', data = 'savra_talk_start', args = []}]
+		}, 
+		{
+			text = tr("BEASTKIN_CAPITAL10"), 
+			reqs = [{type = 'active_quest_stage', value = 'sword_artifact_quest', stage = 'stage12', state = true}], 
+			args = [{code = 'start_event', data = 'savra_talk_start', args = []}]
+		}, 
+		{
+			text = tr("BEASTKIN_CAPITAL11"), 
+			reqs = [{type = 'active_quest_stage', value = 'sword_artifact_quest', stage = 'stage13', state = true}], 
+			args = [{code = 'start_event', data = 'savra_talk_start', args = []}]
+		}, 
+		{
+			text = tr("BEASTKIN_CAPITAL12"), 
+			reqs = [{type = 'active_quest_stage', value = 'sword_artifact_quest', stage = 'stage15', state = true}], 
+			args = [{code = 'start_event', data = 'savra_talk_start', args = []}]
+		}, 
+		{
+			text = tr("BEASTKIN_CAPITAL13"), 
+			reqs = [{type = 'decision', value = 'got_excalibur', check = false}], 
+			args = [{code = 'start_event', data = 'excalibur_quest_1', args = []}]
+		},
+		{
+			text = tr("BEASTKIN_CAPITAL14"), 
+			reqs = [#{type = "quest_completed", name = "getting_lira_quest", check = true},
+#			{code = 'value_check', type = 'dialogue_seen', check = false, value = 'GOBLIN_QUEST_1'}
+			{type = 'active_quest_stage', value = 'goblin_quest', stage = 'stage0', state = true},], 
+			args = [{code = 'start_event', data = 'goblin_quest_1', args = []}]
+		},
+		{
+			text = tr("HELEVIEL_CITY_OPTION_2"), 
+			reqs = [{type = 'active_quest_stage', value = 'heleviel_quest2', stage = 'stage4'}], 
+			args = [{code = 'start_event', data = 'heleviel_slave_beastkin_intro', args = []}]
+		},
+		{
+			text = tr("MAE_SPIRIT_FOLLOW_OPTION"),
+			reqs = [{type = "active_quest_stage", value = "mae_spirit_quest", stage = "stage0"}],
+			args = [{code = "start_event", data = "mae_spirit_follow_start", args = []}]
+		},
+		{
+			text = tr("MAE_SPIRIT_VISIT_SAVRA_OPTION"),
+			reqs = [{type = "active_quest_stage", value = "mae_spirit_quest", stage = "stage4"}],
+			args = [{code = "start_event", data = "mae_spirit_visit_savra", args = []}]
+		},
+	],
+	
+	empire_capital = [
+#		{
+#			text = tr("ACT4_SEBASTIAN_EMPIRE_CAPITAL_OPTION_PROPOSAL"),
+#			reqs = [
+#				{type = 'decision', value = 'JoinCoalition', check = false},
+#				{type = 'has_active_quest', name = 'sebastian_railroad_quest', check = false},
+#				{type = 'quest_completed', name = 'sebastian_railroad_quest', check = false},
+#				{type = 'event_seen', value = 'act4_sebastian_proposal_dwarf_king_1', check = false},
+#				{type = 'event_seen', value = 'act4_sebastian_proposal_bolthar_1', check = false}
+#			],
+#			args = [{code = 'start_event', data = 'act4_sebastian_proposal_dwarf_king_1', args = []}]
+#		},
+#		{
+#			text = tr("ACT4_SEBASTIAN_EMPIRE_CAPITAL_OPTION_PROPOSAL"),
+#			reqs = [
+#				{type = 'decision', value = 'JoinCoalition', check = true},
+#				{type = 'has_active_quest', name = 'sebastian_railroad_quest', check = false},
+#				{type = 'quest_completed', name = 'sebastian_railroad_quest', check = false},
+#				{type = 'event_seen', value = 'act4_sebastian_proposal_dwarf_king_1', check = false},
+#				{type = 'event_seen', value = 'act4_sebastian_proposal_bolthar_1', check = false}
+#			],
+#			args = [{code = 'start_event', data = 'act4_sebastian_proposal_bolthar_1', args = []}]
+#		},
+		{
+			text = tr("ACT4_SEBASTIAN_EMPIRE_CAPITAL_OPTION_REPORT_TECHNICIAN"),
+			reqs = [{type = 'active_quest_stage', value = 'sebastian_railroad_quest', stage = 'report_technician'}],
+			args = [{code = 'start_event', data = 'act4_sebastian_report_technician_1', args = []}]
+		},
+#		{
+#			text = tr("LIRA_QUEST3_EMPIRE_NOTICE_OPTION"),
+#			reqs = [{type = 'active_quest_stage', value = 'lira_quest_3', stage = 'empire', state = true}],
+#			args = [{code = 'start_event', data = 'lira_quest_3_empire_notice', args = []}]
+#		},
+		{
+			text = tr("LIRA_QUEST3_EMPIRE_CARAVAN_MASTER_OPTION"),
+			reqs = [{type = 'active_quest_stage', value = 'lira_quest_3', stage = 'caravan_prepare', state = true}],
+			args = [{code = 'start_event', data = 'lira_quest3_caravan_prepare_1', args = []}]
+		},
+		{
+			text = tr("LIRA_QUEST3_EMPIRE_CARAVAN_ATTACK_OPTION"),
+			reqs = [{type = 'active_quest_stage', value = 'lira_quest_3', stage = 'caravan_attack', state = true}],
+			args = [{code = 'start_event', data = 'lira_quest3_caravan_ambush_1', args = []}]
+		},
+#		{
+#			text = tr("LIRA_QUEST3_EMPIRE_FOLLOW_LEADER_OPTION"),
+#			reqs = [{type = 'active_quest_stage', value = 'lira_quest_3', stage = 'follow_leader', state = true}],
+#			args = [{code = 'start_event', data = 'lira_quest_3_follow_leader', args = []}]
+#		},
+		{
+			text = tr("LIRA_QUEST3_EMPIRE_MERCHANT_OPTION"),
+			reqs = [{type = 'active_quest_stage', value = 'lira_quest_3', stage = 'merchant', state = true}],
+			args = [{code = 'start_event', data = 'lira_quest3_merchant_1', args = []}]
+		},
+		{
+			text = tr("JEAN_SIDEQUEST_GL"),
+			reqs = [{type = 'active_quest_stage', value = 'jean_first_sidequest', stage = 'capital'}],
+			args = [{code = 'start_event', data = 'jean_sidequest_capital_start', args = []}]
+		},
+		{
+			text = tr("JEAN_SIDEQUEST_GL"),
+			reqs = [{type = 'active_quest_stage', value = 'jean_first_sidequest', stage = 'capital_1'}],
+			args = [{code = 'start_event', data = 'jean_sidequest_capital_guard', args = []}]
+		},
+		{
+			text = tr("JEAN_SIDEQUEST_MANSION_OPTION"),
+			reqs = [{type = 'active_quest_stage', value = 'jean_first_sidequest', stage = 'mansion'}],
+			args = [{code = 'start_event', data = 'jean_sidequest_mansion_start_1', args = []}]
+		},
+		{
+			text = tr("JEAN_SIDEQUEST_MANSION_OPTION"),
+			reqs = [{type = 'active_quest_stage', value = 'jean_first_sidequest', stage = 'mansion_1'}],
+			args = [{code = 'start_event', data = 'jean_sidequest_mansion_start_2', args = []}]
+		},
+		{
+			text = tr("JEAN_SIDEQUEST_GL"),
+			reqs = [{type = 'active_quest_stage', value = 'jean_first_sidequest', stage = 'return'}],
+			args = [{code = 'start_event', data = 'jean_sidequest_return_start', args = []}]
+		},
+		{
+			text = tr("JEAN_CAPITAL_OPTION_SEARCH"),
+			reqs = [{type = 'active_quest_stage', value = 'jean_sylas_quest', stage = 'stage2'}],
+			args = [{code = 'start_event', data = 'jean_sylas_capital_meet', args = []}]
+		},
+		{
+			text = tr("JEAN_CAPITAL_OPTION_ARENA"),
+			reqs = [{type = 'active_quest_stage', value = 'jean_sylas_quest', stage = 'stage3'}],
+			args = [{code = 'start_event', data = 'jean_sylas_arena_intro', args = []}]
+		},
+		{
+			text = tr("JEAN_CAPITAL_OPTION_MERCHANTS"),
+			reqs = [{type = 'active_quest_stage', value = 'jean_sylas_quest', stage = 'stage4'}],
+			args = [{code = 'start_event', data = 'jean_sylas_merchants_intro', args = []}]
+		},
+		{
+			text = tr("JEAN_CAPITAL_OPTION_CART"),
+			reqs = [{type = 'active_quest_stage', value = 'jean_sylas_quest', stage = 'stage5'}],
+			args = [{code = 'start_event', data = 'jean_sylas_carriage_search', args = []}]
+		},
+		{
+			text = tr("JEAN_CAPITAL_OPTION_BROTHEL"),
+			reqs = [{type = 'active_quest_stage', value = 'jean_sylas_quest', stage = 'stage6'}],
+			args = [{code = 'start_event', data = 'jean_sylas_brothel_intro', args = []}]
+		},
+		{
+			text = tr("JEAN_CAPITAL_OPTION_BROTHEL_RETURN"),
+			reqs = [{type = 'active_quest_stage', value = 'jean_sylas_quest', stage = 'stage7'}],
+			args = [{code = 'start_event', data = 'jean_sylas_girl_plan_return', args = []}]
+		},
+		{
+			text = tr("ROUGE_CAPITAL_OPTION_FIND"),
+			reqs = [{type = 'active_quest_stage', value = 'act_4_capital', stage = 'act4_continue'}],
+			args = [{code = 'start_event', data = 'rouge_melchor_confrontation_start', args = []}]
+		},
+		{
+			text = tr("ROUGE_CAPITAL_OPTION_MELCHOR"),
+			reqs = [{type = 'decision', value = 'rouge_accepted', check = true}],
+			args = [{code = 'start_event', data = 'rouge_melchor_visit', args = []}]
+		},
+		{
+			text = tr("ROUGE_CAPITAL_OPTION_MEET_ROUGE"),
+			reqs = [{type = 'active_quest_stage', value = 'rouge_quest', stage = 'rouge_meet'}],
+			args = [{code = 'start_event', data = 'rouge_tax_capital_meet_1', args = []}]
+		},
+		{
+			text = tr("ROUGE_CAPITAL_OPTION_MELCHOR"),
+			reqs = [
+				{type = 'decision', value = 'rouge_refused', check = true},
+				{type = 'any_quest_stage', value = 'rouge_quest', stages = ['tax_intro', 'tax_done', 'rouge_meet', 'melchor', 'raid', 'reward']}
+			],
+			args = [{code = 'start_event', data = 'rouge_melchor_visit', args = []}]
+		},
+		{
+			text = tr("ROUGE_CAPITAL_OPTION_WAREHOUSE"),
+			reqs = [{type = 'active_quest_stage', value = 'rouge_quest', stage = 'warehouse'}],
+			args = [{code = 'start_event', data = 'rouge_warehouse_search', args = []}]
+		},
+		{
+			text = tr("EMPIRE_CAPITAL1"), 
+			reqs = [{type = 'active_quest_stage', value = 'act_4_capital', stage = 'ceremony', state = true}], 
+			args = [{code = 'start_event', data = 'emp_ceremony_1', args = []}]
+		},
+		{
+			text = tr("EMPIRE_CAPITAL2"),
+			reqs = [{type = 'event_seen', check = false, value = 'emp_erdyna_intro_1'},],
+			args = [{code = 'start_event', data = 'emp_erdyna_intro_1', args = []}]
+		},
+		{
+			text = "ACT4_EMPIRE_CAPITAL_OPTION_ERDYNA",
+			reqs = [
+				{type = 'event_seen', check = true, value = 'emp_erdyna_intro_12'},
+				{type = 'has_active_quest', name = 'erdyna_quest', check = false},
+				{type = 'quest_completed', name = 'erdyna_quest', check = false},
+			],
+			args = [{code = 'start_event', data = 'emp_erdyna_followup_1', args = []}]
+		},
+		{
+			text = "ACT4_EMPIRE_CAPITAL_OPTION_ERDYNA",
+			reqs = [{type = 'active_quest_stage', value = 'erdyna_quest', stage = 'followup', state = true}],
+			args = [{code = 'start_event', data = 'emp_erdyna_followup_1', args = []}]
+		},
+		{
+			text = "ACT4_EMPIRE_CAPITAL_OPTION_SENERUS",
+			reqs = [{type = 'active_quest_stage', value = 'erdyna_quest', stage = 'senerus', state = true}],
+			args = [{code = 'start_event', data = 'emp_senerus_home_1', args = []}]
+		},
+		{
+			text = "ACT4_EMPIRE_CAPITAL_OPTION_SENERUS",
+			reqs = [{type = 'any_quest_stage', value = 'erdyna_quest', stages = ['catacombs', 'myr_translation', 'dragonhunters']}],
+			args = [{code = 'start_event', data = 'emp_senerus_repeat_1', args = []}]
+		},
+		{
+			text = tr("ACT4_ERDYNA_EMPIRE_CAPITAL_OPT_GROTUS"),
+			reqs = [
+				{type = 'any_quest_stage', value = 'erdyna_quest', stages = ['act4_erdyna_archives', 'archive_search']},
+				{type = 'event_seen', value = 'act4_erdyna_grotus_offer_1', check = true},
+				{type = 'event_seen', value = 'act4_erdyna_grotus_delivery', check = false}
+			],
+			args = [{code = 'start_event', data = 'act4_erdyna_grotus_find', args = []}]
+		},
+		{
+			text = "ACT4_3_EMPIRE_CAPITAL_OPT_ERDYNA_HIDEOUT",
+			reqs = [{type = 'active_quest_stage', value = 'erdyna_quest', stage = 'erdyna_hideout', state = true}],
+			args = [{code = 'start_event', data = 'erdyna_old_hideout_1', args = []}]
+		},
+		{
+			text = tr("ARENA_NAME"),
+			reqs = [{type = 'active_quest_stage', value = 'act_4_capital', stage = 'arena', state = true}],
+			args = [{code = 'start_event', data = 'emp_arena_1', args = []}]
+		},
+		{
+			text = tr('ARENA_NAME'),
+			reqs = [{type = 'quest_completed', name = 'act_4_capital', check = true}],
+			args = [{code = 'open_arena'}]
+		},
+		
+		
+	],
+	settlement_plains1 = [ 
+		{
+			text = tr("SETTLEMENT_PLAINS1_1"), 
+			reqs = [ 
+				{type = 'active_quest_stage', value = 'lead_convoy_quest', stage = 'stage3'},
+			],
+			args = [{code = 'start_event', data = 'betrayal_confirmed_advance', args = []}]
+		},
+		{
+			text = tr("SETTLEMENT_PLAINS1_2"), 
+			reqs = [ 
+				{type = 'active_quest_stage', value = 'divine_symbol_quest', stage = 'stage3'},
+				{type = 'active_quest_stage', value = 'divine_symbol_quest', stage = 'stage4', orflag = true},
+			],
+			args = [{code = 'start_event', data = 'divine_symbol_6', args = []}]
+		},
+	],
+	settlement_plains2 = [ 
+		{
+			text = tr("SETTLEMENT_PLAINS2_1"), 
+			reqs = [ 
+				{type = 'active_quest_stage', value = 'cali_heirloom_quest', stage = 'stage1'}, {type = "location_has_specific_slaves", check = true, location = 'settlement_plains2', reqs = [{code = 'unique', value = 'cali'}]}],
+			args = [{code = 'start_event', data = 'cali_farmer_1', args = []}]
+		},
+		{
+			text = tr("SETTLEMENT_PLAINS2_2"), 
+			reqs = [ 
+				{type = 'active_quest_stage', value = 'cali_heirloom_quest', stage = 'stage2'},{type = "location_has_specific_slaves", check = true, location = 'settlement_plains2', reqs = [{code = 'unique', value = 'cali'}]}
+			],
+			args = [{code = 'start_event', data = 'cali_farmer_4', args = []}]
+		},
+	],
+	settlement_forest1 = [
+		{
+			text = tr("SETTLEMENT_FOREST1_1"), 
+			reqs = [
+				{type = 'active_quest_stage', value = 'lilia_meet_quest', stage = 'stage1'}],
+			args = [{code = 'start_event', data = 'lilia_startring_1', args = []}]
+		},
+		{
+			text = tr("SETTLEMENT_FOREST1_2"), 
+			reqs = [{type = 'active_quest_stage', value = 'lilia_meet_quest', stage = 'stage2'}],
+			args = [{code = 'start_event', data = 'lilia_starting_2', args = []}]
+		},
+		{
+			text = tr("SETTLEMENT_FOREST2_1"), 
+			reqs = [{type = 'active_quest_stage', value = 'lilia_finale_quest', stage = 'stage8'},
+			{type = "location_has_specific_slaves", check = true, location = 'settlement_forest1', reqs = [{code = 'unique', value = 'lilia'}]}],
+			args = [{code = 'start_event', data = 'lilith_good_route_village', args = []}]
+		},
+		{
+			text = tr("SETTLEMENT_FOREST2_2"), 
+			reqs = [{type = 'active_quest_stage', value = 'lilith_patron_quest', stage = 'stage10'},
+			{type = "location_has_specific_slaves", check = true, location = 'settlement_forest1', reqs = [{code = 'unique', value = 'lilith'}]}],
+			args = [{code = 'start_event', data = 'lilith_bad_route_village', args = []}]
+		},
+	],
+	quest_fighters_lich = [
+		{
+			text = tr("QUEST_FIGHTERS_LICH1"), 
+			reqs = [{type = 'active_quest_stage', value = 'fighters_election_quest', stage = 'start'}], 
+			args = [{code = 'start_event', data = 'lich_enc_initiate', args = []}]
+		}
+	],
+	settlement_mountains1 = [
+		{
+			text = tr("KURO3_DEPTHS_OPTION"), 
+			reqs = [
+				{type = 'active_quest_stage', value = 'kuro_quest_3', stage = 'depths'}],
+			args = [{code = 'start_event', data = 'kuro3_depths_1', args = []}]
+		},
+	],
+	quest_mages_xari = [
+		{
+			text = tr("QUEST_MAGES_XARI1"), 
+			reqs = [
+				{type = 'active_quest_stage', value = 'mages_election_quest', stage = 'start'}],
+			args = [{code = 'start_event', data = 'xari_encounter1', args = []}]
+		},
+		{
+			text = tr("QUEST_MAGES_XARI2"), 
+			reqs = [
+				{type = 'active_quest_stage', value = 'mages_election_quest', stage = 'stage1'}],
+			args = [{code = 'start_event', data = 'xari_encounter9', args = []}]
+		},
+		{
+			text = tr("QUEST_MAGES_XARI3"), 
+			reqs = [
+				{type = 'active_quest_stage', value = 'princess_persuasion', stage = 'stage1'}],
+			args = [{code = 'start_event', data = 'mindcontrol_1', args = []}]
+		},
+		{
+			text = tr("QUEST_MAGES_XARI4"), 
+			reqs = [
+				{type = 'active_quest_stage', value = 'sick_lilia_quest', stage = 'stage2'}],
+			args = [{code = 'start_event', data = 'xari_clothes_1', args = []}]
+		},
+		{
+			text = tr("QUEST_MAGES_XARI5"), 
+			reqs = [
+				{type = 'active_quest_stage', value = 'sick_lilia_quest', stage = 'stage4'}],
+			args = [{code = 'start_event', data = 'xari_clothes_7', args = []}]
+		},
+		{
+			text = tr("QUEST_MAGES_XARI6"), 
+			reqs = [
+				{type = 'active_quest_stage', value = 'lilith_patron_quest', stage = 'stage13'}],
+			args = [{code = 'start_event', data = 'lilith_xari_location', args = []}]
+		},
+	],
+	quest_mages_fred = [
+		{
+			text = tr("QUEST_MAGES_FRED1"), 
+			reqs = [
+				{type = 'active_quest_stage', value = 'civil_war_start', stage = 'stage3'}],
+			args = [{code = 'start_event', data = 'fred_1', args = []}]
+		},
+	],
+	basic_threat_wolves = [
+		{
+			text = tr("BASIC_THREAT_WOLVES1"), 
+			reqs = [], 
+			args = [{code = 'start_event', data = 'wolves_skirmish_start', args = []}]
+		}
+	],
+	tutorial_threat_wolves = [
+		{
+			text = tr("BASIC_THREAT_WOLVES1"),
+			reqs = [],
+			args = [{code = 'start_event', data = 'tutorial_wolves_start', args = []}]
+		}
+	],
+	basic_threat_rebels = [
+		{
+			text = tr("BASIC_THREAT_REBELS1"), 
+			reqs = [], 
+			args = [{code = 'start_event', data = 'rebels_skirmish_start', args = []}]
+		}
+	],
+	basic_threat_goblins = [
+		{
+			text = tr("BASIC_THREAT_GOBLINS1"), 
+			reqs = [], 
+			args = [{code = 'start_event', data = 'goblins_skirmish_start', args = []}]
+		}
+	],
+	basic_threat_ogre = [
+		{
+			text = tr("BASIC_THREAT_OGRE1"), 
+			reqs = [], 
+			args = [{code = 'start_event', data = 'ogre_skirmish_start', args = []}]
+		}
+	],
+	basic_threat_troll = [
+		{
+			text = tr("BASIC_THREAT_TROLL1"), 
+			reqs = [], 
+			args = [{code = 'start_event', data = 'troll_skirmish_start', args = []}]
+		}
+	],
+	quest_cali_cave_location = [
+		{
+			text = tr("QUEST_CALI_CAVE_LOCATION1"), 
+			reqs = [{type = 'event_seen', check = false, value = 'got_cali_1_1'}],
+			args = [{code = 'start_event', data = 'cali_intro_1', args = []}]
+		},
+	],
+	quest_cali_goblins_location = [
+		{
+			text = tr("QUEST_CALI_GOBLINS_LOCATION1"), 
+			reqs = [{type = 'active_quest_stage', value = 'cali_fighters_quest', stage = 'stage2', state = true}],
+			args = [{code = 'start_event', data = 'cali_goblins_1', args = []}]
+		},
+	],
+	quest_cali_village = [
+		{
+			text = tr("QUEST_CALI_VILLAGE1"), 
+			reqs = [
+				{type = "location_has_specific_slaves", check = true, location = 'quest_cali_village', reqs = [{code = 'unique', value = 'cali'}]},
+				{type = 'active_quest_stage', value = 'cali_heirloom_quest', stage = 'stage10', state = true}
+				], 
+			args = [{code = 'start_event', data = 'cali_hector_1', args = []}]
+		}
+	],
+	quest_tax_settlement = [
+		{
+			text = tr("ROUGE_TAX_SETTLEMENT_VISIT"),
+			reqs = [{type = "event_seen", check = false, value = "rouge_tax_region_start"}],
+			args = [{code = "start_event", data = "rouge_tax_region_start", args = []}]
+		},
+		{
+			text = tr("ROUGE_TAX_SETTLEMENT_VISIT"),
+			reqs = [{type = "event_seen", check = true, value = "rouge_tax_region_start"}],
+			args = [{code = "start_event", data = "rouge_tax_region_return", args = []}]
+		},
+	],
+	quest_rebels_backrooms = [
+		{
+			text = tr("QUEST_FINAL_OPERATION_LOCATION1"), 
+			reqs = [ 
+				{type = 'active_quest_stage', value = 'princess_search', stage = 'stage2'},
+				{type = 'decision', value = 'BlockSearch', check = false},
+				{type = 'decision', value = 'AllowSearch', check = true}, 
+				{type = 'dialogue_seen', check = false, value = 'LOOKING_FOR_PRINCESS_6'},
+				{type = 'has_material', material = 'princess_bracelet', operant = 'lt', value = 1}
+			],
+			args = [{code = 'start_event', data = 'looking_for_princess_3', args = []}]
+		},
+		{
+			text = tr("QUEST_FINAL_OPERATION_LOCATION2"), 
+			reqs = [ 
+				{type = 'active_quest_stage', value = 'princess_search', stage = 'stage2'},
+				{type = 'decision', value = 'BlockSearch', check = false}, 
+				{type = 'decision', value = 'AllowSearch', check = true}, 
+				{type = 'dialogue_seen', check = true, value = 'LOOKING_FOR_PRINCESS_6'},
+				{type = 'has_material', material = 'princess_bracelet', operant = 'lt', value = 1}
+			],
+			args = [{code = 'start_event', data = 'looking_for_princess_5', args = []}]
+		},
+	],
+	quest_daisy_admirer_location = [
+		{
+			text = tr("QUEST_DAISY_ADMIRER_LOCATION1"), 
+			reqs = [{type = 'active_quest_stage', value = 'daisy_lost', stage = 'stage2'}],
+			args = [{code = 'start_event', data = 'daisy_lost_3', args = []}]
+		}
+	],
+	quest_gryphon_cave_location = [
+		{
+			text = tr("QUEST_GRYPHON_CAVE_LOCATION1"),
+			reqs = [{type = 'dialogue_seen', check = false, value = 'GRYPHON_CAVE_START'}],
+			args = [{code = 'start_event', data = 'gryphon_cave_start', args = []}]
+		},
+	],
+	quest_lira_grove_location = [
+		{
+			text = tr("QUEST_LIRA_GROVE_LOCATION1"),
+			reqs = [{type = 'active_quest_stage', value = 'lira_quest_1', stage = 'grove'}],
+			args = [{code = 'start_event', data = 'lira_quest_1_search_grove', args = []}]
+		},
+	],
+	quest_lira_road_location = [
+		{
+			text = tr("LIRA_QUEST3_ROAD_AMBUSH_OPTION"),
+			reqs = [{type = 'active_quest_stage', value = 'lira_quest_3', stage = 'road', state = true}],
+			args = [{code = 'start_event', data = 'lira_quest3_road_1', args = []}]
+		},
+	],
+	quest_ritual_location = [
+		{
+			text = tr("QUEST_MAE_SEARCH"), 
+			reqs = [{type = 'dialogue_seen', check = false, value = 'PRE_RITUAL_2_1'}],
+			args = [{code = 'start_event', data = 'pre_ritual_1', args = []}]
+		},
+		
+	],
+	quest_mae_spirit_ritual = [
+		{
+			text = tr("MAE_SPIRIT_RITUAL_OPTION"),
+			reqs = [{type = "active_quest_stage", value = "mae_spirit_quest", stage = "stage1"}],
+			args = [{code = "start_event", data = "mae_spirit_ritual_start", args = []}]
+		},
+		{
+			text = tr("MAE_SPIRIT_RITUAL_OPTION"),
+			reqs = [
+				{type = "active_quest_stage", value = "mae_spirit_quest", stage = "stage1_hide"},
+				{type = "has_material", material = "ancestral_hide", operant = "gte", value = 1}
+			],
+			args = [{code = "start_event", data = "mae_spirit_hide_return", args = []}]
+		},
+	],
+	quest_mae_northern_tribe = [
+		{
+			text = tr("MAE_NORTHERN_TRIBE_OPTION"),
+			reqs = [{type = "active_quest_stage", value = "mae_spirit_quest", stage = "stage5"}],
+			args = [{code = "start_event", data = "mae_spirit_northern_arrival", args = []}]
+		},
+	],
+	quest_jean_demon_location = [
+		{
+			text = tr("MAE_NORTHERN_TRIBE_OPTION"),
+			reqs = [{type = "active_quest_stage", value = "jean_sylas_quest", stage = "stage12"}],
+			args = [{code = "start_event", data = "jean_sylas_search_jean_intro_1", args = []}]
+		},
+	],
+	quest_leon_forest = [
+		{
+			text = tr("QUEST_LEON_FOREST_2_1"), 
+			reqs = [{code = 'value_check', type = 'dialogue_seen', check = false, value = 'LEON_FIGHT_1'}],
+			args = [{code = 'start_event', data = 'leon_fight_1', args = []}]
+		},
+	],
+	quest_leon_forest_2 = [
+		{
+			text = tr("QUEST_LEON_FOREST_2_1"), 
+			reqs = [], #leon quest still removes location - so there is no req 
+			args = [{code = 'start_event', data = 'leon_encounter_start', args = []}]
+		},
+	],
+	quest_white_stag_location = [
+		{
+			text = tr("QUEST_WHITE_STAG_LOCATION1"), 
+			reqs = [], #same as above
+			args = [{code = 'start_event', data = 'white_stag_encounter_1', args = []}]
+		},
+	],
+	quest_temple_location = [
+		{
+			text = tr("QUEST_TEMPLE_LOCATION1"), 
+			reqs = [
+				{type = 'active_quest_stage', value = 'temple_quest', stage = 'stage1', state = true},
+				{type = 'dialogue_seen', check = false, value = 'TEMPLE_2_2', },
+				{type = 'dialogue_seen', check = false, value = 'TEMPLE_2_1'}],
+			args = [{code = 'start_event', data = 'temple_start', args = []}]
+		},
+		{
+			text = tr("QUEST_TEMPLE_LOCATION2"), 
+			reqs = [
+				
+				{type = 'dialogue_seen', check = true, value = 'TEMPLE_2_2', },
+				{type = 'dialogue_seen', check = true, value = 'TEMPLE_2_1', orflag = true},
+				{type = 'active_quest_stage', value = 'temple_quest', stage = 'stage1', state = true},],
+			args = [{code = 'start_event', data = 'temple_6', args = []}]
+		},
+	],
+	quest_erlen_location = [
+		{
+			text = tr("QUEST_ERLEN_LOCATION1"), 
+			reqs = [{type = 'active_quest_stage', value = 'getting_lira_quest', stage = 'stage1', state = true}],
+			args = [{code = 'start_event', data = 'erlern_encounter_start', args = []}]
+		},
+		{
+			text = tr("QUEST_ERLEN_LOCATION2"), 
+			reqs = [
+				{type = 'active_quest_stage', value = 'getting_lira_quest', stage = 'stage2', state = true}, 
+				{type = 'active_quest_stage', value = 'getting_lira_quest', stage = 'stage3', state = true, orflag = true} ],
+			args = [{code = 'start_event', data = 'erlen_lira_1', args = []}]
+		},
+		{
+			text = tr("QUEST_ERLEN_LOCATION3"), 
+			reqs = [{type = 'active_quest_stage', value = 'getting_lira_quest', stage = 'stage4', state = true}],
+			args = [{code = 'start_event', data = 'erlen_lira_2', args = []}]
+		},
+	],
+	quest_troll_cave_location = [
+		{
+			text = tr("QUEST_TROLL_CAVE_LOCATION1"), 
+			reqs = [{type = 'active_quest_stage', value = 'sick_lilia_quest', stage = 'stage3', state = true}, {type = 'active_quest_stage', value = 'sick_lilia_quest', stage = 'stage35', state = true, orflag = true}],
+			args = [{code = 'start_event', data = 'troll_clothes_1', args = []}]
+		},
+	],
+	quest_goblin_location = [
+		{
+			text = tr("QUEST_GOBLIN_LOCATION1"), 
+			reqs = [{type = 'active_quest_stage', value = 'goblin_quest', stage = 'stage1', state = true}],
+			args = [{code = 'start_event', data = 'goblin_quest_3', args = []}]
+		},
+		{
+			text = tr("QUEST_GOBLIN_LOCATION2"), 
+			reqs = [{type = 'active_quest_stage', value = 'goblin_quest', stage = 'stage2', state = true}],
+			args = [{code = 'start_event', data = 'goblin_quest_track_1', args = []}]
+		},
+		{
+			text = tr("QUEST_GOBLIN_LOCATION3"), 
+			reqs = [{type = 'active_quest_stage', value = 'goblin_quest', stage = 'stage4', state = true}],
+			args = [{code = 'start_event', data = 'goblin_quest_8', args = []}]
+		},
+		{
+			text = tr("QUEST_GOBLIN_LOCATION4"), 
+			reqs = [{type = 'active_quest_stage', value = 'goblin_quest', stage = 'stage5', state = true}],
+			args = [{code = 'start_event', data = 'goblin_quest_14', args = []}]
+		},
+	],
+	quest_mountain_pass = [
+		{
+			text = tr("QUEST_MOUNTAIN_PASS_LOCATION"), 
+			reqs = [], 
+			args = [{code = 'start_event', data = 'jean_mountain_start', args = []}]
+		}
+	],
+	quest_hollow_passage = [
+		{
+			text = tr("QUEST_HOLLOW_PASSAGE_LOCATION"), 
+			reqs = [{type = 'active_quest_stage', value = 'dking_hara_quest', stage = 'tracks'}], 
+			args = [{code = 'start_event', data = 'hollow_pass_start', args = []}]
+		}
+	],
+	quest_whisky_crash = [
+		{
+			text = tr("QUEST_WHISKY_CRASH_LOCATION"),
+			reqs = [{type = 'active_quest_stage', value = 'kuro_tome_quest', stage = 'carriage'}],
+			args = [{code = 'start_event', data = 'kuro_whiskey_crash', args = []}]
+		}
+	],
+	quest_cult_hideout = [
+		{
+			text = tr("QUEST_CULT_HIDEOUT_LOCATION"),
+			reqs = [{type = 'active_quest_stage', value = 'kuro_errand_quest', stage = 'invite'}],
+			args = [{code = 'start_event', data = 'kuro_hideout_start', args = {}}]
+		}
+	],
+	quest_star_crater = [
+		{
+			text = tr("QUEST_STAR_CRATER_LOCATION"),
+			reqs = [{type = 'active_quest_stage', value = 'meteorite_quest', stage = 'check_out'}],
+			args = [{code = 'start_event', data = 'meteor_ogres_start', args = {}}]
+		}
+	],
+#	quest_ashen_ridge  = [
+#		{
+#			text = tr("QUEST_ASHEN_RIDGE_1"), 
+#			reqs = [{type = 'active_quest_stage', value = 'anastasia_quest', stage = 'stage3'}], 
+#			args = [{code = 'start_event', data = 'ashen_ridge_1', args = []}]
+#		},
+#		{
+#			text = tr("QUEST_ASHEN_RIDGE_2"), 
+#			reqs = [{type = 'active_quest_stage', value = 'anastasia_quest', stage = 'stage4'}], 
+#			args = [{code = 'start_event', data = 'ashen_ridge_3', args = []}]
+#		}
+#	],
+}
+
+var fixed_location_events = {
+	
+}
+
+
+var infinite_dungeon_events = {
+	amelia_infinite = {
+		event = 'amelia_infinite_1',
+		reqs = [{type = 'dialogue_seen', check = false, value = 'AMELIA_INFINITE_1'}],
+		dungeons = ["infinite_aliron"],
+		min_level = 0,
+		chance = 0.1,
+		type = 'subroom'
+	},
+#	test_event_1 = {
+#		event = 'cali_intro',
+#		reqs = [], #{type = 'dialogue_seen', check = false, value = 'CALI_INTRO'}],
+#		#no reqs for testing purpose, not correct for real use
+#		dungeons = ["dungeon_infinite_example"],
+#		min_level = 2,
+#		chance = 0.5,
+#		type = 'enter'
+#	},
+#	test_event_2 = {
+#		event = 'cali_intro',
+#		reqs = [], #{type = 'dialogue_seen', check = false, value = 'CALI_INTRO'}],
+#		#no reqs for testing purpose, not correct for real use
+#		dungeons = ["dungeon_infinite_example"],
+#		min_level = 3,
+#		chance = 0.5,
+#		type = 'subroom'
+#	},
+#	test_event_3 = {
+#		event = 'cali_intro',
+#		reqs = [], #{type = 'dialogue_seen', check = false, value = 'CALI_INTRO'}],
+#		#no reqs for testing purpose, not correct for real use
+#		dungeons = ["dungeon_infinite_example"],
+#		min_level = 4,
+#		chance = 0.5,
+#		type = 'finish'
+#	},
+}
+
+
+func _ready():
+	update_guilds_data()
+
+
+func update_guilds_data():
+	for guild in factiondata.values():
+		if !guild.has('conditions'):
+			guild.conditions = []
+		if guild.has('hireable_characters'): continue
+		guild.hireable_characters = []
+		var tempcat = {code = 'type1'}
+		tempcat.tags = guild.tags.duplicate()
+		tempcat.slavenumber = guild.slavenumber.duplicate()
+		tempcat.character_types = guild.character_types.duplicate()
+		tempcat.character_bonuses = guild.character_bonuses.duplicate()
+		if guild.has('slave_races'):
+			tempcat.slave_races = guild.slave_races.duplicate()
+		else:
+			tempcat.slave_races = []
+		tempcat.preference = guild.preference.duplicate()
+		tempcat.classes = []
+		tempcat.slavelevel = 0
+		guild.hireable_characters.push_back(tempcat)
+

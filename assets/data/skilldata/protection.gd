@@ -1,0 +1,172 @@
+extends Reference
+
+var skills = {
+	taunt = {
+		code = 'taunt',
+		descript = '',
+		icon = "res://assets/images/iconsskills/Protect.png",
+		type = 'combat', 
+		ability_type = 'skill',
+		tags = ['support', 'debuf', 'taunt'],
+#		new_syntax = true,
+		reqs = [],
+		targetreqs = [],
+		effects = [Effectdata.rebuild_template({effect = 'taunt', duration = 1})], 
+		evade = 0,
+		critchance = 0,
+		cost = {mp = 4},
+		charges = 0,
+		combatcooldown = 2,
+		cooldown = 0,
+		catalysts = {},
+		target = 'enemy',
+		target_number = 'all',
+		target_range = 'any',
+		damage_type = 'weapon',
+		sfx = [
+			{code = 'tauntwave', target = 'target_group', period = 'windup'},
+			{code = 'taunt', target = 'caster', period = 'windup'}
+		],
+		sound = [],
+		value = [['0']],
+		damagestat = 'no_stat',
+#		variations = [
+#			{
+#				reqs = [{code = 'has_status', status = 'assassin_hide', check = true}],
+#				append = {tags = 'stealth_casting'},
+#			}
+#		]
+	},
+	disarm_enemy = {
+		code = 'disarm_enemy',
+		descript = '',
+		icon = "res://assets/images/iconsskills/skill_disarm.png",
+		type = 'combat', 
+		ability_type = 'skill',
+		tags = ['damage', 'ads'],
+		reqs = [],
+		targetreqs = [],
+		effects = [Effectdata.rebuild_template({effect = 'disarm', duration = 3})], 
+		cost = {mp = 4},
+		charges = 0,
+		combatcooldown = 2,
+		cooldown = 0,
+		catalysts = {},
+		target = 'enemy',
+		target_number = 'single',
+		target_range = 'melee',
+		damage_type = 'weapon',
+		sfx = [
+			{code = 'disarm', target = 'target', period = 'predamage'},
+			{code = 'cast_weapon', target = 'caster', period = 'windup', is_cast = true}],
+		sounddata = {initiate = null, strike = 'blade', hit = null},
+		value = 1.3,
+		variations = [
+			{
+				reqs = [{code = 'has_status', status = 'assassin_hide', check = true}],
+				append = {tags = 'stealth_casting'},
+			}
+		]
+	},
+	provocation = {
+		code = 'provocation',
+		descript = '',
+		icon = "res://assets/images/iconsskills/taunt.png",
+		type = 'combat', 
+		ability_type = 'skill',
+		tags = ['damage', 'debuf', 'taunt'],
+#		new_syntax = true,
+		reqs = [],
+		targetreqs = [],
+		effects = [Effectdata.rebuild_template({effect = 'provoke', duration = 1})], 
+		cost = {mp = 5},
+		charges = 0,
+		combatcooldown = 2,
+		cooldown = 0,
+		catalysts = {},
+		target = 'enemy',
+		target_number = 'single',
+		target_range = 'weapon',
+		damage_type = 'weapon',
+		sfx = [
+			{code = 'provocation', target = 'target', period = 'predamage'},
+			{code = 'cast_weapon', target = 'caster', period = 'windup', is_cast = true}], 
+		sound = [],
+		value = 0.7,
+		variations = [
+			{
+				reqs = [{code = 'has_status', status = 'assassin_hide', check = true}],
+				append = {tags = 'stealth_casting'},
+			}
+		]
+	},
+	stonewall = {
+		code = 'stonewall',
+		descript = '',
+		icon = "res://assets/images/iconsskills/icon_endure.png",
+		type = 'combat', 
+		ability_type = 'skill',
+		tags = ['heal', 'noreduce', 'noevade','support', 'no_caster_bonuses'],
+		reqs = [],
+		targetreqs = [],
+		effects = [Effectdata.rebuild_template({effect = 'e_s_stonewall', duration = 5})], 
+		cost = {mp = 10},
+		charges = 0,
+		combatcooldown = 4,
+		cooldown = 0,
+		catalysts = {},
+		target = 'self',
+		target_number = 'single',
+		target_range = 'any',
+		damage_type = 'earth',#not sure but not matters #It matter now! -Garden
+		sfx = [
+			{code = 'stonewall', target = 'target', period = 'predamage'},
+			{code = 'cast_earth', target = 'caster', period = 'windup', is_cast = true}],
+		sounddata = {initiate = null, strike = 'skill_scene', hit = null},
+		value = [['caster.hpmax', '*0.15']],
+		damagestat = ['-damage_hp'],
+		variations = [
+			{
+				reqs = [{code = 'has_status', status = 'assassin_hide', check = true}],
+				append = {tags = 'stealth_casting'},
+			}
+		]
+	},
+	last_stand = {
+		code = 'last_stand',
+		descript = '',
+		icon = "res://assets/images/iconsskills/skill_last_stand.png",
+		type = 'combat', 
+		ability_type = 'spell',
+		tags = ['support', 'buff', 'instant'],
+		reqs = [],
+		targetreqs = [],
+		effects = [Effectdata.rebuild_template({effect = 'e_s_lasstand', duration = 1})], 
+		cost = {mp = 5},
+		charges = 0,
+		combatcooldown = 6,
+		cooldown = 0,
+		catalysts = {},
+		target = 'self',
+		target_number = 'single',
+		target_range = 'any',
+		damage_type = 'weapon',
+		sfx = [{code = 'last_stand', target = 'target', period = 'predamage'}], 
+		sound = [],
+		value = [['0']],
+		damagestat = 'no_stat',
+		variations = [
+			{
+				reqs = [{code = 'has_status', status = 'assassin_hide', check = true}],
+				append = {tags = 'stealth_casting'},
+			}
+		]
+	},
+}
+var effects = {}
+var atomic_effects = {}
+var buffs = {
+	
+}
+
+var stacks = {}

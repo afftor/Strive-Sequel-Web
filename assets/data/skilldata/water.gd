@@ -1,0 +1,370 @@
+extends Reference
+
+var skills = {
+	rejuvenation = {
+		code = 'rejuvenation',
+		descript = '',
+		icon = "res://assets/images/iconsskills/Heal.png",
+		type = 'combat', 
+		ability_type = 'spell',
+		tags = ['heal', 'noreduce', 'noevade','support', 'exploration', "multiuse"],
+		reqs = [],
+		targetreqs = [],
+		effects = [
+			Effectdata.rebuild_template({effect = 'e_s_regen', push_value = true, duration = 2}),
+			Effectdata.rebuild_template({effect = Effectdata.rebuild_remove_effect('poison')}),
+			Effectdata.rebuild_template({effect = Effectdata.rebuild_remove_effect('burn')})
+		], 
+		cost = {mp = 10},
+		charges = 0,
+		combatcooldown = 0,
+		cooldown = 0,
+		catalysts = {},
+		target = 'ally',
+		target_number = 'single',
+		target_range = 'any',
+		damage_type = 'water',#not sure but not matters #It's matter now! -Garden
+		sfx = [{code = 'heal', target = 'target', period = 'predamage'}],
+		sounddata = {initiate = null, strike = 'skill_scene', hit = null},
+		value = [['caster.matk', '*0.6'], ['caster.matk']],
+		damagestat = ['no_stat','-damage_hp'],
+		variations = [
+			{
+				reqs = [{code = 'stat', stat = 'mastery_water', value = 4, operant = 'gte'}],
+				set = {target_number = 'row'},
+				add = {descript = '_2'}
+			}
+		]
+	},
+	water_edge = {
+		code = 'water_edge',
+		descript = '',
+		icon = "res://assets/images/iconsskills/wateredge.png",
+		type = 'combat', 
+		ability_type = 'spell',
+		tags = ['damage', 'debuf', 'water', 'ads'],
+#		new_syntax = true,
+		reqs = [],
+		targetreqs = [],
+		effects = [Effectdata.rebuild_template({effect = 'wet'})], 
+		cost = {mp = 3},
+		charges = 0,
+		combatcooldown = 0,
+		cooldown = 0,
+		catalysts = {},
+		target = 'enemy',
+		target_number = 'single',
+		target_range = 'weapon',
+		damage_type = 'water',
+		sfx = [{code = 'water_attack', target = 'target', period = 'predamage'}], 
+		sounddata = {initiate = null, strike = 'blade', hit = null},
+		value = 1.0,
+	},
+	water_shield = {
+		code = 'water_shield',
+		descript = '',
+		icon = load("res://assets/images/iconsskills/Barrier.png"),
+		type = 'combat', 
+		ability_type = 'spell',
+		tags = ['support', 'buff'],
+		reqs = [],
+		targetreqs = [],
+		effects = [Effectdata.rebuild_template({effect = 'e_t_watershield', duration = 5})], 
+		cost = {mp = 8},
+		charges = 0,
+		combatcooldown = 0,
+		cooldown = 0,
+		catalysts = {},
+		target = 'ally',
+		target_number = 'single',
+		target_range = 'any',
+		damage_type = 'water',#not sure but not matters
+		sfx = [{code = 'water_shield', target = 'target', period = 'predamage'}],
+		sounddata = {initiate = null, strike = 'skill_scene', hit = null},
+		value = [['0']],
+		damagestat = ['no_stat'],
+		variations = [
+			{
+				reqs = [{code = 'stat', stat = 'mastery_water', value = 4, operant = 'eq'}],
+				set = {target_number = 'line'},
+				add = {descript = '_1'}
+			},
+			{
+				reqs = [{code = 'stat', stat = 'mastery_water', value = 5, operant = 'gte'}],
+				set = {target_number = 'all'},
+				add = {descript = '_2'}
+			},
+			{
+				reqs = [{code = 'stat', stat = 'combatgroup', value = 'enemy', operant = 'eq'}],
+				set = {targetreqs = [{code = 'has_status', status = 'shield', check = false}],} #to prevent overuse of long-duration buffs
+			}
+		]
+	},
+	frost_prison = {
+		code = 'frost_prison',
+		descript = '',
+		icon = "res://assets/images/iconsskills/freeze.png",
+		type = 'combat', 
+		ability_type = 'spell',
+		tags = ['damage', 'debuf', 'water', 'kill_animation_ice', 'ads'],
+#		new_syntax = true,
+		reqs = [],
+		targetreqs = [],
+		effects = [Effectdata.rebuild_template({effect = 'freeze', chance = 0.5, duration = 1})], 
+		cost = {mp = 6},
+		charges = 0,
+		combatcooldown = 0,
+		cooldown = 0,
+		catalysts = {},
+		target = 'enemy',
+		target_number = 'single',
+		target_range = 'any',
+		damage_type = 'water',
+		sfx = [{code = 'frost_prison', target = 'target', period = 'predamage'}], 
+		sound = [],
+		value = 1.3,
+	},
+	clarity = {
+		code = 'clarity',
+		descript = '',
+		icon = "res://assets/images/iconsskills/Mindread.png",
+		type = 'combat', 
+		ability_type = 'spell',
+		tags = ['support', 'buff'],
+		reqs = [],
+		targetreqs = [],
+		effects = ['e_s_clarity'], 
+		custom_duration = ['4'],
+		cost = {mp = 7},
+		charges = 0,
+		combatcooldown = 0,
+		cooldown = 0,
+		catalysts = {},
+		target = 'ally',
+		target_number = 'single',
+		target_range = 'any',
+		damage_type = 'water',#not sure but not matters #It matter now -Garden
+		sfx = [{code = 'heal', target = 'target', period = 'predamage'}],
+		sounddata = {initiate = null, strike = 'skill_scene', hit = null},
+		value = [['0']],
+		damagestat = ['no_stat'],
+		variations = [
+			{
+				reqs = [{code = 'stat', stat = 'combatgroup', value = 'enemy', operant = 'eq'}],
+				set = {targetreqs = [
+					{code = 'has_status', status = 'fear', check = true},
+					{orflag = true, code = 'has_status', status = 'blind', check = true},
+					{orflag = true, code = 'has_status', status = 'sleep', check = true},
+					{orflag = true, code = 'has_status', status = 'charm', check = true},
+				],}  
+			}
+		]
+	},
+	blizzard = {
+		code = 'blizzard',
+		descript = '',
+		icon = "res://assets/images/iconsskills/icon_ice.png",
+		type = 'combat', 
+		ability_type = 'spell',
+		tags = ['damage', 'debuf', 'water', 'aoe', 'kill_animation_ice'],
+		reqs = [],
+		targetreqs = [],
+		effects = [
+			'e_t_blizzard',
+			Effectdata.rebuild_template({effect = 'freeze', chance = 0.25, duration = 1})
+			], 
+		cost = {mp = 10},
+		charges = 0,
+		combatcooldown = 2,
+		chance = 60,
+		cooldown = 0,
+		catalysts = {},
+		target = 'enemy',
+		target_number = 'all',
+		target_range = 'any',
+		damage_type = 'water',
+		sfx = [{code = 'debuff', target = 'target', period = 'predamage'}], 
+		sound = [],
+		value = 0.9,
+	},
+	hailstorm = {
+		code = 'hailstorm',
+		descript = '',
+		icon = "res://assets/images/iconsskills/skill_hailstorm.png",
+		type = 'combat', 
+		ability_type = 'spell',
+		tags = ['damage', 'debuf', 'water', 'aoe','kill_animation_ice', 'ads'],
+		reqs = [],
+		targetreqs = [],
+		effects = [
+			Effectdata.rebuild_skillvalue_template({target_status = 'wet', value = 1.5}),
+			Effectdata.rebuild_skillvalue_template({target_status = 'freeze', value = 2.0/1.25}),
+			Effectdata.rebuild_template({effect = 'wet'})
+			], 
+		cost = {mp = 16},
+		charges = 0,
+		combatcooldown = 3,
+		cooldown = 0,
+		catalysts = {},
+		target = 'enemy',
+		target_number = 'all',
+		target_range = 'any',
+		damage_type = 'water',
+		sfx = [{code = 'debuff', target = 'target', period = 'predamage'}], 
+		sound = [],
+		value = 1.5,
+	},
+	
+	hyperborea = {
+		code = 'hyperborea',
+		descript = '',
+		icon = "res://assets/images/iconsskills/skill_hyperborea.png",
+		type = 'combat', 
+		ability_type = 'spell',
+		tags = ['damage', 'debuf', 'water', 'aoe'],
+		reqs = [
+			{code = 'stat', stat = 'mastery_water', value = 4, operant = 'gte'},
+			{code = 'stat', stat = 'mastery_light', value = 4, operant = 'gte'},
+		],
+		targetreqs = [],
+		effects = [], 
+		cost = {mp = 40},
+		charges = 0,
+		combatcooldown = 10,
+		cooldown = 0,
+		catalysts = {},
+		target = 'enemy',
+		target_number = 'all',
+		target_range = 'any',
+		damage_type = 'water',
+		sfx = [{code = 'debuff', target = 'target', period = 'predamage'}], 
+		sound = [],
+		value = 2.1,
+		follow_up = 'hyperborea_1' 
+	},
+	hyperborea_1 = {
+		code = 'hyperborea_1',
+		name = '',
+		descript = '',
+		icon = null,
+		type = 'combat', 
+		ability_type = 'spell',
+		tags = ['noevade','noreduce','support', 'aoe', 'not_final'],
+		reqs = [],
+		targetreqs = [],
+		effects = ['e_s_clarity'],
+		custom_duration = ['3'],
+		cost = {},
+		charges = 0,
+		combatcooldown = 0,
+		cooldown = 0,
+		catalysts = {},
+		target = 'enemy',
+		target_number = 'nontarget_group',
+		target_range = 'any',
+		damage_type = 'light',
+		sfx = [], 
+		sounddata = {initiate = null, strike = null, hit = null},
+		value = [['0']],
+		damagestat = 'no_stat',
+		not_final = true
+	},
+	poison_vapors = {
+		code = 'poison_vapors',
+		descript = '',
+		icon = "res://assets/images/iconsskills/skill_vapors.png",
+		type = 'combat', 
+		ability_type = 'spell',
+		tags = ['damage', 'aoe', 'ads', 'water'],
+		reqs = [
+			{code = 'stat', stat = 'mastery_water', value = 1, operant = 'gte'},
+			{code = 'stat', stat = 'mastery_earth', value = 3, operant = 'gte'},
+		],
+		targetreqs = [],
+		effects = [Effectdata.rebuild_template({effect = 'poison', duration = 3})], 
+		cost = {mp = 7},
+		charges = 0,
+		combatcooldown = 0,
+		cooldown = 1,
+		catalysts = {},
+		target = 'enemy',
+		target_number = 'line',
+		target_range = 'any',
+		damage_type = 'water',
+		aipatterns = ['attack'],
+		allowedtargets = ['enemy'],
+		value = 0.25,
+		random_factor_p = 0.1,
+		sfx = [{code = 'weapon', target = 'target', period = 'predamage'}], 
+		sounddata = {initiate = null, strike = 'blade', hit = null},
+	},
+}
+var effects = {
+	e_t_watershield = {
+		type = 'temp_s',
+		target = 'target',
+		stack = 'watershield',
+		tick_event = variables.TR_TURN_F,
+		rem_event = [variables.TR_COMBAT_F, variables.TR_DEATH],
+		duration = 'arg',
+		tags = ['buff','shield'],
+		statchanges = {resist_fire = 40},
+		buffs = [
+			{
+				icon = "res://assets/images/traits/speeddebuf.png",
+				description = "TRAITEFFECTWATERSHIELD",
+			}
+		],
+	},
+	e_s_clarity = {
+		type = 'trigger',
+		trigger = [variables.TR_POSTDAMAGE],
+		conditions = [],
+		req_skill = true,
+		sub_effects = [
+			Effectdata.rebuild_remove_effect('blind'),
+			Effectdata.rebuild_remove_effect('sleep'),
+			Effectdata.rebuild_remove_effect('charm'),
+			'e_t_clarity'
+			],
+		buffs = []
+	},
+	e_t_clarity = {
+		type = 'temp_s',
+		target = 'target',
+		stack = 'clarity',
+		tick_event = variables.TR_TURN_F,
+		rem_event = [variables.TR_COMBAT_F, variables.TR_DEATH],
+		duration = 4, #'arg',
+		tags = ['buff'],
+		statchanges = {matk_add_part = 0.25, resist_blind = 200, resist_sleep = 200},
+		buffs = [
+			{
+				icon = "res://assets/images/iconsskills/Mindread.png",
+				description = "TRAITEFFECTCLARITY",
+			}
+		],
+	},
+	e_t_blizzard = {
+		type = 'trigger',
+		req_skill = true,
+		trigger = [variables.TR_PREHIT],
+		conditions = [
+			{type = 'target', value = [{code = 'has_status', check = true, status = 'wet'}, {orflag = true, code = 'has_status', check = true, status = 'freeze'}]}
+			],
+		sub_effects = [
+			{
+				type = 'oneshot',
+				target = 'skill',
+				atomic = [{type = 'stat_set', stat = 'chance', value = 200}],
+			}
+		]
+	}
+}
+var atomic_effects = {}
+var buffs = {}
+
+var stacks = {
+	watershield = {}, #st 1
+	clarity = {}, #st 1
+}

@@ -1,0 +1,52 @@
+extends Panel
+
+var selectedhero
+
+func _ready():
+	input_handler.register_btn_source('inv_master_line', self, 'tut_get_master')
+
+func tut_get_master():
+	var master_name = ResourceScripts.game_party.get_master().get_full_name()
+	for line in $ScrollContainer/VBoxContainer.get_children():
+		if line.get_node("Label").text == master_name:
+			return line
+
+func update():
+	selectedhero = input_handler.interacted_character
+	input_handler.ClearContainer($ScrollContainer/VBoxContainer)
+	for id in ResourceScripts.game_party.character_order:
+		var i = ResourceScripts.game_party.characters[id]
+		var newnode = input_handler.DuplicateContainerTemplate($ScrollContainer/VBoxContainer)
+		newnode.get_node("Label").text = i.get_full_name()
+		if i.is_master() or i.is_unique():
+			newnode.get_node("Label").set("custom_colors/font_color", variables.hexcolordict.unique)
+		newnode.pressed = (i == selectedhero)
+		if i.is_on_quest():
+			newnode.disabled = true
+			newnode.set("modulate", Color(1,0,0,1))
+		newnode.connect("pressed", get_parent(), "set_active_hero", [i])
+		var work = i.get_work()
+#		var gatherable = Items.materiallist.has(work)
+		if work in ['', 'Assignment', 'disabled', 'learning', 'farming', 'travel']:
+			if i.is_on_quest() or work in ['farming', 'travel']:
+				pass
+				#stub
+				newnode.get_node("ToolIcon").texture = null
+				newnode.get_node("TaskIcon").texture = null
+			else:
+				newnode.get_node("ToolIcon").texture = null
+				newnode.get_node("TaskIcon").texture = load("res://assets/images/gui/gui icons/icon_rest_brothel.png")
+				globals.connecttexttooltip(newnode.get_node("TaskIcon"), tr('REST')) #2test, not sure if assignments are here or in upper block
+		else:
+			var task = i.find_worktask()
+			newnode.get_node("TaskIcon").texture = load(task.icon)
+			globals.connecttexttooltip(newnode.get_node("TaskIcon"), tr(task.name))
+			if task.has('worktool'):
+				var worktool = "res://assets/images/gui/inventory/tool_%s.png" % task.worktool
+				newnode.get_node("ToolIcon").texture = load(worktool)
+				var i_worktool = Items.get_item_by_tooltype(task.worktool)
+				if i_worktool != null:
+					i_worktool = Items.itemlist[i_worktool]
+					globals.connecttexttooltip(newnode.get_node("ToolIcon"), tr(i_worktool.name))
+			else:
+				newnode.get_node("ToolIcon").texture = null

@@ -1,0 +1,720 @@
+[gd_scene load_steps=41 format=2]
+
+[ext_resource path="res://assets/Fonts_v2/PT_Sans/PTSans-Regular.ttf" type="DynamicFontData" id=1]
+[ext_resource path="res://assets/images/portraits/cali_prt.png" type="Texture" id=2]
+[ext_resource path="res://assets/Fonts_v2/PT_Sans/PTSans-Bold.ttf" type="DynamicFontData" id=3]
+[ext_resource path="res://assets/Textures_v2/Universal/Buttons/button_exp_pressed.png" type="Texture" id=4]
+[ext_resource path="res://assets/Textures_v2/Universal/Bars/bar_big.png" type="Texture" id=5]
+[ext_resource path="res://assets/Textures_v2/Universal/Bars/bar_small_submission.png" type="Texture" id=7]
+[ext_resource path="res://assets/images/traits/bowextradamage.png" type="Texture" id=8]
+[ext_resource path="res://assets/Textures_v2/Universal/Bars/bar_big_hp.png" type="Texture" id=9]
+[ext_resource path="res://assets/Textures_v2/Universal/Buttons/button_exp.png" type="Texture" id=10]
+[ext_resource path="res://assets/images/gui/gui icons/icon_wits.png" type="Texture" id=11]
+[ext_resource path="res://assets/Textures_v2/Universal/Bars/bar_big_mp.png" type="Texture" id=12]
+[ext_resource path="res://assets/Textures_v2/Universal/Bars/bar_big_lust.png" type="Texture" id=13]
+[ext_resource path="res://assets/Textures_v2/Universal/Bars/bar_small.png" type="Texture" id=14]
+[ext_resource path="res://assets/images/sexicons/futa.png" type="Texture" id=15]
+[ext_resource path="res://assets/images/gui/gui icons/icon_physics.png" type="Texture" id=16]
+[ext_resource path="res://assets/images/gui/gui icons/icon_charm.png" type="Texture" id=17]
+[ext_resource path="res://assets/images/gui/gui icons/icon_slaveinfo_star.png" type="Texture" id=18]
+[ext_resource path="res://assets/Textures_v2/Universal/Buttons/button_exp_hover.png" type="Texture" id=19]
+[ext_resource path="res://assets/Textures_v2/MANSION/Skills/Buttons/buttonskill.png" type="Texture" id=20]
+[ext_resource path="res://assets/Textures_v2/Universal/Icons/crown.png" type="Texture" id=21]
+[ext_resource path="res://src/scenes/RightClickReactButton.gd" type="Script" id=22]
+[ext_resource path="res://assets/images/gui/inventory/icon_craft1.png" type="Texture" id=23]
+[ext_resource path="res://assets/Themes_v2/MANSION/M_Slave_Module.tres" type="Theme" id=24]
+[ext_resource path="res://assets/Themes_v2/UNIVERSAL/DecorButton.tres" type="Theme" id=25]
+[ext_resource path="res://assets/Fonts_v2/FontThemes/TitlesMiddle.tres" type="DynamicFont" id=26]
+[ext_resource path="res://gui_modules/Mansion/Scripts/MansionSlaveModule.gd" type="Script" id=27]
+[ext_resource path="res://assets/Themes_v2/MANSION/MansionSlaveInfoPanele.tres" type="StyleBox" id=28]
+[ext_resource path="res://assets/Fonts_v2/FontThemes/MainMiddle.tres" type="DynamicFont" id=29]
+[ext_resource path="res://assets/Fonts_v2/FontThemes/MainSmallBold.tres" type="DynamicFont" id=30]
+[ext_resource path="res://assets/Themes_v2/UNIVERSAL/VScrollBar.tres" type="Theme" id=31]
+[ext_resource path="res://assets/images/iconstraits/grey.png" type="Texture" id=32]
+[ext_resource path="res://assets/images/iconstraits/cross.png" type="Texture" id=33]
+[ext_resource path="res://assets/Textures_v2/CHAR_INFO/traitpanel/button_traits_universal.png" type="Texture" id=34]
+[ext_resource path="res://assets/images/iconsraces/human.png" type="Texture" id=35]
+[ext_resource path="res://assets/Fonts_v2/Noto_Sans_SC/NotoSansSC-Regular.otf" type="DynamicFontData" id=36]
+[ext_resource path="res://assets/images/iconsages/T.png" type="Texture" id=37]
+
+[sub_resource type="DynamicFont" id=1]
+size = 14
+font_data = ExtResource( 3 )
+
+[sub_resource type="DynamicFont" id=2]
+size = 24
+font_data = ExtResource( 1 )
+
+[sub_resource type="DynamicFont" id=3]
+size = 24
+font_data = ExtResource( 1 )
+
+[sub_resource type="DynamicFont" id=4]
+size = 34
+use_filter = true
+font_data = ExtResource( 36 )
+
+[node name="MansionSlaveModule" type="Panel"]
+rect_min_size = Vector2( 470, 665 )
+theme = ExtResource( 24 )
+custom_styles/panel = ExtResource( 28 )
+script = ExtResource( 27 )
+
+[node name="Background" type="Panel" parent="."]
+self_modulate = Color( 0, 0, 0, 0.705882 )
+show_behind_parent = true
+margin_right = 470.0
+margin_bottom = 665.0
+rect_min_size = Vector2( 470, 665 )
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="job" type="RichTextLabel" parent="."]
+visible = false
+margin_left = 200.0
+margin_top = 139.0
+margin_right = 456.0
+margin_bottom = 204.0
+mouse_filter = 2
+custom_colors/default_color = Color( 0.878431, 0.878431, 0.878431, 1 )
+custom_fonts/normal_font = ExtResource( 29 )
+bbcode_enabled = true
+text = "Job"
+scroll_active = false
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="TextureRect" type="Panel" parent="."]
+self_modulate = Color( 1, 1, 1, 0 )
+margin_right = 470.0
+margin_bottom = 100.0
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="ScrollContainer" type="ScrollContainer" parent="TextureRect"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+margin_left = 5.0
+margin_top = 5.0
+margin_right = -5.0
+margin_bottom = -5.0
+theme = ExtResource( 31 )
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="professions" type="GridContainer" parent="TextureRect/ScrollContainer"]
+mouse_filter = 2
+custom_constants/vseparation = 0
+custom_constants/hseparation = 0
+columns = 5
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Button" type="TextureRect" parent="TextureRect/ScrollContainer/professions" groups=["ignore_rightclicks"]]
+visible = false
+margin_right = 89.0
+margin_bottom = 89.0
+grow_horizontal = 0
+grow_vertical = 0
+rect_min_size = Vector2( 89, 89 )
+texture = ExtResource( 20 )
+expand = true
+stretch_mode = 6
+script = ExtResource( 22 )
+
+[node name="Label" type="Label" parent="TextureRect/ScrollContainer/professions/Button"]
+visible = false
+margin_left = 6.0
+margin_top = 64.0
+margin_right = 84.0
+margin_bottom = 83.0
+custom_fonts/font = SubResource( 1 )
+text = "Label"
+align = 1
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="ProfIcon" type="TextureRect" parent="TextureRect/ScrollContainer/professions/Button"]
+show_behind_parent = true
+margin_left = 6.0
+margin_top = 6.0
+margin_right = 84.0
+margin_bottom = 84.0
+expand = true
+stretch_mode = 1
+
+[node name="Portrait" type="TextureRect" parent="."]
+margin_left = 7.0
+margin_top = 103.0
+margin_right = 181.0
+margin_bottom = 261.0
+rect_min_size = Vector2( 120, 150 )
+texture = ExtResource( 2 )
+expand = true
+stretch_mode = 7
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="race" type="TextureRect" parent="."]
+margin_left = 252.416
+margin_top = 146.127
+margin_right = 292.416
+margin_bottom = 186.127
+texture = ExtResource( 35 )
+expand = true
+stretch_mode = 6
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="sex" type="TextureRect" parent="."]
+margin_left = 307.201
+margin_top = 146.18
+margin_right = 347.201
+margin_bottom = 186.18
+texture = ExtResource( 15 )
+expand = true
+stretch_mode = 6
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="age" type="TextureRect" parent="."]
+margin_left = 361.201
+margin_top = 146.18
+margin_right = 401.201
+margin_bottom = 186.18
+texture = ExtResource( 37 )
+expand = true
+stretch_mode = 6
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="RichTextLabel" type="RichTextLabel" parent="."]
+margin_left = 200.0
+margin_top = 103.436
+margin_right = 456.0
+margin_bottom = 140.436
+custom_colors/default_color = Color( 1, 0.721569, 0.196078, 1 )
+custom_fonts/normal_font = ExtResource( 29 )
+bbcode_enabled = true
+text = "Name"
+scroll_active = false
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="base_stats" type="VBoxContainer" parent="." groups=["hide_stranger"]]
+margin_left = 195.0
+margin_top = 206.0
+margin_right = 455.0
+margin_bottom = 308.0
+custom_constants/separation = 9
+
+[node name="hp" type="TextureProgress" parent="base_stats"]
+margin_right = 260.0
+margin_bottom = 28.0
+rect_min_size = Vector2( 200, 25 )
+value = 100.0
+rounded = true
+texture_over = ExtResource( 5 )
+texture_progress = ExtResource( 9 )
+texture_progress_offset = Vector2( 29, 3 )
+
+[node name="Label" type="Label" parent="base_stats/hp"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+custom_colors/font_color = Color( 0.878431, 0.878431, 0.878431, 1 )
+custom_fonts/font = ExtResource( 30 )
+text = "1.100"
+align = 1
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="mp" type="TextureProgress" parent="base_stats"]
+margin_top = 37.0
+margin_right = 260.0
+margin_bottom = 65.0
+rect_min_size = Vector2( 200, 25 )
+value = 50.0
+texture_over = ExtResource( 5 )
+texture_progress = ExtResource( 12 )
+texture_progress_offset = Vector2( 29, 3 )
+
+[node name="Label" type="Label" parent="base_stats/mp"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+custom_colors/font_color = Color( 0.878431, 0.878431, 0.878431, 1 )
+custom_fonts/font = ExtResource( 30 )
+text = "1.100"
+align = 1
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="lust" type="TextureProgress" parent="base_stats"]
+margin_top = 74.0
+margin_right = 260.0
+margin_bottom = 102.0
+rect_min_size = Vector2( 200, 25 )
+value = 50.0
+texture_over = ExtResource( 5 )
+texture_progress = ExtResource( 13 )
+texture_progress_offset = Vector2( 29, 3 )
+
+[node name="Label" type="Label" parent="base_stats/lust"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+custom_colors/font_color = Color( 0.878431, 0.878431, 0.878431, 1 )
+custom_fonts/font = ExtResource( 30 )
+text = "1.100"
+align = 1
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="productivity" type="TextureRect" parent="."]
+margin_top = 458.016
+margin_right = 66.0
+margin_bottom = 524.016
+texture = ExtResource( 23 )
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Label" type="Label" parent="productivity"]
+margin_left = 80.0
+margin_top = 13.9836
+margin_right = 176.0
+margin_bottom = 53.9836
+custom_colors/font_color = Color( 0.878431, 0.878431, 0.878431, 1 )
+custom_fonts/font = SubResource( 2 )
+align = 1
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="CharacterInfoButton" type="Button" parent="."]
+margin_left = 16.0
+margin_top = 591.0
+margin_right = 456.0
+margin_bottom = 654.0
+theme = ExtResource( 25 )
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Label" type="Label" parent="CharacterInfoButton"]
+margin_left = 8.0
+margin_right = 432.0
+margin_bottom = 63.0
+custom_colors/font_color = Color( 0.976471, 0.882353, 0.505882, 1 )
+custom_fonts/font = ExtResource( 26 )
+text = "MSMNAME"
+align = 1
+valign = 1
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="growth" type="Label" parent="."]
+margin_left = 73.0
+margin_top = 309.0
+margin_right = 178.0
+margin_bottom = 344.0
+custom_colors/font_color = Color( 0.996078, 0.317647, 0.364706, 1 )
+custom_fonts/font = ExtResource( 29 )
+text = "Growth"
+align = 1
+clip_text = true
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="physics" type="Label" parent="."]
+margin_left = 71.641
+margin_top = 345.752
+margin_right = 121.641
+margin_bottom = 377.752
+custom_colors/font_color = Color( 0.878431, 0.878431, 0.878431, 1 )
+custom_fonts/font = ExtResource( 29 )
+text = "Wits"
+align = 1
+clip_text = true
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="physics2" type="Label" parent="."]
+margin_left = 130.052
+margin_top = 346.546
+margin_right = 180.052
+margin_bottom = 378.546
+custom_colors/font_color = Color( 0.878431, 0.878431, 0.878431, 1 )
+custom_fonts/font = ExtResource( 29 )
+text = "Wits"
+align = 1
+clip_text = true
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="wits" type="Label" parent="."]
+margin_left = 71.2438
+margin_top = 384.08
+margin_right = 121.244
+margin_bottom = 416.08
+custom_colors/font_color = Color( 0.878431, 0.878431, 0.878431, 1 )
+custom_fonts/font = ExtResource( 29 )
+text = "Charm"
+align = 1
+clip_text = true
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="wits2" type="Label" parent="."]
+margin_left = 130.449
+margin_top = 383.682
+margin_right = 180.449
+margin_bottom = 415.682
+custom_colors/font_color = Color( 0.878431, 0.878431, 0.878431, 1 )
+custom_fonts/font = ExtResource( 29 )
+text = "Charm"
+align = 1
+clip_text = true
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="charm" type="Label" parent="."]
+margin_left = 72.4354
+margin_top = 422.01
+margin_right = 122.435
+margin_bottom = 454.01
+custom_colors/font_color = Color( 0.878431, 0.878431, 0.878431, 1 )
+custom_fonts/font = ExtResource( 29 )
+text = "Sexuals"
+align = 1
+clip_text = true
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="charm2" type="Label" parent="."]
+margin_left = 131.244
+margin_top = 422.01
+margin_right = 181.244
+margin_bottom = 454.01
+custom_colors/font_color = Color( 0.878431, 0.878431, 0.878431, 1 )
+custom_fonts/font = ExtResource( 29 )
+text = "Sexuals"
+align = 1
+clip_text = true
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="TextureRect2" type="Control" parent="."]
+margin_left = 16.0126
+margin_top = 284.016
+margin_right = 56.0126
+margin_bottom = 458.016
+mouse_filter = 2
+
+[node name="Exp" type="TextureButton" parent="TextureRect2"]
+margin_left = -8.0
+margin_top = -14.0
+margin_right = 48.0
+margin_bottom = 20.0
+texture_normal = ExtResource( 10 )
+texture_pressed = ExtResource( 4 )
+texture_hover = ExtResource( 19 )
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Label" type="Label" parent="TextureRect2/Exp"]
+margin_left = -1.0
+margin_right = 52.0
+margin_bottom = 34.0
+text = "MSMEXP"
+align = 1
+valign = 1
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="growth_factor" type="TextureRect" parent="TextureRect2"]
+margin_left = 2.20064
+margin_top = 25.7605
+margin_right = 42.2006
+margin_bottom = 55.7605
+mouse_filter = 0
+texture = ExtResource( 18 )
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="physics" type="TextureRect" parent="TextureRect2"]
+margin_left = 2.20064
+margin_top = 64.7605
+margin_right = 42.2006
+margin_bottom = 89.7605
+mouse_filter = 0
+texture = ExtResource( 16 )
+
+[node name="wits" type="TextureRect" parent="TextureRect2"]
+margin_top = 102.649
+margin_right = 40.0
+margin_bottom = 127.649
+mouse_filter = 0
+texture = ExtResource( 11 )
+
+[node name="charm" type="TextureRect" parent="TextureRect2"]
+margin_left = 3.07358
+margin_top = 140.532
+margin_right = 43.0736
+margin_bottom = 165.532
+mouse_filter = 0
+texture = ExtResource( 17 )
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="exp" type="Label" parent="."]
+margin_left = 106.784
+margin_top = 269.761
+margin_right = 146.785
+margin_bottom = 301.761
+custom_colors/font_color = Color( 0.878431, 0.878431, 0.878431, 1 )
+custom_fonts/font = SubResource( 3 )
+text = "0"
+align = 1
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Panel" type="Control" parent="."]
+self_modulate = Color( 1, 1, 1, 0 )
+margin_left = 200.0
+margin_top = 320.0
+margin_right = 452.0
+margin_bottom = 512.0
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="obedlabel" type="Label" parent="Panel" groups=["hide_master", "hide_stranger"]]
+margin_left = 120.77
+margin_top = -8.47575
+margin_right = 199.77
+margin_bottom = 41.5242
+rect_scale = Vector2( 0.627771, 0.627771 )
+custom_colors/font_color = Color( 0.878431, 0.878431, 0.878431, 1 )
+custom_fonts/font = SubResource( 4 )
+text = "25"
+align = 1
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="icon" type="TextureRect" parent="Panel/obedlabel"]
+margin_left = -70.9468
+margin_top = -11.9857
+margin_right = 5.05327
+margin_bottom = 59.0143
+texture = ExtResource( 21 )
+expand = true
+stretch_mode = 6
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="authoritylabel" type="Label" parent="Panel" groups=["hide_master", "hide_stranger"]]
+visible = false
+margin_left = -0.793697
+margin_top = 103.0
+margin_right = 237.206
+margin_bottom = 138.0
+mouse_filter = 0
+custom_colors/font_color = Color( 0.976471, 0.882353, 0.505882, 1 )
+custom_fonts/font = ExtResource( 29 )
+text = "Authority: "
+align = 1
+
+[node name="authoritylabel2" type="Label" parent="Panel" groups=["hide_master", "hide_stranger"]]
+margin_left = 32.0
+margin_top = 36.0803
+margin_right = 211.0
+margin_bottom = 71.0803
+mouse_filter = 0
+custom_colors/font_color = Color( 0.878431, 0.878431, 0.878431, 1 )
+custom_fonts/font = ExtResource( 29 )
+text = "Loyalty"
+align = 1
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="authoritylabel3" type="Label" parent="Panel" groups=["hide_master", "hide_stranger"]]
+visible = false
+margin_left = 32.0
+margin_top = 77.0
+margin_right = 211.0
+margin_bottom = 109.0
+mouse_filter = 0
+custom_colors/font_color = Color( 0.878431, 0.878431, 0.878431, 1 )
+custom_fonts/font = ExtResource( 29 )
+text = "Submission"
+align = 1
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="loyaltylabel" type="Label" parent="Panel" groups=["hide_master", "hide_stranger"]]
+visible = false
+margin_left = 32.0
+margin_top = 51.0
+margin_right = 211.0
+margin_bottom = 75.0
+
+[node name="submissionlabel" type="TextureProgress" parent="Panel" groups=["hide_master", "hide_stranger"]]
+visible = false
+margin_left = 32.0
+margin_top = 107.582
+margin_right = 211.0
+margin_bottom = 131.582
+value = 100.0
+texture_over = ExtResource( 14 )
+texture_progress = ExtResource( 7 )
+
+[node name="buffscontainer" type="HBoxContainer" parent="."]
+margin_left = 8.0
+margin_top = 528.0
+margin_right = 464.0
+margin_bottom = 579.0
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Button" type="TextureRect" parent="buffscontainer"]
+visible = false
+margin_right = 51.0
+margin_bottom = 51.0
+rect_min_size = Vector2( 51, 51 )
+texture = ExtResource( 8 )
+expand = true
+stretch_mode = 1
+
+[node name="Label" type="Label" parent="buffscontainer/Button"]
+margin_top = 24.0
+margin_right = 49.0
+margin_bottom = 51.0
+custom_colors/font_color_shadow = Color( 0, 0, 0, 1 )
+custom_fonts/font = ExtResource( 29 )
+text = "5"
+align = 1
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="scroll" type="ScrollContainer" parent="."]
+margin_left = 189.0
+margin_top = 456.0
+margin_right = 463.0
+margin_bottom = 521.0
+theme = ExtResource( 31 )
+scroll_vertical_enabled = false
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="traitscontainer" type="HBoxContainer" parent="scroll"]
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Button" type="TextureButton" parent="scroll/traitscontainer"]
+visible = false
+margin_right = 50.0
+margin_bottom = 51.0
+rect_min_size = Vector2( 50, 50 )
+texture_normal = ExtResource( 32 )
+expand = true
+
+[node name="icon" type="TextureRect" parent="scroll/traitscontainer/Button"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+margin_left = 10.0
+margin_top = 10.0
+margin_right = -10.0
+margin_bottom = -10.0
+mouse_filter = 2
+expand = true
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="cross" type="TextureRect" parent="scroll/traitscontainer/Button"]
+visible = false
+anchor_right = 1.0
+anchor_bottom = 1.0
+margin_left = 10.0
+margin_top = 10.0
+margin_right = -10.0
+margin_bottom = -10.0
+mouse_filter = 2
+texture = ExtResource( 33 )
+expand = true
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="TextureRect" type="TextureRect" parent="scroll/traitscontainer/Button"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+texture = ExtResource( 34 )
+expand = true
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Button2" type="TextureRect" parent="scroll/traitscontainer"]
+visible = false
+margin_right = 51.0
+margin_bottom = 51.0
+rect_min_size = Vector2( 51, 51 )
+texture = ExtResource( 8 )
+expand = true
+stretch_mode = 1
+
+[node name="Label" type="Label" parent="scroll/traitscontainer/Button2"]
+margin_top = 24.0
+margin_right = 49.0
+margin_bottom = 51.0
+custom_colors/font_color_shadow = Color( 0, 0, 0, 1 )
+custom_fonts/font = ExtResource( 29 )
+text = "5"
+align = 1
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="TextureRect" type="TextureRect" parent="scroll/traitscontainer/Button2"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+texture = ExtResource( 34 )
+expand = true
+__meta__ = {
+"_edit_use_anchors_": false
+}

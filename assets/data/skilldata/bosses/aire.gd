@@ -1,0 +1,547 @@
+extends Reference
+
+var skills = {
+	#Behind the scene skill zone
+	underwatched = {
+		code = 'underwatched',
+		descript = '',
+		icon =  "res://assets/images/iconsskills/comboattack.png",
+		type = 'auto', 
+		ability_type = 'spell',
+		tags = ['aoe', 'debuff','instant','noreduce', 'noevade', 'passive'],
+		reqs = [],
+		targetreqs = [],
+		effects = ['e_underwatch'], 
+		cost = {},
+		charges = 0,
+		combatcooldown = 0,
+		cooldown = 0,
+		catalysts = {},
+		target = 'self',
+		target_number = 'nontarget_group',
+		target_range = 'any',
+		damage_type = 'weapon',
+		sfx = [], 
+		sounddata = {initiate = null, strike = null, hit = null, hittype = null},
+		value = [['0']],
+		damagestat = ['no_stat'],
+		critchance = 0,
+		not_final = true
+	},
+	aire_cover_fire = {
+		code = 'aire_cover_fire',
+		descript = '',
+		icon = load("res://assets/images/iconsskills/heavyshot.png"),
+		type = 'combat', 
+		ability_type = 'skill',
+		tags = ['damage', 'disable_immunity', 'basic', 'stealth_casting'],
+		reqs = [],
+		targetreqs = [],
+		effects = ['expose_cover'], 
+		cost = {},
+		charges = 0,
+		combatcooldown = 0,
+		cooldown = 0,
+		catalysts = {},
+		target = 'enemy',
+		target_number = 'single',
+		target_range = 'any',
+		damage_type = 'weapon',
+		aipatterns = ['attack'],
+		allowedtargets = ['enemy'],
+		value = 0.625,
+		sfx = [{code = 'ranged_attack', target = 'target', period = 'predamage'}], 
+		sounddata = {initiate = null, strike = 'blade', hit = null},
+		variations = [ #Due to order of thing...5 goddamn counter attack will still be fire even if Aire only have 1 counter attack left
+			{# Using variation seem to be the only way to enforce correct number of counter attack
+				reqs = [{code = 'stat', stat = 'counterattacks', operant = 'lt', value = 1.0}],
+				set = {
+					value = [['0']],
+					damagestat = ['no_stat'],
+					critchance = 0,
+					sfx = [], 
+					sounddata = {initiate = null, strike = null, hit = null, hittype = null},
+				},
+			},
+		]
+	},
+	aire_eye_for_an_eye = {
+		code = 'aire_eye_for_an_eye',
+		descript = '',
+		icon = load("res://assets/images/iconsskills/heavyshot.png"),
+		type = 'combat',
+		ability_type = 'skill',
+		tags = ['damage', 'disable_immunity', 'basic', 'stealth_casting'],
+		reqs = [],
+		targetreqs = [],
+		effects = ['expose_cover'], 
+		cost = {},
+		charges = 0,
+		combatcooldown = 0,
+		cooldown = 0,
+		catalysts = {},
+		target = 'enemy',
+		target_number = 'single',
+		target_range = 'any',
+		damage_type = 'weapon',
+		aipatterns = ['attack'],
+		allowedtargets = ['enemy'],
+		value = 1.4,
+		armor_p = [['target.armor','*0.3']],
+		sfx = [{code = 'provocation', target = 'caster', period = 'windup'},{code = 'ranged_attack', target = 'target', period = 'predamage'}], 
+		sounddata = {initiate = null, strike = 'blade', hit = null},
+		variations = [
+			{
+				reqs = [{code = 'stat', stat = 'counterattacks', operant = 'lt', value = 1.0}],
+				set = {
+					value = [['0']],
+					damagestat = ['no_stat'],
+					critchance = 0,
+					sfx = [], 
+					sounddata = {initiate = null, strike = null, hit = null, hittype = null},
+				},
+			},
+		]
+	},
+	#Actual skill zone.
+	for_the_princess = {
+		code = 'for_the_princess',
+		descript = '',
+		icon = load("res://assets/images/iconsskills/Warn.png"),
+		type = 'combat', 
+		ability_type = 'skill',
+		tags = ['damage', 'buff'],
+		reqs = [],
+		targetreqs = [],
+		effects = [], 
+		cost = {mp = 5},
+		charges = 0,
+		combatcooldown = 3,
+		cooldown = 0,
+		catalysts = {},
+		target = 'enemy',
+		target_number = 'single',
+		target_range = 'any',
+		damage_type = 'weapon',
+		aipatterns = ['attack'],
+		allowedtargets = ['enemy'],
+		value = 1.1,
+		sfx = [{code = 'ranged_attack', target = 'target', period = 'predamage'}], 
+		sounddata = {initiate = null, strike = 'blade', hit = null},
+		follow_up = 'for_the_princess_1',
+		not_final = true
+	},
+	for_the_princess_1 = {
+		code = 'for_the_princess_1',
+		descript = '',
+		icon = load("res://assets/images/iconsskills/icon_earthquake.png"),
+		type = 'auto', 
+		ability_type = 'spell',
+		tags = ['instant', 'passive','aoe','support','buff','noreduce', 'noevade'],
+		reqs = [],
+		targetreqs = [],
+		effects = [
+			Effectdata.rebuild_template({effect = Effectdata.rebuild_remove_effect('fear')}),
+			Effectdata.rebuild_template({effect = Effectdata.rebuild_remove_effect('taunt')}),
+			Effectdata.rebuild_template({effect = Effectdata.rebuild_remove_effect('silence')}),
+			Effectdata.rebuild_template({effect = Effectdata.rebuild_remove_effect('sleep')}),
+		], 
+		cost = {},
+		charges = 0,
+		combatcooldown = 0,
+		cooldown = 0,
+		catalysts = {},
+		target = 'ally',
+		target_number = 'nontarget_group',
+		target_range = 'any',
+		damage_type = 'air',
+		sfx = [
+			{code = 'inspire', target = 'target', period = 'predamage'},
+			{code = 'cast_air', target = 'caster', period = 'windup', is_cast = true}], 
+		sounddata = {initiate = null, strike = null, hit = null},
+		value = [['0']],
+		damagestat = 'no_stat',
+	},
+	ricochet_shot = {
+		code = 'ricochet_shot',
+		descript = '',
+		icon = "res://assets/images/iconsskills/windblade.png",
+		type = 'combat', 
+		ability_type = 'skill',
+		tags = ['damage', 'damage_spot', 'stealth_casting'],
+		reqs = [],
+		targetreqs = [],
+		effects = [], 
+		cost = {mp = 8},
+		repeat = 2,
+		charges = 0,
+		combatcooldown = 1,
+		cooldown = 0,
+		catalysts = {},
+		target = 'enemy',
+		target_number = 'single',
+		target_range = 'any',
+		damage_type = 'weapon',
+		random_target = true,
+		not_final = true,
+		sfx = [
+				{code = 'ranged_attack',target = 'target', period = 'predamage',},
+				{code = '', code_repeat = {
+				1 : "devastation_1", 2 : "devastation_2", 3 : "devastation_3", 4 : "devastation_4",}, 
+				target = 'target', period = 'predamage', duration = 0.2, no_repeat_delays = true},
+				
+			],
+		sounddata = {initiate = null, strike = 'blade', hit = null},
+		value = 0.5,
+		random_factor_p = 0.1,
+		keep_target = variables.TARGET_KEEPFIRST,
+		next_target = variables.NT_ANY_NOREPEAT,
+		variations = [
+			{
+				reqs = [{code = 'random', value = 66}],
+				set = { 
+						repeat = 3,
+					},
+			},
+			{
+				reqs = [{code = 'random', value = 33}],
+				set = { 
+						repeat = 4,
+					},
+			},
+		]
+	},
+}
+var effects = {
+	overwatch_assignment = {
+		type = 'simple',
+		statchanges = {counterattacks_max = 4},
+		tags = ['overwatch_assignment'],
+		buffs = [{
+			icon = "res://assets/images/iconsskills/takeposition.png",
+			description = "TRAIT_OVERWATCH_ASSIGNMENT",
+			tags = ['combat_only'],
+			bonuseffect = 'counterattacks'
+		}]
+	},
+	overwatch_apply = {
+		type = 'trigger',
+		trigger = [variables.TR_COMBAT_S],
+		conditions = [],
+		atomic = [],
+		buffs = [],
+		req_skill = false,
+		sub_effects = [
+			{
+				type = 'oneshot',
+				target = 'owner',
+				atomic = [{type = 'use_combat_skill', skill = 'underwatched'}]
+			},
+		],
+	},
+	e_underwatch = {
+		type = 'trigger',
+		trigger = [variables.TR_POSTDAMAGE],
+		conditions = [],
+		req_skill = true,
+		sub_effects = ['ts_underwatched'],
+		buffs = []
+	},
+	ts_underwatched = {
+		type = 'temp_global',
+		target = 'target',
+		tick_event = [variables.TR_TURN_S,],
+		rem_event = [variables.TR_COMBAT_F],
+		sub_effects = [
+			'tr_underwatched',
+			'tr_eye_for_an_eye'
+		],
+		name = 'underwatched',
+		args = {
+			skill = {obj = 'skill', func = 'eq'},
+			caster = {obj = 'caster', func = 'eq'},
+		},
+		timers = [
+			{events = variables.TR_COMBAT_F, objects = [], timer = 1},
+			{events = variables.TR_DEATH, objects = 'caster', timer = 1},
+		],
+		tags = ['underwatched','duration_none'],
+	},
+	tr_underwatched = {
+		type = 'trigger',
+		trigger = [variables.TR_PREHIT],
+		req_skill = true,
+		conditions = [
+			{type = 'skill', value = ['tags', 'has', 'damage'] },
+			{type = 'skill', value = ['mode', 'eq', variables.SKILL_BASE]},
+			{type = 'target', value = [{code = 'stat', stat = 'combatgroup', value = 'enemy', operant = 'eq'}] },
+			{type = 'target', value = [{code = 'trait', trait = 'aire_overwatch_assignment', check = false}] },
+			{type = 'caster', value = [{code = 'stat', stat = 'hp', operant = 'gt', value = 0}]},
+			{type = 'watcher', value = [{code = 'trait', trait = 'aire_overwatch_assignment', check = true},]},
+			{type = 'watcher', value = [{code = 'has_status', status = 'disable', check = false},]},
+			{type = 'watcher', value = [{code = 'has_status', status = 'disarm', check = false},]},
+			{type = 'watcher', value = [{code = 'has_status', status = 'blind', check = false},]},
+			{type = 'watcher', value = [{code = 'stat', stat = 'counterattacks', operant = 'gte', value = 1.0},]},
+		],
+		args = {
+			skill = {obj = 'skill', func = 'eq'},
+			caster = {obj = 'caster', func = 'eq'},
+			target = {obj = 'target', func = 'eq'},
+			watcher = {obj = 'parent', func = 'arg', arg = 'caster'}
+		},
+		sub_effects = [
+			{
+				type = 'oneshot',
+				target = 'watcher',
+				args = {caster = {obj = 'parent', func = 'arg', arg = 'caster'}},
+				conditions = [{code = 'stat', stat = 'counterattacks', operant = 'gte', value = 1.0}],
+				atomic = [
+					{type = 'use_combat_skill', skill = 'aire_cover_fire', target = ['parent_args', 'caster']},
+					{type = 'stat_add', stat = 'counterattacks', value = -1},
+				],
+			},
+		]
+	},
+	tr_eye_for_an_eye = {
+		type = 'trigger',
+		trigger = [variables.TR_KILL],
+		req_skill = true,
+		conditions = [
+			{type = 'target', value = [{code = 'stat', stat = 'combatgroup', value = 'enemy', operant = 'eq'}] },
+			{type = 'owner', value = [{code = 'stat', stat = 'hp', operant = 'gt', value = 0}]},
+			{type = 'watcher', value = [{code = 'trait', trait = 'aire_overwatch_assignment', check = true},]},
+			{type = 'watcher', value = [{code = 'has_status', status = 'disable', check = false},]},
+			{type = 'watcher', value = [{code = 'has_status', status = 'disarm', check = false},]},
+			{type = 'watcher', value = [{code = 'has_status', status = 'blind', check = false},]},
+			{type = 'watcher', value = [{code = 'stat', stat = 'counterattacks', operant = 'gte', value = 1.0},]},
+		],
+		args = {
+			skill = {obj = 'skill', func = 'eq'},
+			caster = {obj = 'caster', func = 'eq'},
+			target = {obj = 'target', func = 'eq'},
+			watcher = {obj = 'parent', func = 'arg', arg = 'caster'}
+		},
+		sub_effects = [
+			{
+				type = 'oneshot',
+				target = 'watcher',
+				args = {targetValue = {obj = 'parent', func = 'arg', arg = 'caster'}},
+				conditions = [{code = 'stat', stat = 'counterattacks', operant = 'gte', value = 1.0}],
+				atomic = [
+					{type = 'use_combat_skill', skill = 'aire_eye_for_an_eye', target = ['parent_args', 'targetValue']},
+					{type = 'stat_add', stat = 'counterattacks', value = -1},
+				],
+			},
+		]
+	},
+	trait_behind_cover = {
+		type = 'trigger',
+		trigger = [variables.TR_TURN_GET],
+		conditions = [
+			{type = 'owner', value = [{code = 'has_status', status = 'behind_cover', check = false}]},
+			{type = 'owner', value = [{code = 'has_status', status = 'disable', check = false}]},
+			{type = 'owner', value = [{code = 'has_status', status = 'cover_blocked', check = false}]},
+			{type = 'owner', value = [{code = 'stat', stat = 'hp', operant = 'gt', value = 0}]},
+		],
+		atomic = [],
+		buffs = [],
+		req_skill = false,
+		tags = ['trait_behind_cover'],
+		sub_effects = [
+			{
+				type = 'oneshot',
+				target = 'owner',
+				atomic = [{type = 'sfx', value = 'earth_shield'},]
+			},
+			'behind_cover','cover_blocked'
+		],
+	},
+	behind_cover = {
+		type = 'temp_s',
+		target = 'owner',
+		stack = 'behind_cover',
+		tick_event = [variables.TR_NONE],
+		rem_event = [variables.TR_DEATH, variables.TR_COMBAT_F],
+		duration = 1,
+		tags = ['behind_cover'],
+		statchanges = {},
+		sub_effects = ['behind_cover_tr_melee_aoe','behind_cover_tr_range'],
+		buffs = ['b_behind_cover'],
+	},
+	cover_blocked = {
+		type = 'temp_s',
+		target = 'owner',
+		tick_event = [variables.TR_NONE],
+		rem_event = [variables.TR_TURN_S, variables.TR_COMBAT_F],
+		duration = 1,
+		tags = ['cover_blocked'],
+		statchanges = {},
+		sub_effects = [],
+		buffs = [],
+	},
+	behind_cover_tr_melee_aoe = {
+		type = 'trigger',
+		trigger = [variables.TR_DEF],
+		req_skill = true,
+		conditions = [
+			{type = 'skill', value = ['tags', 'has', 'aoe'] },
+			{type = 'skill', value = ['target_range', 'eq', 'melee']},
+			{type = 'caster', value = [{code = 'stat', stat = 'combatgroup', value = 'enemy', operant = 'neq'}] },
+		],
+		args = {
+			skill = {obj = 'skill', func = 'eq'},
+			caster = {obj = 'caster', func = 'eq'},
+			target = {obj = 'target', func = 'eq'},
+			receiver = {obj = 'receiver', func = 'eq'},
+		},
+		sub_effects = [
+			{
+				type = 'oneshot',
+				target = 'skill',
+				atomic = [{type = 'stat_set', stat = 'hit_res', value = variables.RES_MISS},],
+			},
+			{
+				type = 'oneshot',
+				target = 'target',
+				atomic = [{type = 'remove_all_effects', value = 'behind_cover'},]
+			},
+		]
+	},
+	behind_cover_tr_range = {
+		type = 'trigger',
+		trigger = [variables.TR_DEF],
+		req_skill = true,
+		conditions = [
+			{type = 'skill', value = ['target_range', 'eq', 'any']},
+			{type = 'caster', value = [{code = 'stat', stat = 'combatgroup', value = 'enemy', operant = 'neq'}] },
+		],
+		args = {
+			skill = {obj = 'skill', func = 'eq'},
+			caster = {obj = 'caster', func = 'eq'},
+			target = {obj = 'target', func = 'eq'},
+			receiver = {obj = 'receiver', func = 'eq'},
+		},
+		sub_effects = [
+			{
+				type = 'oneshot',
+				target = 'skill',
+				atomic = [{type = 'stat_set', stat = 'hit_res', value = variables.RES_MISS},],
+			},
+			{
+				type = 'oneshot',
+				target = 'target',
+				atomic = [{type = 'remove_all_effects', value = 'behind_cover'},]
+			},
+		]
+	},
+	expose_cover = {
+		type = 'trigger',
+		trigger = [variables.TR_POSTDAMAGE],
+		req_skill = true,
+		conditions = [],
+		args = {
+			skill = {obj = 'skill', func = 'eq'},
+			caster = {obj = 'caster', func = 'eq'},
+		},
+		sub_effects = [
+			{
+				type = 'oneshot',
+				target = 'caster',
+				conditions = [],
+				atomic = [{type = 'remove_all_effects', value = 'behind_cover'}],
+			},
+		],
+	},
+	tr_aim_adjustment = {
+		type = 'trigger',
+		trigger = [variables.TR_POSTDAMAGE],
+		req_skill = true,
+		conditions = [
+			{type = 'skill', value = ['tags', 'has', 'damage'] },
+			{type = 'skill', value = ['target_range', 'eq', 'any']},
+			{type = 'skill', value = ['target_number', 'eq', 'single']},
+			{type = 'caster', value = [{code = 'buff_number', operant = 'lt', status = 'aim_adjustment', value = 3}] },
+		],
+		args = {
+			skill = {obj = 'skill', func = 'eq'},
+			caster = {obj = 'caster', func = 'eq'},
+		},
+		sub_effects = [
+			'aim_adjustment'
+		]
+	},
+	aim_adjustment_tr = {
+		type = 'trigger',
+		trigger = [variables.TR_HIT],
+		req_skill = true,
+		conditions = [
+			{type = 'skill', value = ['tags', 'has', 'damage'] },
+			{type = 'owner', value = [{code = 'buff_number', operant = 'gte', status = 'aim_adjustment', value = 3}] },
+		],
+		args = {skill = {obj = 'skill', func = 'eq'}},
+		sub_effects = [
+			{
+				type = 'oneshot',
+				target = 'skill',
+				atomic = [{type = 'stat_set', stat = 'hit_res', value = variables.RES_CRIT}],
+			},
+		]
+	},
+	aim_adjustment = {
+		type = 'temp_s',
+		target = 'caster',
+		stack = 'aim_adjustment',
+		rem_event = [variables.TR_DEATH,variables.TR_COMBAT_F],
+		tick_event = [variables.TR_NONE],
+		tags = ['aim_adjustment'],
+		duration = 1,
+		statchanges = {},
+		sub_effects = ['aim_adjustment_tr','aim_adjustment_removal'],
+		buffs = ['b_aim_adjustment']
+	},
+	aim_adjustment_removal = {
+		type = 'trigger',
+		trigger = [variables.TR_POSTDAMAGE],
+		req_skill = true,
+		conditions = [
+			{type = 'skill', value = ['tags', 'has', 'damage'] },
+			{type = 'owner', value = [{code = 'buff_number', operant = 'gte', status = 'aim_adjustment', value = 3}] },
+		],
+		args = {
+			skill = {obj = 'skill', func = 'eq'},
+			caster = {obj = 'caster', func = 'eq'},
+		},
+		sub_effects = [
+			{
+				type = 'oneshot',
+				target = 'owner',
+				conditions = [],
+				atomic = [{type = 'remove_all_effects', value = 'aim_adjustment'}],
+			},
+		],
+	},
+}
+var atomic_effects = {}
+var buffs = {
+	b_behind_cover = {
+		icon = "res://assets/images/iconsitems/item_stone.png",
+		description = "EFFECT_BEHIND_COVER",
+	},
+	b_aim_adjustment = {
+		icon = "res://assets/images/iconsskills/icon_hunters_mark.png",
+		description = "EFFECT_AIM_ADJUSTMENT",
+		tags = ['show_amount']
+	},
+}
+var stacks = {
+	behind_cover = {
+		type = 'stack_s',
+		stack = 1,
+		buff = 'b_behind_cover'
+	},
+	aim_adjustment = {
+		type = 'stack_a',
+		stack = 3,
+		buff = 'b_aim_adjustment',
+	},
+}

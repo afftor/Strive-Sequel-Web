@@ -1,0 +1,549 @@
+extends Panel
+#warning-ignore-all:return_value_discarded
+
+
+var category = 'all'
+var person
+var mode
+var current_class
+var selected_mastery = 'warfare'
+
+var mastery_category = "combat"
+# all, weapon, magic, support, aoe, heal
+
+var parentnode
+var shutoff = false
+var prevnode
+
+var character = Reference
+
+var Panel_x = 598
+var Text_x = 565
+
+var stat_tooltip_keys = {
+	atk = 'SIMATK_DESC',
+	matk = 'SIMMATK_DESC',
+	armor = 'SIMDEF_DESC',
+	mdef = 'SIMMDEF_DESC',
+	hitrate = 'SIMHITRATE_DESC',
+	evasion = 'SIMEVASION_DESC',
+	speed = 'SIMSPEED_DESC',
+	armorpenetration = 'SIMARMORPEN_DESC',
+	critchance = 'SIMCRITICAL_DESC',
+	critmod = 'SIMCRITICALMOD_DESC',
+}
+
+func _ready():
+	for i in $categories.get_children():
+		i.connect("pressed",self,'class_category', [i.name])
+	for i in $MasteryPanel/Categories.get_children():
+		i.connect("pressed", self, 'change_mastery_category', [i.name])
+	$ClassPanel/HBoxContainer2/Unlock.connect('pressed', self, 'unlock_class')
+	for ch in $categories.get_children():
+		globals.connecttexttooltip(ch, tr("CAT_" + str(ch.name).to_upper() + "_DESC"))
+#	$UpgradeButton.connect("pressed", $stats_upgrade, 'show')
+	if !get_parent().name == "CheatsModule":
+		$CheckBox.connect("pressed", self, "checkbox_locked")
+#	input_handler.AddPanelOpenCloseAnimation($ClassPanel)
+	$MasteryPanel/AddPoint.connect("pressed", self, 'add_mastery_prompt')
+	$MasteryPanel/AddPoint2.connect("pressed", self, 'add_mastery_prompt_1')
+	$MasteryPanel/SkillBookButton.connect("pressed", self, "SkillBookButtonPress")
+	for i in ['combat', 'magic', 'universal']:
+		var st = 'mastery_point_' + i
+		var stdata = statdata.statdata[st]
+		globals.connecttexttooltip(get_node('MasteryPanel/Categories3/' + i), tr(stdata.name))
+	
+	
+	for i in variables.resists_list:
+		if i == 'all': continue
+		var newicon = $BaseStatsPanel/resists/Icon.duplicate()
+		var newvalue = $BaseStatsPanel/resists/Value.duplicate()
+		$BaseStatsPanel/resists.add_child(newicon)
+		$BaseStatsPanel/resists.add_child(newvalue)
+		newicon.texture = images.get_icon('resist_' + i)
+		newvalue.name = i
+		newicon.show()
+		newvalue.show()
+		globals.connecttexttooltip(newicon, tr(i.to_upper() + "RESIST_DESC"))
+	for stat in stat_tooltip_keys:
+		var icon_node = $"BaseStatsPanel/base_stats".get_node_or_null("label_" + stat)
+		if icon_node:
+			icon_node.texture = images.get_icon(variables.fighter_stat_icons[stat])
+	
+	input_handler.register_btn_source('class_fighter', self, 'tut_get_class_fighter')
+	input_handler.register_btn_source('class_unlock', self, 'tut_get_unlock')
+	input_handler.register_btn_source('mastery_leadership', self, 'tut_get_leadership')
+	input_handler.register_btn_source('mastery_add_point', self, 'tut_get_AddPoint')
+	input_handler.register_btn_source('mastery_add_point2', self, 'tut_get_AddPoint2')
+	input_handler.register_btn_source('mastery_add_point_highlight', self, null, self, "tut_get_AddPoint_highlight")
+
+func tut_get_class_fighter():
+	for btn in $ScrollContainer/GridContainer.get_children():
+		if btn.get_meta('class_code', '') == 'fighter':
+			return btn
+
+func tut_get_unlock():
+	return $ClassPanel/HBoxContainer2/Unlock
+
+func tut_get_leadership():
+	for btn in $MasteryPanel/Categories2.get_children():
+		if btn.get_meta('mastery', '') == 'leadership':
+			return btn
+
+func tut_get_AddPoint():
+	return $MasteryPanel/AddPoint
+func tut_get_AddPoint_highlight():
+	var res_rect = tut_get_AddPoint().get_global_rect()
+	res_rect.end = tut_get_AddPoint2().get_global_rect().end
+	return res_rect
+func tut_get_AddPoint2():
+	return $MasteryPanel/AddPoint2
+
+func SkillBookButtonPress():
+	$SkillBook.activecharacter = person
+	$SkillBook.toggle()
+
+
+func _process(delta):
+	if parentnode != null && ( parentnode.is_visible_in_tree() == false || !parentnode.get_global_rect().has_point(get_global_mouse_position())):
+		set_process(false)
+		hide()
+
+
+func _init():
+	set_process(false)
+
+
+func close_tooltip():
+	globals.closeclasstooltip()
+
+func open(tempperson, tempmode = 'normal'):
+	#if !gui_controller.windows_opened.has(self):
+	#	gui_controller.windows_opened.append(self)
+	#show()
+	person = tempperson
+	mode = tempmode
+	current_class = null
+	update()
+#	$stats_upgrade.show()
+
+
+func update():
+	person = input_handler.interacted_character
+	if person == null:
+		 return
+	$ClassPanel.hide()
+	$MasteryPanel.show()
+	change_mastery_category(mastery_category)
+	input_handler.ClearContainer($ScrollContainer/GridContainer)
+	var array = []
+	for i in classesdata.professions.values():
+		if !ResourceScripts.game_globals.unlock_all_classes:
+			if (!i.categories.has(category) && category != 'all') || !person.checkreqs(i.showupreqs, true) || person.has_profession(i.code):
+				continue
+			if !$CheckBox.pressed && person.checkreqs(i.reqs, true) == false:
+				continue
+		array.append(i)
+	
+	array.sort_custom(self, 'sort_by_name')
+	
+	for i in array:
+		var newbutton = input_handler.DuplicateContainerTemplate($ScrollContainer/GridContainer)
+		newbutton.get_node('icon').texture = i.icon
+		var name = i.name
+		if !ResourceScripts.game_globals.unlock_all_classes:
+			if i.has('altname') && person.checkreqs(i.altnamereqs):
+				name = i.altname
+			var f = person.checkreqs(i.reqs, true)
+			for prof in i.conflict_classes:
+				f = f and !person.has_profession(prof)
+			if  f == false:
+				newbutton.texture_normal = load("res://assets/images/gui/universal/skill_frame_diabled.png")
+				newbutton.texture_hover = load("res://assets/images/gui/universal/skill_frame_diabled.png")
+				newbutton.texture_pressed = load("res://assets/images/gui/universal/skill_frame_diabled.png")
+				# newbutton.disabled = true
+		newbutton.get_node('name').text = tr(name)
+		newbutton.connect('pressed',self,"open_class", [i.code])
+		newbutton.set_meta('class_code', i.code)
+		globals.connectclasstooltip(newbutton, person, i.code)
+		newbutton.connect('mouse_exited', self, 'close_tooltip')
+		# globals.connecttexttooltip(newbutton, ResourceScripts.descriptions.get_class_details(person, i, true, true))
+	
+	
+	for i in $BaseStatsPanel/resists.get_children():
+		if !statdata.statdata.has('resist_' + i.name):
+			continue
+		var tmp = person.get_stat('resist_' + i.name)
+		i.text = str(tmp)
+		if tmp > 0:
+			i.set("custom_colors/font_color", variables.hexcolordict.yellow)
+		elif tmp < 0:
+			i.set("custom_colors/font_color", variables.hexcolordict.green)
+		else:
+			i.set("custom_colors/font_color", variables.hexcolordict.white)
+	
+	for i in variables.fighter_stats_list:
+		if !i in ['hpmax', 'mpmax','critmod', 'speed']:
+			$"BaseStatsPanel/base_stats".get_node(i).text = str(floor(person.get_stat(i)))
+		elif i == 'critmod':
+			$"BaseStatsPanel/base_stats".get_node(i).text = str(floor(person.get_stat(i)*100)) + '%'
+		elif i == 'speed':
+			$"BaseStatsPanel/base_stats".get_node(i).text = str(floor(person.get_stat(i)[0]))
+			
+
+
+	for i in $"BaseStatsPanel/base_stats".get_children():
+		var stat_key = i.name.replace("label_","")
+		if stat_tooltip_keys.has(stat_key):
+			globals.connecttexttooltip(i, tr(stat_tooltip_keys[stat_key]))
+
+func checkbox_locked():
+	person = input_handler.interacted_character
+#	open(person, mode)
+	update()
+
+
+func class_category(name):
+	person = gui_controller.mansion.active_person if person == null else input_handler.interacted_character
+	category = name
+	$ClassPanel.hide()
+	$MasteryPanel.show()
+	for i in $categories.get_children():
+		i.pressed = i.name == category
+	update()
+#	open(person, mode)
+
+
+func sort_by_name(first,second):
+#	return first.name <= second.name
+	return first.name < second.name
+
+
+func open_class(classcode):
+	#if !gui_controller.windows_opened.has($ClassPanel):
+	#	gui_controller.windows_opened.append($ClassPanel)
+	var tempclass = classesdata.professions[classcode]
+	var class_locked = true
+	if !ResourceScripts.game_globals.unlock_all_classes:
+		class_locked = !person.checkreqs(tempclass.reqs, true)
+	else:
+		class_locked = false
+	var text #= ResourceScripts.descriptions.get_class_details(person, tempclass)
+	current_class = classcode
+	$ClassPanel/scroll._open_panel(person, classcode)
+	if person.has_profession(tempclass.code):
+		text = person.translate(tr("CLASSALREADYACQUIRED"))
+		$ClassPanel/HBoxContainer2/Unlock.hide()
+		$ClassPanel/HBoxContainer2/ExpLabel.set("custom_colors/font_color", Color(1,1,1))
+	else:
+		text = tr("EXPREQUIRED")+": " + str(person.get_next_class_exp()) + "/" +  str(floor(person.get_stat('base_exp'))) 
+		$ClassPanel/HBoxContainer2/Unlock.show()
+		if person.get_stat('base_exp') < person.get_next_class_exp():
+			$ClassPanel/HBoxContainer2/ExpLabel.set("custom_colors/font_color", variables.hexcolordict.red)
+		else:
+			$ClassPanel/HBoxContainer2/ExpLabel.set("custom_colors/font_color", variables.hexcolordict.green)
+	$ClassPanel/HBoxContainer2/Unlock.disabled = class_locked || (person.get_stat('base_exp') < person.get_next_class_exp())
+	
+	$ClassPanel/HBoxContainer2/ExpLabel.text = text
+	update_class_buttons(classcode)
+	$ClassPanel.visible = true
+	$MasteryPanel.hide()
+
+
+func update_class_buttons(classcode):
+	for button in $ScrollContainer/GridContainer.get_children():
+		if button == $ScrollContainer/GridContainer.get_child($ScrollContainer/GridContainer.get_children().size()-1):
+			continue
+		button.pressed = (button.get_meta("class_code") == classcode)
+
+
+func unlock_class():
+	var args = {}
+	args["current_class"] = current_class
+	args["person"] = person
+	input_handler.play_animation("class_aquired", args)
+	$ClassPanel.hide()
+	$MasteryPanel.show()
+	gui_controller.windows_opened.clear()
+	yield(get_tree().create_timer(0.2),"timeout")
+	person.add_stat('base_exp', -person.get_next_class_exp())
+	person.unlock_class(current_class)
+	yield(get_tree().create_timer(0.2),"timeout")
+	globals.text_log_add("char", person.translate(tr("CLASSNEWACQUIREDLOG") % tr(classesdata.professions[current_class].name)))
+	get_parent().BodyModule.update()
+	get_parent().set_state("default")
+
+
+#masteries
+func change_mastery_category(cat):
+	mastery_category = cat
+	for i in $MasteryPanel/Categories.get_children():
+		i.pressed = i.name == cat
+	build_mastery_cat()
+
+
+func get_mastery_pools(masdata):
+	match masdata.type:
+		'combat':
+			return ['combat', 'universal']
+		'spell':
+			return ['magic', 'universal']
+	return ['universal']
+
+
+func get_invested_mastery_points(mas, pools):
+	var invested_points = 0
+	for pool in pools:
+		invested_points += person.dyn_stats.masteries[mas][pool].size()
+	return invested_points
+
+
+
+
+func get_bonus_mastery_points(mas, invested_points):
+	var mastery_level = int(person.get_stat('mastery_' + mas))
+	return max(mastery_level - invested_points, 0)
+
+
+func get_total_mastery_points(mas, invested_points):
+	return invested_points + get_bonus_mastery_points(mas, invested_points)
+
+func build_passive_mastery_bonus_tooltip(bonusstats, mul = 1):
+	var lines = globals.build_desc_for_bonusstats(bonusstats, mul).strip_edges().split("\n")
+	var result = []
+	for line in lines:
+		line = line.strip_edges()
+		if line != "":
+			result.append(line)
+	return PoolStringArray(result).join("\n")
+
+func build_mastery_cat():
+	input_handler.ClearContainer($MasteryPanel/Categories2, ['button'])
+	var tmp = null
+	var change_mastery = false
+	var lv_sum = {combat = 0, spell = 0}
+	for mas in Skilldata.masteries:
+		var masdata = Skilldata.masteries[mas]
+		var text = ""
+		var lv = person.get_stat('mastery_' + mas)
+		lv_sum[masdata.type] += lv
+		if masdata.type == mastery_category:
+			if tmp == null:
+				tmp = mas
+			var button = input_handler.DuplicateContainerTemplate($MasteryPanel/Categories2, 'button')
+			button.set_meta('mastery', mas)
+			button.connect('pressed', self, 'change_mastery', [mas])
+			button.get_node('icon').texture = images.get_icon(masdata.icon)
+			button.get_node('icon/Label').text = str(lv)
+			globals.connecttexttooltip(button, tr(masdata.name))
+			text += "[center]"+tr("MASTERY"+mas.to_upper()) + "[/center]\n"+tr("LVLBONUSPERPOINT")+":\n"
+			text += build_passive_mastery_bonus_tooltip(masdata.passive) + '\n'
+			if lv > 0:
+				text += "[center]"+tr("LVLCURRENT")+":[/center]\n"
+				text += build_passive_mastery_bonus_tooltip(masdata.passive, lv) + '\n'
+			#add mastery tooltip
+			var mastery_points_pools = get_mastery_pools(masdata)
+			var invested_points = get_invested_mastery_points(mas, mastery_points_pools)
+			var total_points = get_total_mastery_points(mas, invested_points)
+			text += ("[center]"
+				+
+				tr("LVLTOTALPOINTS") + ": {color=yellow|%d}; " % [total_points]
+				+
+				tr("LVLINVESTED") + ": %d/%d" % [invested_points, variables.mastery_train_limit]
+				+
+				"[/center]\n\n"
+				)
+			globals.connecttexttooltip(button, text)
+		else:
+			if mas == selected_mastery:
+				change_mastery = true
+			continue
+	if change_mastery:
+		selected_mastery = tmp
+	change_mastery(selected_mastery)
+	for i in $MasteryPanel/Categories.get_children():
+		i.get_node('Label').text = str(lv_sum[i.name])
+
+
+var text
+var text_1
+func change_mastery(mas):
+	selected_mastery = mas
+	for node in $MasteryPanel/Categories2.get_children():
+		if node.has_meta('mastery'):
+			var cmastery = node.get_meta('mastery')
+			node.pressed = (cmastery == selected_mastery)
+#			node.get_node('icon/Label').text = str(person.get_stat('mastery_' + cmastery))
+	input_handler.ClearContainer($MasteryPanel/mastery/ScrollContainer/VBoxContainer, ['HSeparator', 'container'])
+	var masdata = Skilldata.masteries[mas]
+	$MasteryPanel/mastery/Label.text = tr(masdata.name)
+	$MasteryPanel/mastery.texture = images.get_background(masdata.background, true)
+	match masdata.type:
+		'combat':
+			$MasteryPanel/AddPoint/TextureRect.texture = images.get_icon('mastery_point_combat')
+		'spell':
+			$MasteryPanel/AddPoint/TextureRect.texture = images.get_icon('mastery_point_magic')
+	var lv = person.get_stat('mastery_' + mas)
+	text = tr('ADD_MASTERY_CONFIRM')
+	text_1 = tr("ADD_MASTERY_CONFIRM_UNIVERSAL")
+#	text += globals.build_desc_for_bonusstats(masdata.passive)
+	for lv_tmp in range(1, masdata.maxlevel + 1):
+		if lv_tmp > 1:
+			input_handler.DuplicateContainerTemplate($MasteryPanel/mastery/ScrollContainer/VBoxContainer, 'HSeparator')
+		var panel = input_handler.DuplicateContainerTemplate($MasteryPanel/mastery/ScrollContainer/VBoxContainer, 'container')
+		panel.get_node('frame/lvl').text = input_handler.roman_number_converter(lv_tmp)
+		if lv_tmp > lv:
+			panel.get_node('frame/lvl').self_modulate = Color(1.0, 1.0, 1.0, 0.5)
+			panel.get_node('frame').self_modulate = Color(1.0, 1.0, 1.0, 0.0)
+		var key = 'level%d' % lv_tmp
+		if !masdata.has(key):
+			continue
+		var lvdata = masdata[key]
+		var f = false
+		if lv_tmp == lv + 1:
+			f = true
+		for s_id in lvdata.combat_skills:
+			var sdata = Skilldata.get_template(s_id, person)
+			var skill_icon = input_handler.DuplicateContainerTemplate(panel.get_node('container'), 'skill')
+			skill_icon.get_node('icon').material = load("res://assets/masked_sprite.tres").duplicate(true)
+			if lv_tmp <= lv:
+				skill_icon.texture = images.get_icon('frame_skill_1')
+			else:
+				skill_icon.texture = images.get_icon('frame_skill')
+#			skill_icon.texture = images.get_icon('frame_skill')
+			skill_icon.get_node('icon').texture = sdata.icon
+			skill_icon.get_node('icon').material.set_shader_param('mask', images.get_icon('frame_skill_mask'))
+			skill_icon.set_meta('display_only', true)
+			if sdata.has('container'):
+				globals.connecttexttooltip(skill_icon, tr(sdata.descript))
+			else:
+				globals.connectskilltooltip(skill_icon, s_id, person)
+#			if f:
+#				text += tr('SKILLLEARN') + tr(sdata.name) + '\n'
+		for s_id in lvdata.explore_skills:
+			var sdata = Skilldata.get_template(s_id, person)
+			var skill_icon = input_handler.DuplicateContainerTemplate(panel.get_node('container'), 'skill')
+			skill_icon.get_node('icon').material = load("res://assets/masked_sprite.tres").duplicate(true)
+			if lv_tmp <= lv:
+				skill_icon.texture = images.get_icon('frame_explore_1')
+			else:
+				skill_icon.texture = images.get_icon('frame_explore')
+#			skill_icon.texture = images.get_icon('frame_explore')
+			skill_icon.get_node('icon').texture = sdata.icon
+			skill_icon.get_node('icon').material.set_shader_param('mask', images.get_icon('frame_explore_mask'))
+			skill_icon.set_meta('display_only', true)
+			globals.connectskilltooltip(skill_icon, s_id, person)
+#			if f:
+#				text += tr('SKILLLEARN') + tr(sdata.name) + '\n'
+		for tr_id in lvdata.traits:
+			var trdata = Traitdata.traits[tr_id]
+			var skill_icon = input_handler.DuplicateContainerTemplate(panel.get_node('container'), 'skill')
+			skill_icon.get_node('icon').material = load("res://assets/masked_sprite.tres").duplicate(true)
+			var frame_id = 'frame_trait'
+			var frame_mask_id = 'frame_trait_mask'
+			if trdata.has('tags') and trdata.tags.has('sex_action_unlock'):
+				frame_id = 'frame_sex_skill'
+				frame_mask_id = 'frame_sex_skill_mask'
+			if lv_tmp <= lv:
+				skill_icon.texture = images.get_icon(frame_id + '_1')
+			else:
+				skill_icon.texture = images.get_icon(frame_id)
+#			skill_icon.texture = images.get_icon('frame_trait')
+			if trdata.icon is String:
+				skill_icon.get_node('icon').texture = load(trdata.icon)
+			else:
+				skill_icon.get_node('icon').texture = trdata.icon
+			skill_icon.get_node('icon').material.set_shader_param('mask', images.get_icon(frame_mask_id))
+			globals.connecttexttooltip(skill_icon, tr(trdata.descript))
+#			if f:
+#				text += tr('TRAITLEARN') + tr(trdata.name) + '\n'
+		for s_id in lvdata.action:
+			var sdata = Skilldata.training_actions[s_id]
+			var skill_icon = input_handler.DuplicateContainerTemplate(panel.get_node('container'), 'skill')
+			skill_icon.get_node('icon').material = load("res://assets/masked_sprite.tres").duplicate(true)
+			if lv_tmp <= lv:
+				skill_icon.texture = images.get_icon('frame_train_1')
+			else:
+				skill_icon.texture = images.get_icon('frame_train')
+#			skill_icon.texture = images.get_icon('frame_train')
+			skill_icon.get_node('icon').texture = load(sdata.icon)
+			skill_icon.get_node('icon').material.set_shader_param('mask', images.get_icon('frame_train_mask'))
+			globals.connecttexttooltip(skill_icon, '[center]' + tr(sdata.name) + '[/center]\n' + tr(sdata.descript_mastery))
+#			if f:
+#				text += tr('TRAININGLEARN') + tr(sdata.name) + '\n'
+	var en_data = person.get_stat_value_data('mastery_%s_enable' % mas)
+	if en_data.result:
+		$MasteryPanel/blocked.visible = false
+	else:
+		$MasteryPanel/blocked.visible = true
+		var src
+		var src_val
+		for rec in en_data.bonuses.set:
+			if !rec.value:
+				src = rec.src_type
+				src_val = rec.src_value
+				break
+		$MasteryPanel/blocked/Label.text = tr('MASTERYBLOCKSRC') % globals.get_tr_src(src, src_val)
+	
+	$MasteryPanel/AddPoint.disabled = !person.can_upgrade_mastery(mas)
+	$MasteryPanel/AddPoint2.disabled = !person.can_upgrade_mastery(mas, true)
+	$MasteryPanel/Categories3/combat/Label.text = tr("MASTERYPOINTS") % person.get_stat('mastery_point_combat')
+	$MasteryPanel/Categories3/magic/Label.text = tr("MASTERYPOINTS") % person.get_stat('mastery_point_magic')
+	$MasteryPanel/Categories3/universal/Label.text = tr("MASTERYPOINTS") % person.get_stat('mastery_point_universal')
+	
+
+#	text += tr('FOR')
+#	text_1 = text
+#	var cost = person.upgrade_mastery_cost(mas) 
+#	for point in cost:
+#		var stdata = statdata.statdata[point]
+#		if cost[point] > 0:
+#			text += "%s : %d \n" % [tr(stdata.name), cost[point]]
+#	cost = person.upgrade_mastery_cost(mas, true) 
+#	for point in cost:
+#		var stdata = statdata.statdata[point]
+#		if cost[point] > 0:
+#			text_1 += "%s : %d \n" % [tr(stdata.name), cost[point]]
+
+
+func add_mastery_prompt():
+	input_handler.get_spec_node(input_handler.NODE_YESNOPANEL, [self, 'add_mastery', text])
+
+
+func add_mastery():
+	person.upgrade_mastery(selected_mastery)
+	build_mastery_cat()
+	var args = {}
+	args["mastery"] = selected_mastery
+	args["person"] = person
+	input_handler.play_animation("mastery_aquired", args)
+#	change_mastery(selected_mastery)
+
+
+func add_mastery_prompt_1():
+	input_handler.get_spec_node(input_handler.NODE_YESNOPANEL, [self, 'add_mastery_1', text_1])
+
+
+func add_mastery_1():
+	person.upgrade_mastery(selected_mastery, true)
+	build_mastery_cat()
+	var args = {}
+	args["mastery"] = selected_mastery
+	args["person"] = person
+	input_handler.play_animation("mastery_aquired", args)
+
+
+# func play_animation():
+# 	input_handler.PlaySound("class_aquired")
+# 	var anim_scene
+# 	anim_scene = input_handler.get_spec_node(input_handler.ANIM_CLASS_ACHIEVED)
+# 	anim_scene.get_node("AnimationPlayer").play("class_achieved")
+# 	anim_scene.get_node("TextureRect").texture = classesdata.professions[current_class].icon
+# 	anim_scene.get_node("Label2").text = current_class.capitalize()
+# 	anim_scene.get_node("Label3").text = person.get_full_name()
+# 	yield(anim_scene.get_node("AnimationPlayer"), "animation_finished")
+# 	ResourceScripts.core_animations.FadeAnimation(anim_scene, 0.5)
+# 	yield(get_tree().create_timer(0.5), 'timeout')
+# 	anim_scene.queue_free()
+# 	input_handler.SetMusic("mansion1")
+

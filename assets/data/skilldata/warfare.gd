@@ -1,0 +1,315 @@
+extends Reference
+
+var skills = {
+	draw_blood = {
+		code = 'draw_blood',
+		descript = '',
+		icon = "res://assets/images/iconsskills/Lich-strike.png",
+		type = 'combat', 
+		ability_type = 'skill',
+		tags = ['damage','ads'],
+		reqs = [],
+		targetreqs = [],
+		effects = [Effectdata.rebuild_template({effect = 'bleed', duration = 2})],
+		cost = {mp = 2},
+		charges = 0,
+		combatcooldown = 3,
+		cooldown = 0,
+		catalysts = {},
+		target = 'enemy',
+		target_number = 'single',
+		target_range = 'weapon',
+		damage_type = 'weapon',
+		sfx = [
+			{code = 'draw_blood', target = 'target', period = 'predamage'},
+			{code = 'cast_weapon', target = 'caster', period = 'windup', is_cast = true}], 
+		sounddata = {initiate = null, strike = 'fleshhit', hit = null},
+		value = 1.1,
+		variations = [
+			{
+				reqs = [{code = 'has_status', status = 'assassin_hide', check = true}],
+				append = {tags = 'stealth_casting'},
+			}
+		]
+	},
+	sunder = {
+		code = 'sunder',
+		descript = '',
+		icon = "res://assets/images/iconsskills/icon_elementa_weakness.png",
+		type = 'combat', 
+		ability_type = 'skill',
+		tags = ['damage','ads'],
+		reqs = [],
+		targetreqs = [],
+		effects = [Effectdata.rebuild_template({effect = 'shred', duration = 5})], 
+		cost = {mp = 3},
+		charges = 0,
+		combatcooldown = 0,
+		cooldown = 0,
+		catalysts = {},
+		target = 'enemy',
+		target_number = 'single',
+		target_range = 'melee',
+		damage_type = 'weapon',
+		sfx = [
+			{code = 'sunder', target = 'target', period = 'predamage'},
+			{code = 'cast_weapon', target = 'caster', period = 'windup', is_cast = true}], 
+		sounddata = {initiate = null, strike = 'blade', hit = null},
+		value = 0.85,
+		variations = [
+			{
+				reqs = [{code = 'stat', stat = 'combatgroup', value = 'enemy', operant = 'eq'}],
+				set = {targetreqs = [{code = 'has_status', status = 'shred', check = false}],} #to prevent overuse of long-duration buffs
+			},
+			{
+				reqs = [{code = 'has_status', status = 'assassin_hide', check = true}],
+				append = {tags = 'stealth_casting'},
+			}
+		]
+	},
+	cleave = {
+		code = 'cleave',
+		descript = '',
+		icon = "res://assets/images/iconsskills/swipe.png",
+		type = 'combat', 
+		ability_type = 'skill',
+		tags = ['damage', 'aoe'],
+		reqs = [],
+		targetreqs = [],
+		effects = [Effectdata.rebuild_skillvalue_template({target_status = 'bleed', value = 1.15})],
+		cost = {mp = 5},
+		charges = 0,
+		combatcooldown = 0,
+		cooldown = 1,
+		catalysts = {},
+		target = 'enemy',
+		target_number = 'line',
+		target_range = 'melee',
+		damage_type = 'weapon',
+		aipatterns = ['attack'],
+		allowedtargets = ['enemy'],
+		value = 0.9,
+		random_factor_p = 0.1,
+		sfx = [
+			{code = 'cleave', target = 'target_line', period = 'windup'},
+			{code = 'cast_weapon', target = 'caster', period = 'windup', is_cast = true}], 
+		sounddata = {initiate = null, strike = 'blade', hit = null},
+#		variations = [
+#			{
+#				reqs = [{code = 'has_status', status = 'assassin_hide', check = true}],
+#				append = {tags = 'stealth_casting'},
+#			}
+#		]
+	},
+	warcry = {
+		code = 'warcry',
+		descript = '',
+		icon = "res://assets/images/iconsskills/warcry.png",
+		type = 'combat',
+		ability_type = 'skill',
+		tags = ['support', 'instant', 'disable_immunity'],
+		reqs = [],
+		targetreqs = [],
+		effects = [
+			Effectdata.rebuild_template({effect = Effectdata.rebuild_remove_effect('silence')}),
+			Effectdata.rebuild_template({effect = Effectdata.rebuild_remove_effect('fear')}),
+		],
+		cost = {mp = 5},
+		charges = 0,
+		combatcooldown = 2,
+		cooldown = 0,
+		catalysts = {},
+		target = 'self',
+		target_number = 'single',
+		target_range = 'any',
+		damage_type = 'weapon',
+		sfx = [{code = 'inspire', target = 'target', period = 'predamage'}],
+		sounddata = {initiate = null, strike = 'skill_scene', hit = null},
+		value = [['0']],
+		damagestat = ['no_stat'],
+	},
+	strike_through = {
+		code = 'strike_through',
+		descript = '',
+		icon = "res://assets/images/iconsskills/Aimed-strike.png",
+		type = 'combat', 
+		ability_type = 'skill',
+		tags = ['damage', 'aoe'],
+		reqs = [],
+		targetreqs = [],
+		effects = ['e_s_strike_setup', 'e_s_strike_apply'],
+		cost = {mp = 3},
+		charges = 0,
+		combatcooldown = 0,
+		cooldown = 3,
+		catalysts = {},
+		target = 'enemy',
+		target_number = 'row',
+		target_range = 'melee',
+		damage_type = 'weapon',
+		aipatterns = ['attack'],
+		allowedtargets = ['enemy'],
+		value = 1.1,
+		random_factor_p = 0.1,
+		sfx = [
+			{code = 'strike_through', target = 'target_row', period = 'windup'},
+			{code = 'cast_weapon', target = 'caster', period = 'windup', is_cast = true}], 
+		sounddata = {initiate = null, strike = 'blade', hit = null},
+#		variations = [
+#			{
+#				reqs = [{code = 'has_status', status = 'assassin_hide', check = true}],
+#				append = {tags = 'stealth_casting'},
+#			}
+#		]
+	},
+	execution = {
+		code = 'execution',
+		descript = '',
+		eff_descript = ['fear'],
+		icon = "res://assets/images/iconsskills/skill_execute.png",
+		type = 'combat', 
+		ability_type = 'skill',
+		tags = ['damage','ads','damage_spot','ultimate'],
+		reqs = [],
+		targetreqs = [],
+		effects = ['e_kill_execute'], 
+		cost = {mp = 8},
+		charges = 0,
+		combatcooldown = 4,
+		cooldown = 0,
+		catalysts = {},
+		target = 'enemy',
+		target_number = 'single',
+		target_range = 'weapon',
+		damage_type = 'weapon',
+		sfx = [
+			{code = 'execution', target = 'target', period = 'predamage'},
+			{code = 'cast_weapon', target = 'caster', period = 'windup', is_cast = true}], 
+		sounddata = {initiate = null, strike = 'blade', hit = null},
+		value = 2.25,
+		variations = [
+			{
+				reqs = [{code = 'has_status', status = 'assassin_hide', check = true}],
+				append = {tags = 'stealth_casting'},
+			}
+		]
+	},
+	execution_1 = {
+		code = 'execution_1',
+		descript = '',
+		icon =  "res://assets/images/iconsskills/skill_execute.png",
+		type = 'auto', 
+		ability_type = 'skill',
+		tags = ['aoe', 'debuff', 'ads', 'instant', 'passive'],
+		reqs = [],
+		targetreqs = [],
+		effects = [Effectdata.rebuild_template({effect = 'fear', duration = 1})], 
+		cost = {},
+		charges = 0,
+		combatcooldown = 0,
+		cooldown = 0,
+		catalysts = {},
+		target = 'self',
+		target_number = 'nontarget_group',
+		target_range = 'any',
+		damage_type = 'weapon',
+		sfx = [{code = 'execution', target = 'target', period = 'postdamage'}], 
+		sounddata = {initiate = 'avalanche', strike = null, hit = null, hittype = 'bodyarmor'},
+		value = [['0']],
+		damagestat = ['no_stat'],
+		not_final = true,
+		variations = [
+			{
+				reqs = [{code = 'has_status', status = 'assassin_hide', check = true}],
+				append = {tags = 'stealth_casting'},
+			}
+		]
+	},
+	holy_lance = { #ex valkyrie
+		code = 'holy_lance',
+		descript = '',
+		icon = load("res://assets/images/iconsskills/holylance.png"),
+		type = 'combat', 
+		ability_type = 'skill',
+		tags = ['damage','aoe'],
+		reqs = [
+			{code = 'gear_equiped', param = 'geartype', value = 'spear', check = true},
+			{code = 'stat', stat = 'mastery_warfare', value = 4, operant = 'gte'},
+			{code = 'stat', stat = 'mastery_light', value = 3, operant = 'gte'},
+		],
+		targetreqs = [],
+		effects = [], 
+		cost = {mp = 5},
+		charges = 0,
+		combatcooldown = 2,
+		cooldown = 0,
+		catalysts = {},
+		target = 'enemy',
+		target_number = 'row',
+		target_range = 'any',
+		damage_type = 'light',
+		sfx = [
+			{code = 'targetattack', target = 'target', period = 'predamage'},
+			{code = 'cast_light', target = 'caster', period = 'windup', is_cast = true}], 
+		sounddata = {initiate = null, strike = 'blade', hit = null},
+		value = 1.0,
+#		variations = [
+#			{
+#				reqs = [{code = 'has_status', status = 'assassin_hide', check = true}],
+#				append = {tags = 'stealth_casting'},
+#			}
+#		]
+	},
+}
+var effects = {
+	e_kill_execute = {
+		type = 'trigger',
+		trigger = [variables.TR_KILL],
+		conditions = [],
+		req_skill = true,
+		sub_effects = [{
+				type = 'oneshot',
+				target = 'caster',
+				atomic = [{type = 'use_combat_skill', skill = 'execution_1'}],
+			}
+		]
+	},
+	e_s_strike_setup = {
+		type = 'trigger',
+		trigger = [variables.TR_CAST_TARGET],
+		conditions = [
+			{type = 'target', value = [{code = 'has_status', status = 'shred', check = true}]}
+		],
+		req_skill = true,
+		sub_effects = [
+			{
+				type = 'oneshot',
+				target = 'skill',
+				atomic = [{type = 'add_tag', value = 'frontline_shred'}],
+			}
+		]
+	},
+	e_s_strike_apply = {
+		type = 'trigger',
+		req_skill = true,
+		trigger = [variables.TR_POSTDAMAGE],
+		conditions = [
+			{type = 'skill', value = ['hit_res', 'mask', variables.RES_HITCRIT]},
+			{type = 'skill', value = ['tags', 'has', 'frontline_shred']},
+			{type = 'target', value = [{code = 'is_in_ranged_zone', check = true}]},
+		],
+		buffs = [],
+		sub_effects = ['blind'],
+		args = {
+			skill = {obj = 'skill', func = 'eq'},
+			caster = {obj = 'caster', func = 'eq'},
+			target = {obj = 'target', func = 'eq'},
+			receiver = {obj = 'receiver', func = 'eq'},
+			duration = {obj = 'self', func = 'dur', dur = 2}
+		},
+	},
+}
+var atomic_effects = {}
+var buffs = {}
+
+var stacks = {}

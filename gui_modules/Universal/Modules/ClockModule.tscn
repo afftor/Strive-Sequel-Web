@@ -1,0 +1,230 @@
+[gd_scene load_steps=17 format=2]
+
+[ext_resource path="res://assets/Fonts_v2/PT_Sans/PT_30.tres" type="DynamicFont" id=1]
+[ext_resource path="res://gui_modules/Universal/Scripts/ClockModule.gd" type="Script" id=2]
+[ext_resource path="res://assets/Textures_v2/ClockModule/button_timersmall.png" type="Texture" id=3]
+[ext_resource path="res://assets/Textures_v2/ClockModule/button_timerbig.png" type="Texture" id=4]
+[ext_resource path="res://assets/Textures_v2/ClockModule/timer_landscape_v2.png" type="Texture" id=5]
+[ext_resource path="res://assets/Textures_v2/ClockModule/button_timersmall_pressed.png" type="Texture" id=6]
+[ext_resource path="res://assets/Textures_v2/ClockModule/button_timerbig_pressed.png" type="Texture" id=7]
+[ext_resource path="res://assets/Textures_v2/ClockModule/timer_frame.png" type="Texture" id=8]
+[ext_resource path="res://assets/Textures_v2/ClockModule/button_timerbig_hover.png" type="Texture" id=9]
+[ext_resource path="res://assets/Textures_v2/ClockModule/button_timersmall_hover.png" type="Texture" id=10]
+[ext_resource path="res://assets/Fonts_v2/PT_Sans/PT_24.tres" type="DynamicFont" id=11]
+[ext_resource path="res://assets/Textures_v2/ClockModule/icon_food_timer.png" type="Texture" id=12]
+[ext_resource path="res://assets/Textures_v2/ClockModule/icon_money_timer.png" type="Texture" id=13]
+[ext_resource path="res://assets/Themes_v2/UNIVERSAL/HintTooltip.tres" type="Theme" id=19]
+[ext_resource path="res://assets/Themes_v2/UNIVERSAL/PT_24_Label.tres" type="Theme" id=20]
+
+[sub_resource type="AtlasTexture" id=1]
+flags = 4
+atlas = ExtResource( 5 )
+region = Rect2( 0, 0, 145, 111 )
+
+[node name="MansionClockModule" type="Control"]
+margin_left = 15.0
+margin_top = 15.0
+margin_right = 305.0
+margin_bottom = 195.0
+rect_min_size = Vector2( 290, 180 )
+theme = ExtResource( 19 )
+script = ExtResource( 2 )
+
+[node name="Sky" type="TextureRect" parent="."]
+show_behind_parent = true
+light_mask = 2
+margin_left = 1.50169
+margin_top = 53.3746
+margin_right = 146.502
+margin_bottom = 164.375
+grow_horizontal = 2
+grow_vertical = 2
+rect_pivot_offset = Vector2( 110, 110 )
+mouse_filter = 2
+texture = SubResource( 1 )
+
+[node name="TimeNode" type="TextureRect" parent="."]
+margin_right = 290.0
+margin_bottom = 222.0
+texture = ExtResource( 8 )
+
+[node name="Time" type="Label" parent="TimeNode"]
+margin_left = 145.0
+margin_top = 108.0
+margin_right = 288.0
+margin_bottom = 163.0
+custom_colors/font_color = Color( 0.976471, 0.882353, 0.505882, 1 )
+custom_colors/font_color_shadow = Color( 0, 0, 0, 1 )
+custom_fonts/font = ExtResource( 11 )
+text = "Time"
+align = 1
+valign = 1
+clip_text = true
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Date" type="Label" parent="TimeNode"]
+margin_left = 145.0
+margin_top = 55.0
+margin_right = 288.0
+margin_bottom = 106.0
+hint_tooltip = "Date"
+mouse_filter = 1
+custom_colors/font_color = Color( 0.976471, 0.882353, 0.505882, 1 )
+custom_colors/font_color_shadow = Color( 0, 0, 0, 1 )
+custom_fonts/font = ExtResource( 11 )
+text = "Date"
+align = 1
+valign = 1
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="FoodIcon" type="TextureRect" parent="TimeNode"]
+margin_left = 146.869
+margin_top = 2.87753
+margin_right = 196.869
+margin_bottom = 52.8775
+texture = ExtResource( 12 )
+expand = true
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="food" type="Label" parent="TimeNode"]
+margin_left = 202.604
+margin_top = 6.56123
+margin_right = 286.604
+margin_bottom = 51.5612
+mouse_filter = 1
+custom_colors/font_color = Color( 0.976471, 0.882353, 0.505882, 1 )
+custom_colors/font_outline_modulate = Color( 1, 1, 1, 1 )
+custom_fonts/font = ExtResource( 11 )
+text = "500"
+align = 1
+valign = 1
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="GoldIcon" type="TextureRect" parent="TimeNode"]
+margin_left = 5.58528
+margin_top = 3.24131
+margin_right = 55.5853
+margin_bottom = 53.2413
+texture = ExtResource( 13 )
+expand = true
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="gold" type="Label" parent="TimeNode"]
+margin_left = 56.804
+margin_top = 5.2077
+margin_right = 140.804
+margin_bottom = 50.2077
+mouse_filter = 1
+custom_colors/font_color = Color( 0.976471, 0.882353, 0.505882, 1 )
+custom_colors/font_outline_modulate = Color( 1, 1, 1, 1 )
+custom_fonts/font = ExtResource( 11 )
+text = "500"
+align = 1
+valign = 1
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="HBoxContainer" type="HBoxContainer" parent="TimeNode"]
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+margin_top = -58.0
+custom_constants/separation = 0
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="finish_turn" type="TextureButton" parent="TimeNode/HBoxContainer"]
+margin_right = 180.0
+margin_bottom = 58.0
+hint_tooltip = "TOOLTIP_CLOCK1"
+texture_normal = ExtResource( 4 )
+texture_pressed = ExtResource( 7 )
+texture_hover = ExtResource( 9 )
+
+[node name="Label" type="Label" parent="TimeNode/HBoxContainer/finish_turn"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+custom_colors/font_color = Color( 0.976471, 0.882353, 0.505882, 1 )
+custom_fonts/font = ExtResource( 1 )
+text = "FINISHTURNBUTTON"
+align = 1
+valign = 1
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="x2" type="TextureButton" parent="TimeNode/HBoxContainer"]
+margin_left = 180.0
+margin_right = 235.0
+margin_bottom = 58.0
+hint_tooltip = "TOOLTIP_CLOCK2"
+texture_normal = ExtResource( 3 )
+texture_pressed = ExtResource( 6 )
+texture_hover = ExtResource( 10 )
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Label" type="Label" parent="TimeNode/HBoxContainer/x2"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+theme = ExtResource( 20 )
+custom_colors/font_color = Color( 0.976471, 0.882353, 0.505882, 1 )
+custom_fonts/font = ExtResource( 1 )
+text = "x2"
+align = 1
+valign = 1
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="x4" type="TextureButton" parent="TimeNode/HBoxContainer"]
+margin_left = 235.0
+margin_right = 290.0
+margin_bottom = 58.0
+hint_tooltip = "TOOLTIP_CLOCK3"
+texture_normal = ExtResource( 3 )
+texture_pressed = ExtResource( 6 )
+texture_hover = ExtResource( 10 )
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Label" type="Label" parent="TimeNode/HBoxContainer/x4"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+theme = ExtResource( 20 )
+custom_colors/font_color = Color( 0.976471, 0.882353, 0.505882, 1 )
+custom_fonts/font = ExtResource( 1 )
+text = "x4"
+align = 1
+valign = 1
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="timetooltip" type="Control" parent="TimeNode"]
+margin_left = 149.059
+margin_top = 56.0
+margin_right = 285.059
+margin_bottom = 155.0
+
+[node name="external_block" type="ToolButton" parent="TimeNode"]
+visible = false
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 1
+
+[node name="Tween" type="Tween" parent="."]

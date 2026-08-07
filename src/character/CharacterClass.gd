@@ -1,0 +1,3051 @@
+extends Reference
+#class_name Slave
+# warning-ignore-all:return_value_discarded
+
+var dyn_stats = ResourceScripts.scriptdict.ch_statlist_dynamic.new()
+var statlist = ResourceScripts.scriptdict.ch_statlist.new()
+var xp_module = ResourceScripts.scriptdict.ch_leveling.new()
+var equipment = ResourceScripts.scriptdict.ch_equipment.new()
+var skills = ResourceScripts.scriptdict.ch_skills.new()
+var travel = ResourceScripts.scriptdict.ch_travel.new()
+#var effects = ResourceScripts.scriptdict.ch_effects.new()
+var food = ResourceScripts.scriptdict.ch_food.new()
+var training = ResourceScripts.scriptdict.ch_training.new()
+var enthrall = ResourceScripts.scriptdict.ch_enthrall.new()
+var displaynode = null
+var ai = null
+var need_req = false #For boss or monster that really need move req to function
+
+var id
+var is_active = true
+var is_players_character = false
+var is_known_to_player = false #for purpose of private parts
+var npc_reference = null
+var tags = []
+#base combat stats
+var hp = 100 setget hp_set#, hp_get
+var mp = 50 setget mp_set
+var shield = 0 setget set_shield
+var defeated = false
+var combatgroup = ''
+var position = 0 # Not sure it's used or not. Make new field just in case
+var combat_position = 0 setget, get_combat_positon
+var selectedskill = 'attack'
+
+var previous_location
+var price_compo_text
+var stat_compo_dict
+#constant stats
+
+#to delegate!
+
+#debug, 2remove later
+var src = ""
+
+const CHARACTER_STANDING_MAP = [
+	['standing_antipathy', 'standing_friend', 'standing_love_pest'],
+	['standing_minion', 'standing_housemate', 'standing_infatuated'],
+	['standing_sworn_servant', 'standing_companion', 'standing_beloved'],
+]
+
+
+func _init(source = null):
+	src = source
+	rebuild_parents()
+	input_handler.connect("fighter_changed", self, 'reset_rebuild')
+
+
+func get_combat_positon():
+	return int(combat_position)
+
+func rebuild_parents():
+	statlist.parent = weakref(self)
+	dyn_stats.parent = weakref(self)
+	xp_module.parent = weakref(self)
+	equipment.parent = weakref(self)
+	skills.parent = weakref(self)
+	travel.parent = weakref(self)
+#	effects.parent = weakref(self)
+	food.parent = weakref(self)
+	training.parent = weakref(self)
+	enthrall.parent = weakref(self)
+
+
+#component functions tunneling
+func get_timestamp():
+	return dyn_stats.get_timestamp()
+
+func reset_rebuild():
+	dyn_stats.reset_rebuild()
+#	dyn_stats.generate_data(variables.DYN_STATS_FULL, true)
+	if displaynode != null:
+		displaynode.rebuildbuffs()
+
+
+func reset_rebuild_delay():
+	dyn_stats.reset_rebuild_delay()
+
+
+func setup_etb():
+	dyn_stats.setup_etb()
+
+
+func base_exp_set(value):
+	xp_module.base_exp = value
+
+
+func swap_alternate_exterior():
+	statlist.swap_alternate_exterior()
+
+
+func update_capped_stats():
+	hp = min(hp, get_stat('hpmax'))
+	mp = min(mp, get_stat('mpmax'))
+	statlist.update_capped_stats()
+
+
+func get_stat_value_data(statname):
+	var st_data = statdata.statdata[statname]
+	if st_data.direct:
+		var res = {
+			base_value = statlist.get_stat(statname),
+			result = 0,
+			bonuses = {},
+		}
+		res.result = res.base_value
+		return res
+	else:
+		return dyn_stats.get_stat_data(statname)
+
+
+func get_stat(statname, nobonus = false, desc_ready = false):
+	if desc_ready:
+		reset_stat_compo_dict()
+	if statname in ['hp', 'mp', 'shield', 'combatgroup', 'id', 'combat_position']:
+		return get(statname)
+	if statname in ['physics','wits','charm','sexuals']:
+		if nobonus:
+			return statlist.get_stat(statname)
+		else:
+			var dyn_dict = dyn_stats.get_stat_full(statname + '_bonus')
+			var res = max(statlist.get_stat(statname) + dyn_dict.result, 0)
+			if desc_ready:
+				stat_compo_dict.base_value = statlist.get_stat(statname) + dyn_dict.base_value
+				stat_compo_dict.bonuses = dyn_dict.bonuses
+				stat_compo_dict.result = res
+			return res
+	if statname == 'desirability':
+		var base = variables.desirability_base + variables.desirability_per_charm_factor * get_stat('charm_factor') + variables.desirability_per_charm_stat * get_stat('charm')
+		var fame_desirability = get_fame_bonus('desirability_bonus')
+		if check_trait('courtesan'):
+			fame_desirability *= variables.courtesan_fame_desirability_mult
+		base += fame_desirability
+		if has_profession('petbeast'):
+			base += variables.petbeast_desirability_per_tame_factor * get_stat('tame_factor')
+		if nobonus:
+			if check_trait('harlot'):
+				base = min(base, variables.harlot_desirability_cap)
+			return base
+		var dyn_dict = dyn_stats.get_stat_full('desirability_bonus')
+		var res = max(base + dyn_dict.result, 0)
+		if check_trait('harlot'):
+			res = min(res, variables.harlot_desirability_cap)
+		if desc_ready:
+			stat_compo_dict.base_value = base + dyn_dict.base_value
+			stat_compo_dict.bonuses = dyn_dict.bonuses
+			stat_compo_dict.result = res
+		return res
+	if statname.begins_with('mastery_') and !statname.begins_with('mastery_point'):
+		return dyn_stats.get_mastery_level(statname.trim_prefix('mastery_'), desc_ready)
+	if statname == 'base_exp':
+		return xp_module.base_exp
+	if statname == 'counters':
+		return dyn_stats.counters
+	if statname == 'alt_form':
+		return enthrall.alt_form
+	if statname == 'thrall_points':
+		return enthrall.thrall_points
+	if statname == 'thrall_master':
+		return enthrall.get_thrall_master()
+	if statname == 'thralls':
+		return enthrall.get_thralls()
+	if statname == 'thralls_amount':
+		return enthrall.get_thrall_count()
+	if statname == 'thralls_amount_max':
+		return enthrall.get_thrall_max_count()
+	if statname == 'price':
+		return calculate_price()
+	if statname == 'food_demand':
+		return food.get_demand()
+	if (statname.begins_with('food_') and statname != 'food_consumption') or statname in ['fed', 'last_meal_type', 'last_meal_poor', 'starvation']:
+		return food.get(statname)
+	if statname in variables.training_stat_list:
+		return training.get(statname)
+	if statname == 'pregnancy_status':
+		if has_status('heavy_pregnant'):
+			return 'heavy'
+		elif has_status('pregnant'):
+			return 'early'
+		else:
+			return 'no'
+	if statname == 'downed_opponent_amount':
+		if input_handler.combat_node == null:
+			return 0
+		else:
+			return input_handler.combat_node.get_downed_opponent_amount(combatgroup)
+	if statname.begins_with('armor_'):
+		match statname:
+			'armor_base':
+#				return ('servant') #temporal, until correct recolor of armor
+				var res =  equipment.get_gear_type('chest')
+				if res == 'hector_armor':
+					res = 'chest_base_metal'
+				elif res == 'garb_of_forest':
+					res = 'chest_base_leather'
+				if res == null and !has_work_rule('nudity'):
+					res = 'underwear'
+				if !GeneratorData.transforms[statname].has(res):
+					res = 'servant'
+				return res
+			'armor_lower':
+#				return ('servant') #temporal, until correct recolor of armor
+				var res = equipment.get_gear_type('legs')
+				if res == 'garb_of_forest':
+					res = 'legs_base_leather'
+				if res == null and !has_work_rule('nudity'):
+					res = 'underwear'
+				if !GeneratorData.transforms[statname].has(res):
+					res = 'servant'
+				return res
+			'armor_base_underwear', 'armor_lower_underwear':
+				var res = equipment.get_gear_type('underwear')
+				if res == null and !has_work_rule('nudity'):
+					res = 'underwear'
+				if res != null and has_work_rule('nudity'):
+					res = null
+				return res
+			'armor_collar':
+				var res = equipment.get_gear_type('neck')
+				if !GeneratorData.transforms[statname].has(res):
+					res = null
+				return res
+			'armor_weapon':
+				var res = equipment.get_gear_type('rhand')
+				if !GeneratorData.transforms[statname].has(res):
+					res = null
+				return res
+			'armor_head':
+				var res = equipment.get_gear_type('head')
+				if !GeneratorData.transforms[statname].has(res):
+					res = null
+				return res
+	var st_data = statdata.statdata[statname]
+	if st_data.direct:
+		return statlist.get_stat(statname)
+	else:
+		if desc_ready:
+			stat_compo_dict = dyn_stats.get_stat_full(statname)
+		return dyn_stats.get_stat(statname)
+
+func reset_stat_compo_dict():
+	stat_compo_dict = {
+		base_value = 0,
+		result = 0,
+		bonuses = {},
+	}
+
+func get_stat_composition_dict():
+	#can return "clean" (just reset) dict, if stat has no bonuses,
+	#or get_stat() currently can't find them
+	return stat_compo_dict
+
+#metrics_* are bookkeeping counters - nothing derives a bonus from them, so writing one
+#must not throw away the dyn-stat cache. Doing so used to force a full rebuild on the next
+#get_stat, which is what made brothel/work ticks scale so badly with party size.
+func stat_affects_dyn_stats(statname):
+	return !statname.begins_with('metrics_')
+
+
+func set_stat(stat, value):
+	if stat in ['hp', 'mp', 'shield', 'taunt']:
+		set(stat, value)
+		return
+	if stat == 'base_exp':
+		xp_module.base_exp = value
+		return
+	if stat in variables.training_stat_list:
+		training.set(stat, value)
+		dyn_stats.reset_rebuild()
+		return
+	if stat == 'thrall_master':
+		enthrall.set_thrall_master(value)
+		dyn_stats.reset_rebuild()
+		return
+	if stat == 'alt_form':
+		enthrall.set_alt_form(value)
+		dyn_stats.reset_rebuild()
+		return
+	if (stat.begins_with('food_') and stat != 'food_consumption') or stat == 'fed':
+		food.set(stat, value)
+		return
+	if stat.ends_with('_virgin'):
+		if value:
+			set_stat(stat + '_lost', null)
+		else:
+			set_stat(stat + '_lost', 'unknown')
+		return
+	var st_data = statdata.statdata[stat]
+	if st_data.direct:
+		statlist.update_stat(stat, value, 'set')
+	else:
+#		print ("warning - direct setting of dynamic stat %s" % stat)
+		dyn_stats.set_default_value(stat, value)
+	if stat_affects_dyn_stats(stat):
+		dyn_stats.reset_rebuild()
+
+
+func add_stat_bonuses(ls:Dictionary):
+	dyn_stats.add_stat_bonuses(ls)
+	dyn_stats.reset_rebuild()
+
+
+func remove_stat_bonus(stat, op):
+	dyn_stats.remove_stat_bonus(stat, op)
+
+
+func add_stat(statname, value, force_store = false): #only oneshots
+	if statname in ['physics', 'wits', 'charm'] and value > 0:
+		value *= statlist.get_stat_gain_rate(statname)
+	if statname in ['hp', 'mp', 'shield']:
+		set(statname, get(statname) + value)
+	elif statname == 'thrall_points':
+		enthrall.thrall_points += value
+	elif statname == 'base_exp':
+		if value > 0:
+			xp_module.base_exp += value * get_stat('exp_gain_mod')
+		else: 
+			xp_module.base_exp += value
+	elif statname == 'base_exp_direct':
+		xp_module.base_exp += value
+	elif statname in variables.training_stat_list:
+		training.add_stat(statname, value)
+	elif statname == 'fed':
+		food.fed = int(max(food.fed + value, 0))
+	else:
+		if statname.ends_with('_direct'):
+			statname = statname.trim_suffix('_direct')
+		var st_data = statdata.statdata[statname]
+		if st_data.direct:
+			statlist.update_stat(statname, value, 'add')
+		else:
+#			print ("warning - direct setting of dynamic stat %s" % statname)
+			if force_store:
+				dyn_stats.add_stat_stored(statname, value)
+			else:
+				dyn_stats.add_stat_bonuses({statname + '_add': value})
+	if stat_affects_dyn_stats(statname):
+		dyn_stats.reset_rebuild()
+
+
+func mul_stat(statname, value): #only oneshots
+	var st_data = statdata.statdata[statname]
+	if st_data.direct:
+		statlist.update_stat(statname, value, 'mul')
+	else:
+#		print ("warning - direct setting of dynamic stat %s" % statname)
+		dyn_stats.add_stat_bonuses({statname + '_mul': value})
+	dyn_stats.reset_rebuild()
+
+
+func add_part_stat(statname, value): #only oneshots
+	var st_data = statdata.statdata[statname]
+	if st_data.direct:
+		statlist.update_stat(statname, value, 'mul')
+	else:
+#		print ("warning - direct setting of dynamic stat %s" % statname)
+		dyn_stats.add_stat_bonuses({statname + '_add_part': value})
+	dyn_stats.reset_rebuild()
+
+
+func change_personality_stats(stat, init_value, flag = false):
+	return statlist.change_personality_stats(stat, init_value, flag)
+
+func get_weapon_range():
+	if combatgroup == 'ally':
+		return equipment.get_weapon_range()
+	else:
+		return ai.get_weapon_range()
+
+func get_weapon_animation():
+	return equipment.get_weapon_animation()
+
+func get_weapon_cast_animation():
+	return equipment.get_weapon_cast_animation()
+
+func get_weapon_sound():
+	return equipment.get_weapon_sound()
+
+func get_damage_mod(skill):
+	return skills.get_damage_mod(skill)
+
+func get_value_damage_mod(skill_v):
+	return skills.get_value_damage_mod(skill_v)
+
+func remove_negative_sex_trait(code):
+	statlist.remove_negative_sex_trait(code)
+
+func add_sex_trait(code, known = false):
+	statlist.add_sex_trait(code, known)
+
+func remove_sex_trait(code, absolute = true):
+	statlist.remove_sex_trait(code, absolute)
+
+func unlock_sex_trait(code):
+	statlist.unlock_sex_trait(code)
+
+func create_s_trait_select(trait):
+	statlist.create_s_trait_select(trait)
+
+func fill_masternoun():
+	statlist.fill_masternoun()
+
+#questionable
+func is_controllable(): #alias
+	return is_combatant()
+
+func is_avaliable():
+	if has_status('no_job'):
+		return false
+	if get_work() == 'disabled':
+		return false
+	if get_work() == 'Assignment':
+		return false
+	
+	return true
+
+func has_profession(profession):
+	if profession in ['pet','petbeast']:
+		if dyn_stats.professions.has('pet') || dyn_stats.professions.has('petbeast'):
+			return true
+	return dyn_stats.professions.has(profession)
+
+func check_trait(trait):
+	if is_master() and trait.begins_with('loyalty_'): 
+		return true
+	
+	return (
+		dyn_stats.traits_real.has(trait)
+		or dyn_stats.traits_2_real.has(trait)
+		or dyn_stats.traits_stored.has(trait)
+		or statlist.sex_traits.has(trait)
+		or statlist.negative_sex_traits.has(trait)
+	)
+
+
+func get_character_standing_tier(value):
+	if value <= -50:
+		return 0
+	elif value >= 50:
+		return 2
+	return 1
+
+
+func get_character_standing_code():
+	var respect_tier = get_character_standing_tier(get_stat('respect'))
+	var affection_tier = get_character_standing_tier(get_stat('affection'))
+	return CHARACTER_STANDING_MAP[respect_tier][affection_tier]
+
+
+func get_character_standing():
+	return tr('CHARACTER_' + get_character_standing_code().to_upper())
+
+
+func predict_preg_time():
+	return statlist.predict_preg_time()
+
+func get_class_icon():
+	if get_stat('slave_class') in ['master', 'heir', 'spouse', 'servant', 'servant_notax']:
+		return images.get_icon(ResourceScripts.descriptions.bodypartsdata.slave_class[get_stat('slave_class')].icon)
+#	elif has_status('training_success'):
+#		var tmp = get_traits_by_tag('training_success')
+#		var upgrade_data = Traitdata.traits[tmp[0]]
+#		if upgrade_data.icon_small is String:
+#			return load(upgrade_data.icon_small)
+#		else:
+#			return upgrade_data.icon_small
+	else:
+		return images.get_icon(ResourceScripts.descriptions.bodypartsdata.slave_class[get_stat('slave_class')].icon)
+#end to add
+func process_chardata(chardata, unique = false):
+	statlist.process_chardata(chardata)
+	dyn_stats.process_chardata(chardata)
+	if chardata.has('slave_class'): 
+		set_slave_category(chardata.slave_class)
+	training.process_chardata(chardata)
+	food.process_chardata(chardata)
+	tags = chardata.tags.duplicate()
+	skills.setup_skills(chardata)
+	reset_rebuild()
+
+
+func generate_ea_character(gendata, desired_class):
+	var res = desired_class
+	var array = []
+	for i in worlddata.easter_egg_characters.values():
+		var temprace = gendata.race
+		if races.race_groups.has(temprace):
+			temprace = input_handler.random_from_array(races.race_groups[temprace])
+		if ResourceScripts.game_world.easter_egg_characters_acquired.has(i.name) == false && (temprace == 'random' || gendata.race == i.race):
+			var char_exists = false
+			for k in characters_pool.characters.values():
+				if k.get_stat('unique') == i.code:
+					char_exists = true
+					break
+			if char_exists == false:
+				array.append(i)
+	if !array.empty():
+		var chardata = input_handler.random_from_array(array)
+		create(chardata.race, chardata.sex, chardata.age)
+		process_chardata(chardata, true)
+		res = chardata.class_category
+	return res
+
+
+func generate_random_character_from_data(races_l, desired_class = null, adjust_difficulty = 0, trait_blacklist = [], guaranteed_classes = []):
+	adjust_difficulty = min(adjust_difficulty, 15)
+	var gendata = {race = '', sex = 'random', age = 'random'}
+
+	if typeof(races_l) == TYPE_STRING && races_l == 'random':
+		gendata.race = races.get_random_race()
+	elif typeof(races_l) == TYPE_STRING:
+		gendata.race = races_l
+	else:
+		gendata.race = input_handler.random_from_array(races_l)
+	create(gendata.race, gendata.sex, gendata.age)
+	dyn_stats.generate_data()
+	statlist.generate_random_character_from_data(adjust_difficulty)
+	dyn_stats.generate_random_character_from_data(desired_class, adjust_difficulty, guaranteed_classes)
+	dyn_stats.get_random_traits(trait_blacklist)
+	xp_module.set_service_boost()
+
+
+func get_random_name(keep_surname = false):
+	statlist.get_random_name(keep_surname)
+
+
+func get_class_list(category, person):
+	return dyn_stats.get_class_list(category, person)
+
+
+func generate_simple_fighter(tempname, setup_ai = true):
+	var data = Enemydata.enemies[tempname]
+	for i in variables.fighter_stats_list:
+		if data.has(i):
+#			set_stat(i, 0)
+#		else:
+			set_stat(i, data[i])
+	npc_reference = data.code
+	statlist.generate_simple_fighter(data)
+	dyn_stats.generate_simple_fighter(data)
+	equipment.generate_simple_fighter(data)
+	skills.setup_skills(data)
+	if setup_ai:
+		ai = ResourceScripts.scriptdict.class_ai_base.new()
+		if data.has('full_ai'):
+			ai.set_simple_ai(data.ai)
+		else:
+			#need check for hard difficulty
+			if data.has('ai_hard'): #and ResourceScripts.game_globals.diff_hard_monsters: 
+				fill_ai(data.ai_hard)
+			else:
+				fill_ai(data.ai)
+		ai.set_obj(self)
+		if data.has('skill_rotation'):
+			ai.set_skill_rotation(data.skill_rotation)
+		if data.has('need_req'):
+			need_req = data.need_req
+		if data.ai_position.has('ranged'):
+			ai.ai_position = 'any'
+	if data.has('tags') and data.tags.has('boss'):
+		globals.char_roll_data.uniq = true
+
+
+func add_mastery_as_bonuses(category, lv, mul = 2.5):
+	dyn_stats._add_mastery_as_bonuses(category, lv)
+
+
+func roll_static_masteries(list, lv):
+	var mas_1
+	var mas_2
+	var mas_3
+	var lv_1
+	var lv_2
+	var lv_3
+	if list.empty():
+		mas_1 = 'leadership'
+	else:
+		mas_1 = input_handler.random_from_array(list)
+		list.erase(mas_1)
+	if list.empty():
+		mas_2 = null
+	else:
+		mas_2 = input_handler.random_from_array(list)
+		list.erase(mas_2)
+	if list.empty():
+		mas_3 = null
+	else:
+		mas_3 = input_handler.random_from_array(list)
+	
+	match lv:
+		1:
+			lv_1 = globals.rng.randi_range(2, 3)
+			lv_2 = 0
+			lv_3 = 0
+		2:
+			lv_1 = globals.rng.randi_range(4, 5)
+			lv_2 = globals.rng.randi_range(2, 3)
+			lv_3 = 0
+		3:
+			lv_1 = globals.rng.randi_range(5, 6)
+			lv_2 = globals.rng.randi_range(3, 4)
+			lv_3 = 0
+		4:
+			lv_1 = globals.rng.randi_range(5, 6)
+			lv_2 = globals.rng.randi_range(5, 6)
+			lv_3 = 0
+		5:
+			lv_1 = globals.rng.randi_range(7, 9)
+			lv_2 = globals.rng.randi_range(4, 5)
+			lv_3 = 0
+		6:
+			lv_1 = globals.rng.randi_range(10, 15)
+			lv_2 = 20 - lv_1
+			lv_3 = 0
+		7:
+			lv_1 = globals.rng.randi_range(15, 20)
+			lv_2 = 30 - lv_1
+			lv_3 = 0
+		8:
+			lv_1 = globals.rng.randi_range(15, 20)
+			lv_2 = globals.rng.randi_range(13, 18)
+			lv_3 = 45 - lv_1 - lv_2
+	
+	add_mastery_as_bonuses(mas_1, lv_1)
+	if mas_2 != null:
+		add_mastery_as_bonuses(mas_2, lv_2)
+	if mas_3 != null:
+		add_mastery_as_bonuses(mas_3, lv_3)
+
+
+
+func generate_predescribed_character(data):
+	create(data.race, data.sex, data.age)
+	process_chardata(data, true)
+	if data.has('service_boosters'):
+		xp_module.set_service_boost(data.service_boosters)
+	else:
+		xp_module.set_service_boost()
+
+
+func turn_into_unique(code):
+	var data = worlddata.pregen_characters[code]
+	statlist.update_chardata(data)
+	dyn_stats.process_chardata(data)
+	food.process_chardata(data)
+	training.process_chardata(data)
+	tags = data.tags.duplicate() #or not
+	skills.setup_skills(data)
+	if data.has('service_boosters'):
+		xp_module.set_service_boost(data.service_boosters)
+	else:
+		xp_module.set_service_boost()
+	update_prt()
+	input_handler.achievements.try_add_char_achimnt(get_stat('unique'))
+	globals.emit_signal("slave_added")
+
+
+func create(temp_race, temp_gender, temp_age):
+	id = characters_pool.add_char(self)
+	dyn_stats.gather_innate_bonuses()
+	learn_c_skill('attack')
+	statlist.create(temp_race, temp_gender, temp_age)
+	add_trait('core_trait')
+	add_trait('untrained')
+	
+	hp = get_stat('hpmax')
+	mp = get_stat('mpmax')
+	
+	food.create()
+#	training.build_stored_reqs()
+
+
+func get_racial_features(race):
+	var race_template = races.racelist[race]
+	
+	dyn_stats.get_racial_features(race)
+	statlist.get_racial_features(race)
+	training.setup_dispositions(race)
+#	if race_template.has("combat_skills"):
+#		for i in race_template.combat_skills:
+#			learn_c_skill(i)
+	food.get_racial_features(race)
+
+
+func fill_boosters():
+	xp_module.set_service_boost()
+
+func make_random_portrait():
+	statlist.make_random_portrait()
+
+func make_relative_of(person, relation, sync_surname = true, sync_age = true):
+	var target = person
+	if typeof(person) == TYPE_STRING:
+		target = characters_pool.get_char_by_id(person)
+	if target == null:
+		print("error - can't connect relative for %s: target is null" % id)
+		return false
+	if target.id == id:
+		print("error - character %s can't become a relative of itself" % id)
+		return false
+	relation = str(relation).to_lower()
+	match relation:
+		'sibling':
+			ResourceScripts.game_party.connectrelatives(id, target.id, 'sibling')
+		'parent', 'mother', 'father':
+			var parent_role = relation
+			if parent_role == 'parent':
+				parent_role = get_parent_relative_role()
+			ResourceScripts.game_party.connectrelatives(target.id, id, parent_role)
+		'child':
+			ResourceScripts.game_party.connectrelatives(id, target.id, target.get_parent_relative_role())
+		_:
+			print("error - unsupported relative type %s for %s" % [relation, id])
+			return false
+	if sync_surname:
+		var family_surname = target.get_stat('surname')
+		if family_surname != '':
+			set_stat('surname', family_surname)
+	if sync_age:
+		match relation:
+			'parent', 'mother', 'father':
+				align_relative_age(target, 'parent')
+			_:
+				align_relative_age(target, relation)
+	refresh_relatives_record()
+	return true
+
+func get_parent_relative_role():
+	if get_stat('sex') == 'male' and !get_stat('has_womb'):
+		return 'father'
+	return 'mother'
+
+func align_relative_age(person, relation):
+	var age_order = ['teen', 'adult', 'mature']
+	var self_age = get_stat('age')
+	var target_age = person.get_stat('age')
+	if !age_order.has(self_age) or !age_order.has(target_age):
+		return
+	var self_age_idx = age_order.find(self_age)
+	var target_age_idx = age_order.find(target_age)
+	match relation:
+		'sibling':
+			set_stat('age', target_age)
+		'parent':
+			if self_age_idx <= target_age_idx:
+				set_stat('age', age_order[min(target_age_idx + 1, age_order.size() - 1)])
+		'child':
+			if self_age_idx >= target_age_idx:
+				set_stat('age', age_order[max(target_age_idx - 1, 0)])
+
+func refresh_relatives_record():
+	if !ResourceScripts.game_party.relativesdata.has(id):
+		return
+	var reldata = ResourceScripts.game_party.relativesdata[id]
+	reldata.name = get_full_name()
+	reldata.race = get_stat('race')
+	reldata.sex = get_stat('sex')
+
+func setup_baby(mother, father):
+	var temp_race
+	var race1 = mother.get_stat('race')
+	var race2 = father.get_stat('race')
+	if randf() >= 0.5:
+		temp_race = race1
+	else:
+		temp_race = race2
+	var furryfix = false
+	if race2.find('Beastkin') >= 0 && race1.find("Beastkin") < 0:
+		temp_race = race2.replace("Beastkin", "Halfkin")
+		furryfix = true
+	elif race1.find('Beastkin') >= 0 && race2.find("Beastkin") < 0:
+		temp_race = race1.replace("Beastkin", "Halfkin")
+		furryfix = true
+	create(temp_race, 'random', 'teen')
+	
+	
+	for i in variables.inheritedstats:
+		if furryfix and i == 'skin_coverage':
+			continue
+		if father.has_status("breeder") and !mother.has_status("breeder"):
+			set_stat(i, father.get_stat(i))
+		elif !father.has_status("breeder") and mother.has_status("breeder"):
+			set_stat(i, mother.get_stat(i))
+		elif randf() >= 0.5:
+			set_stat(i, mother.get_stat(i))
+		else:
+			set_stat(i, father.get_stat(i))
+	
+	if mother.check_trait('master_progenecy') or father.check_trait('master_progenecy'):
+		for factor in [
+			'physics_factor',
+			'magic_factor',
+			'tame_factor',
+			'authority_factor',
+			'growth_factor',
+			'charm_factor',
+			'wits_factor',
+			'sexuals_factor',
+		]:
+			if randf() <= 0.5:
+				add_stat(factor, 1)
+	
+	for tr in mother.get_traits_by_tag('positive') + father.get_traits_by_tag('positive'):
+		if randf() <= 0.8 or mother.has_status("breeder") or father.has_status("breeder"):
+			add_trait(tr)
+	for tr in mother.get_traits_by_tag('negative') + father.get_traits_by_tag('negative'):
+		if mother.has_status("breeder") or father.has_status("breeder"):
+			if randf() <= 0.1:
+				add_trait(tr)
+		elif randf() <= 0.5:
+			add_trait(tr)
+	
+	baby_transform(mother)
+	mother.set_stat('pregnancy_baby', id)
+	mother.set_stat('pregnancy_duration', variables.pregduration)
+	characters_pool.move_to_baby(id)
+	ResourceScripts.game_party.connectrelatives(id, mother.id, "mother")
+	ResourceScripts.game_party.connectrelatives(id, father.id, "father")
+	xp_module.set_service_boost()
+
+func get_baby_or_null():
+	var tmp = get_stat('pregnancy_baby')
+	return tmp
+
+func get_short_name():
+	return statlist.get_short_name()
+
+func get_full_name():
+	return statlist.get_full_name()
+
+func get_short_race():
+	var race = races.racelist[get_stat('race')].name
+	if race.findn('Beastkin '): race = race.replace('Beastkin ','B.')
+	if race.findn('Halfkin '): race = race.replace('Halfkin ','H.')
+	return race.capitalize()
+
+func equip(item, item_prev_id = null):
+	equipment.equip(item, item_prev_id)
+	set_stat('portrait_update', true)
+
+func unequip(item, hard = true):
+	equipment.unequip(item, hard)
+	set_stat('portrait_update', true)
+
+func unequip_all(hard = true):
+	equipment.clear_equip(hard)
+	set_stat('portrait_update', true)
+
+
+func upgrade_mastery(school, force_universal = false):
+	dyn_stats.upgrade_mastery(school, force_universal)
+
+func can_upgrade_mastery(school, force_universal = false):
+	return dyn_stats.can_upgrade_mastery(school, force_universal)
+
+func upgrade_mastery_cost(school, force_universal = false):
+	return dyn_stats.upgrade_mastery_cost(school, force_universal)
+
+func unlock_class(prof, satisfy_progress_reqs = false):
+	dyn_stats.unlock_class(prof, satisfy_progress_reqs)
+
+func remove_class(prof):
+	dyn_stats.remove_class(prof)
+
+func remove_all_classes():
+	dyn_stats.remove_all_classes()
+
+func reset_mastery():
+	dyn_stats.reset_mastery()
+
+func add_trait(tr_code):
+	dyn_stats.add_trait(tr_code)
+
+func can_add_trait(tr_code):
+	return dyn_stats.can_add_trait(tr_code)
+
+func remove_trait(tr_code):
+	dyn_stats.remove_trait(tr_code)
+
+func get_traits_by_tag(tag):
+	return dyn_stats.get_traits_by_tag(tag)
+
+func get_random_trait_tag(tag):
+	return dyn_stats.get_random_trait_tag(tag)
+
+func get_traits_by_arg(arg, value):
+	return dyn_stats.get_traits_by_arg(arg, value)
+
+func get_random_traits():
+	dyn_stats.get_random_traits()
+
+
+func get_body_upgrades():
+	return dyn_stats.get_body_upgrades()
+
+
+func has_body_upgrade(id):
+	return dyn_stats.has_body_upgrade(id)
+
+
+func can_learn_skill(skill_id):
+	var skilldata = Skilldata.Skilllist[skill_id]
+	if !skilldata.tags.has('learnable'):
+		return false
+	if skilldata.has('learn_reqs') and !checkreqs(skilldata.learn_reqs):
+		return false
+	if skilldata.has('learn_cost') and xp_module.abil_exp < skilldata.learn_cost:
+		return false
+	return true
+
+func learn_skill(skill):
+	skills.learn_skill(skill)
+
+func learn_c_skill(skill):
+	skills.learn_c_skill(skill)
+
+func learn_e_skill(skill):
+	skills.learn_e_skill(skill)
+
+func unlearn_skill(skill):
+	skills.unlearn_skill(skill)
+
+func unlearn_c_skill(skill):
+	skills.unlearn_c_skill(skill)
+	if selectedskill == skill:
+		selectedskill = get_skill_by_tag('basic')
+
+func unlearn_e_skill(skill):
+	skills.unlearn_e_skill(skill)
+
+
+func rebuild_skills():
+	dyn_stats.rebuild_skills()
+
+func spend_combat_charge(skill_id, skill_cooldown):
+	skills.spend_combat_charge(skill_id, skill_cooldown)
+
+func cooldown_tick():
+	skills.cooldown_tick()
+	training.cooldown_tick()
+
+
+func check_task(task):
+	return xp_module.check_task(task)
+
+func get_task_diff():
+	return xp_module.get_task_diff()
+
+func assign_to_task(taskcode):
+	xp_module.assign_to_task(taskcode)
+
+func remove_from_task(travel = false):
+	xp_module.remove_from_task(travel)
+
+func return_to_task():
+	xp_module.return_to_task()
+
+func get_unaval_string():
+	return xp_module.get_unaval_string()
+
+func recruit_tick(task):
+	return xp_module.recruit_tick(task)
+
+func special_tick(task):
+	return xp_module.special_tick(task)
+
+func get_progress_resource(tempresource, count_crit = false):
+	return xp_module.get_progress_resource(tempresource, count_crit)
+
+func get_job_value(temptask, count_crit = false):
+	return xp_module.get_job_value(temptask, count_crit)
+
+func get_service_desirability(enabled_actions = null):
+	return xp_module.get_service_desirability(enabled_actions)
+
+func get_estimated_service_value():
+	return xp_module.get_estimated_service_value()
+
+func get_estimated_non_sex_service_value():
+	return xp_module.get_estimated_non_sex_service_value()
+
+func get_farming_rules():
+	return xp_module.get_farming_rules()
+
+func add_metric_for_outcome(res_id, amount):
+	xp_module.add_metric_for_outcome(res_id, amount)
+
+func work_tick_values(workstat):
+	xp_module.work_tick_values(workstat)
+
+func travel_per_tick():
+	return travel.travel_per_tick()
+
+func calculate_estimated_travel_time(t_time):
+	return travel.calculate_estimated_travel_time(t_time)
+
+func set_travel_time(value):
+	travel.set_travel_time(value)
+
+func return_to_mansion(instant = false):
+	xp_module.remove_from_task()
+	travel.return_to_mansion(instant)
+	input_handler.slave_list_node.update_dislocations()
+	input_handler.slave_list_node.rebuild()
+
+func recruit(enslave = false):
+	is_active = true
+	travel.location = input_handler.active_location.id
+	travel.area = input_handler.active_area.code
+	if enslave == true:
+		set_slave_category('slave')
+#		set_work_rule('bindings', true)
+#	else:
+#		set_slave_category('servant')
+	ResourceScripts.game_party.add_slave(self)
+
+
+func add_to_captured():
+	is_active = true
+	input_handler.active_location.captured_characters.push_back(id)
+	input_handler.emit_signal("LocationSlavesUpdate")
+
+
+func recruit_and_return():
+	travel.return_recruit()
+	ResourceScripts.game_party.add_slave(self)
+
+
+func get_job_order(materials = true):
+	return xp_module.get_job_order(materials)
+
+func get_job_priority(job, materials = true):
+	return xp_module.get_job_priority(job, materials)
+
+func get_jobs_enabled(materials = true):
+	return xp_module.get_jobs_enabled(materials)
+
+
+func set_job_orders(value, materials = true): 
+	xp_module.set_job_orders(value, materials)
+
+
+func set_job_order(job, value, materials = true):
+	xp_module.set_job_order(job, value, materials)
+
+
+func set_job_enabled(job, value, materials = true):
+	xp_module.set_job_enabled(job, value, materials)
+
+
+func set_work(task):
+	if xp_module.work == 'disabled' and task != 'disabled':
+		print("There is a critical error - attempting to enable character a wrong way. Please try to remember and report chain of actions that can be its cause. All saves after this may (or may not) be broken.")
+		return
+	xp_module.remove_from_task()
+	xp_module.work = task
+	if task == 'produce':
+		xp_module.setup_farm()
+
+func set_work_rule(rule, value):
+	xp_module.set_work_rule(rule, value)
+
+func check_work_rule(rule):
+	return xp_module.check_work_rule(rule)
+
+func set_brothel_rule(rule, value):
+	xp_module.set_brothel_rule(rule, value)
+
+func check_brothel_rule(rule):
+	return xp_module.check_brothel_rule(rule)
+
+func set_farm_res(res, value):
+	xp_module.set_farm_res(res, value)
+
+func get_farm_res(res):
+	return xp_module.check_farm_res(res)
+
+func find_worktask():
+	return xp_module.find_worktask()
+
+
+func get_quest_time_init():
+	return xp_module.get_quest_time_init()
+
+func get_selected_quest():
+	return xp_module.get_selected_quest()
+
+func remove_from_work_quest():
+	xp_module.remove_from_work_quest()
+
+func get_skill_by_tag(tg):
+	var res = skills.get_skill_by_tag(tg)
+	if res == null: print ("ERROR in skill config - no basic skill")
+	return res
+
+func baby_transform(mother):
+	statlist.baby_transform(mother)
+
+
+func setup_as_heir():
+	var reldata = ResourceScripts.game_party.get_relatives_data(id)
+	if reldata == null: return #possibly error
+	if reldata.father == null or reldata.mother == null: return
+	var mreldata = ResourceScripts.game_party.get_relatives_data(reldata.mother)
+	var freldata = ResourceScripts.game_party.get_relatives_data(reldata.father)
+	if mreldata == null or freldata == null: return
+	var mother = characters_pool.get_char_by_id(mreldata.id)
+	var father = characters_pool.get_char_by_id(freldata.id)
+	if mother == null or father == null: return
+	if mother.is_master():
+		if father.is_spouse():
+			set_slave_category('heir')
+		else:
+			set_slave_category('slave')
+	elif mother.is_spouse():
+		if father.is_master():
+			set_slave_category('heir')
+		else:
+			var tmp = mother.get_stat('slave_class')
+			if tmp == 'slave_trained':
+				tmp = 'slave'
+			set_slave_category(tmp)
+	else:
+		var tmp = mother.get_stat('slave_class')
+		if tmp == 'slave_trained':
+			tmp = 'slave'
+		set_slave_category(tmp)
+
+
+func get_weapon_element():
+	if has_status('e_damage_buff'):
+		return get_stat('damagetype')
+	var tmp = equipment.get_weapon_element()
+	if tmp != 'normal':
+		return tmp
+	return get_stat('damagetype')
+
+func find_temp_effect_tag(eff_tag):
+	if dyn_stats.rebuild < variables.DYN_STATS_PREAREA:
+		dyn_stats.generate_data(variables.DYN_STATS_PREAREA)
+	return dyn_stats.find_temp_effect_tag(eff_tag)
+
+
+func apply_effect_code(eff_code, args = {}):
+	if npc_reference == 'combat_global': 
+		return
+	dyn_stats.add_stored_effect(eff_code, args)
+
+
+func apply_status(eff, args = {}):
+	if npc_reference == 'combat_global': 
+		return
+	args.effect = eff
+	if !args.has('chance'):
+		args.chance = 1.0
+	dyn_stats.apply_status(args)
+
+
+func remove_effect_stack(id):
+	dyn_stats.remove_effect_stack(id)
+
+
+func remove_effect(eff_id, internal = false):
+	dyn_stats.remove_effect(eff_id, internal)
+
+
+func remove_temp_effect_tag(eff_tag):#function for non-direct temps removing, like heal or dispel
+	dyn_stats.remove_temp_effect_tag(eff_tag)
+
+func remove_all_temp_effects_tag(eff_tag):#function for non-direct temps removing, like heal or dispel
+	#the tag lookup reads the rebuilt effect containers, same as find_temp_effect_tag
+	if dyn_stats.rebuild < variables.DYN_STATS_PREAREA:
+		dyn_stats.generate_data(variables.DYN_STATS_PREAREA)
+	dyn_stats.remove_all_temp_effects_tag(eff_tag)
+
+
+func process_event(ev, data = {}):
+	if dyn_stats.rebuild < variables.DYN_STATS_FULL:
+		dyn_stats.generate_data()
+	dyn_stats.process_event(ev, data)
+
+func get_all_buffs():
+	if dyn_stats.rebuild < variables.DYN_STATS_FULL:
+#	reset_rebuild()
+		dyn_stats.generate_data()
+	return dyn_stats.buffs
+
+func get_mansion_buffs():
+	var tres = get_all_buffs()
+	var res = []
+	
+	for b in tres:
+		if b.tags.has('combat_only'): 
+			continue
+		res.push_front(b)
+	return res
+
+func get_combat_buffs():
+	var tres = get_all_buffs()
+	var res = []
+	for b in tres:
+		if b.tags.has('mansion_only'): 
+			continue
+		res.push_front(b)
+	return res
+
+func can_act():
+	if is_koed(): 
+		return false
+	return !has_status('disable') or has_status('ignore_disable')
+
+func can_evade():
+	var res = can_act()
+	if has_status('defend'): 
+		res = false
+	return res
+
+func can_use_skill(skill):
+	if (is_players_character or need_req) and skill.has('reqs') and !checkreqs(skill.reqs): 
+		return false
+	if skill.type == 'auto': 
+		return false
+	if is_players_character and !check_cost(skill.cost): 
+		return false
+	if skills.combat_cooldowns.has(skill.code): 
+		return false
+	if has_status('disarm') and skill.ability_type == 'skill' and !skill.tags.has('disable_immunity'):
+		 return false
+	if has_status('silence') and skill.ability_type == 'spell' and !skill.tags.has('disable_immunity'):
+		 return false
+	return true
+
+func has_status(status):
+	var res = dyn_stats.has_status(status) or statlist.has_status(status) or tags.has(status)
+	return res
+
+func has_stored_status(status):
+	var res = dyn_stats.has_stored_status(status)
+	return res
+
+func is_combatant():
+	if get_stat('slave_class') != 'slave':
+		return has_status('combatant')
+	else:
+		return training.get_trainer() != null or enthrall.get_thrall_master() != null
+
+
+func get_noncombatant_report():
+	if get_stat('slave_class') != 'slave':
+		return translate(tr('NO_FIGHT_LOW_OBED'))
+	else:
+		return translate(tr('NO_FIGHT_LOW_OBED2'))
+
+
+func is_worker():
+	if get_stat('slave_class') != 'slave':
+		return has_status('worker')
+	else:
+		return training.get_trainer() != null or enthrall.get_thrall_master() != null
+
+func has_work_rule(rule):
+	if !variables.work_rules.has(rule): return false
+	return xp_module.work_rules[rule]
+
+func is_master():
+	return has_profession('master')
+
+func is_spouse():
+	return id == ResourceScripts.game_progress.spouse
+
+
+func is_unique():
+	return get_stat('unique') != null
+
+
+func add_rare_trait():
+	if ResourceScripts.game_globals.date < 2: return
+	tags.push_back('rare')
+	dyn_stats.add_rare_trait()
+	#tutorial part here
+	#input_handler.ActivateTutorial('rares')
+
+func can_be_damaged(skill):
+	if skill.tags.has('damage'):
+		if has_status('warded') and !has_status('ward'):
+			return false
+	match skill.ability_type:
+		'skill': 
+			return !has_status('banish')
+		'spell': 
+			return !has_status('void')
+
+func restore_skill_charge(code):
+	skills.restore_skill_charge(code)
+
+
+func set_slave_category(new_class):
+	var oldclass = get_stat('slave_class')
+	if oldclass == new_class:
+		return
+	if oldclass != '':
+		remove_trait(oldclass)
+	add_trait(new_class)
+	dyn_stats.generate_data(variables.DYN_STATS_PREAREA)
+	statlist.statlist.slave_class = new_class
+	if new_class == 'heir':
+		for tr in variables.servant_unlock_traits:
+			add_trait(tr)
+	if has_status('trained'):
+		finish_training(true)
+	else:
+		reset_training()
+
+
+func use_social_skill(s_code, target):
+	skills.use_social_skill(s_code, target, null)
+
+#func process_skill_cast_event(s_skill, event):
+#	effects.process_skill_cast_event(s_skill, event)
+
+func check_location(loc, completed = false):
+	if loc == 'mansion': loc = ResourceScripts.game_world.mansion_location
+	return travel.check_location(loc, completed)
+
+func remove_from_travel():
+	travel.remove_from_travel()
+
+func reset_location():
+	travel.set_location_to_default()
+
+func same_location_with(ch):
+	return travel.same_location_with(ch.travel)
+
+func get_current_location_desc():
+	return travel.make_location_description()
+
+func set_travel_to(from_loc, to_loc):
+	travel.set_travel_to(from_loc, to_loc)
+
+func instant_travel(to_loc):
+	travel.instant_travel(to_loc)
+
+func get_loc_group():
+	return travel.loc_group
+
+func set_loc_group(group_name):
+	travel.loc_group = group_name
+
+func get_next_class_exp():
+	return xp_module.get_next_class_exp()
+
+func get_work():
+	return xp_module.get_work()
+
+func get_tutelage_type():
+	return xp_module.get_tutelage_type()
+
+
+func is_on_quest():
+	return xp_module.is_on_quest()
+
+func is_unavaliable():
+	return xp_module.is_unavaliable()
+
+func is_free():
+	if is_on_quest(): return false
+	return check_location('mansion', true)
+
+
+func assign_to_quest_and_make_unavalible(quest, work_time = -1):
+	xp_module.assign_to_quest_and_make_unavalible(quest, work_time)
+
+func get_quest_time_remains():
+	return xp_module.get_quest_time_remains()
+
+func quest_day_tick():
+	xp_module.quest_day_tick()
+
+func training_day_tick():
+	training.day_tick()
+
+func get_prof_number():
+	return dyn_stats.get_prof_number()
+
+func get_professions():
+	return dyn_stats.get_professions()
+
+
+func use_mansion_item(item):
+	skills.use_mansion_item(item)
+
+func get_icon(path = false):
+	if path: 
+		return statlist.get_icon_path()
+	else: 
+		var res = statlist.get_icon()
+		if res == null:
+			res = races.racelist[get_stat('race')].icon
+			if res is String:
+				res = load(res)
+		return res
+
+func get_icon_small(): #obsolete
+	var res = get_icon()
+	if res == null:
+		res = races.racelist[get_stat('race')].icon
+		if res is String:
+			res = load(res)
+	return res
+
+func get_body_image():
+	return statlist.get_body_image()
+
+func get_stored_body_image():
+	return statlist.get_stored_body_image()
+
+func get_stat_data():
+	var res = {}
+	res['skill_stat'] = 'physics'
+	res['spell_stat'] = 'wits'
+	res['skill_atk'] = 'atk'
+	res['spell_atk'] = 'matk'
+	#to add trait checks
+	return res
+
+func access_sexexp():
+	return statlist.access_sexexp()
+
+func get_all_sex_traits():
+	return statlist.get_all_sex_traits()
+
+func get_sex_traits():
+	return statlist.get_sex_traits()
+
+func get_sex_skills():
+	return statlist.get_sex_skills()
+
+func get_sex_training():
+	return statlist.get_sex_training()
+
+func get_sex_mastery_progress():
+	return statlist.get_sex_mastery_progress()
+
+func get_negative_sex_traits():
+	return statlist.get_negative_sex_traits()
+
+func get_unlocked_sex_traits():
+	return statlist.get_unlocked_sex_traits()
+
+func make_trait_known(trait):
+	return statlist.make_trait_known(trait)
+
+func get_gear(slot):
+	return equipment.get_gear(slot)
+
+func has_shield_with_evasion_bonus():
+	if !is_players_character:
+		return true
+	var shield_id = get_gear('lhand')
+	if shield_id == null or !ResourceScripts.game_res.items.has(shield_id):
+		return false
+	var shield_item = ResourceScripts.game_res.items[shield_id]
+	if shield_item.geartype != 'shield':
+		return false
+	return shield_item.get_bonusstats().get('evasion', 0) > 0
+
+func get_equiped_items():
+	return equipment.get_equiped_items()
+
+func get_location():
+	return travel.location
+
+func get_tattoo(slot):
+	return statlist.get_tattoo(slot)
+
+func get_tattoos():
+	return statlist.get_tattoos()
+
+func get_filled_tattoos():
+	return statlist.get_filled_tattoos()
+
+func can_add_tattoo(slot, code):
+	return statlist.can_add_tattoo(slot, code)
+
+func add_tattoo(slot, code):
+	return statlist.add_tattoo(slot, code)
+
+func remove_tattoo(slot):
+	statlist.remove_tattoo(slot)
+
+func play_sfx(code):
+	if displaynode != null:
+		displaynode.process_sfx(code)
+
+func get_progress_task(temptask, tempsubtask, count_crit = false):
+	return xp_module.get_progress_task(temptask, tempsubtask, count_crit)
+
+
+func get_progress_farm(res):
+	return xp_module.get_progress_farm(res)
+
+
+func select_brothel_activity():
+	xp_module.select_brothel_activity()
+
+
+func get_farming_limit():
+	return xp_module.get_farming_limit()
+
+func can_add_farming():
+	return xp_module.can_add_farming()
+
+
+func predict_active_task():
+	return xp_module.predict_active_task()
+
+
+func act_prepared():
+	skills.act_prepared()
+
+
+func get_upgrade_points():
+	return dyn_stats.get_upgrade_points()
+
+
+func add_upgrade(upg): #unsafe adding
+	dyn_stats.add_upgrade(upg)
+
+
+func can_add_upgrade(upg):
+	return dyn_stats.can_add_upgrade(upg)
+
+
+func remove_upgrade(upg):
+	dyn_stats.remove_upgrade(upg)
+
+
+func recheck_upgrades():
+	dyn_stats.recheck_upgrades()
+
+
+func recheck_equip():
+	equipment.recheck_equip()
+
+func process_disposition_data(data, setup = false):
+	training.process_disposition_data(data, setup)
+
+func process_traits_availability_data(data):
+	training.process_traits_availability_data(data)
+
+func get_trainer():
+	return training.get_trainer()
+
+func get_trainees():
+	return training.get_trainees()
+
+func get_dispositions_text():
+	return training.get_dispositions_text()
+
+func add_trainee(id):
+	training.add_trainee(id)
+
+func add_training(id):
+	training.add_training(id)
+
+func add_training_post(id):
+	training.add_training_post(id)
+
+func reset_training():
+	training.reset_training()
+
+func clear_training():
+	training.clear_training()
+#	if training.clear_training():
+#		#check if need remove from unavaliable work
+#		#char MAY still be worker after trainer remove
+#		if !is_worker() and !(get_work() in ['', 'rest', 'disabled', 'travel']):
+#			 remove_from_task()
+
+func can_be_trained():
+	return training.can_be_trained()
+
+func can_be_trainer():
+	var res = true
+	if get_stat('slave_class') == 'slave':
+		res = !training.enable
+	return res and has_status('trainer')
+
+func finish_training(internal = false):
+	training.finish_training(internal)
+
+func apply_training(tr_code):
+	training.apply_training(tr_code)
+
+func get_training_cost():
+	return training.get_training_cost()
+
+func get_servant_training_cost():
+	return training.get_servant_training_cost()
+
+func process_training_metrics(value):
+	training.process_training_metrics(value)
+
+func can_add_thrall():
+	return enthrall.can_add_thrall()
+
+func release_all_thralls():
+	enthrall.release_all_thralls()
+	reset_rebuild()
+
+func release_thrall(chid):
+	enthrall.release_thrall(chid)
+	reset_rebuild()
+
+func add_thrall(chid):
+	enthrall.add_thrall(chid)
+	reset_rebuild()
+
+func clear_enthrall():
+	enthrall.cleanup()
+
+
+func serialize():
+	var res = inst2dict(self)
+	res.statlist = inst2dict(statlist)
+	res.dyn_stats = inst2dict(dyn_stats)
+	res.xp_module = inst2dict(xp_module)
+	res.equipment = inst2dict(equipment)
+	res.skills = inst2dict(skills)
+	res.travel = inst2dict(travel)
+	res.food = inst2dict(food)
+	res.training = inst2dict(training)
+	res.enthrall = inst2dict(enthrall)
+	return res
+
+func fix_serialization():
+	if xp_module is Dictionary:
+		xp_module = dict2inst(xp_module)
+	if equipment is Dictionary:
+		if equipment.gear.has('tool'):
+			equipment.gear.tool_axe = null
+			equipment.gear.tool_pickaxe = null
+			equipment.gear.tool_hammer = null
+			equipment.gear.tool_rod = null
+			equipment.gear.tool_sickle = null
+			equipment.gear.tool_hunt_knife = null
+			equipment.gear.erase('tool')
+		equipment = dict2inst(equipment)
+	if skills is Dictionary:
+		skills = dict2inst(skills)
+	skills.repair_skill_panels()
+	if travel is Dictionary:
+		travel = dict2inst(travel)
+	if food is Dictionary:
+		food = dict2inst(food)
+	if training is Dictionary:
+		training = dict2inst(training)
+	if enthrall is Dictionary:
+		enthrall = dict2inst(enthrall)
+	var tmp = statlist.duplicate()
+	var tmp2 = dyn_stats.duplicate()
+	for st in ['physics_factor', 'magic_factor', 'tame_factor', 'authority_factor', 'growth_factor', 'charm_factor', 'wits_factor', 'sexuals_factor']:
+		if tmp.statlist.has(st):
+			tmp2.statlist[st] = tmp.statlist[st]
+			tmp.statlist.erase(st)
+	statlist = ResourceScripts.scriptdict.ch_statlist.new()
+	dyn_stats = ResourceScripts.scriptdict.ch_statlist_dynamic.new()
+	rebuild_parents()
+	statlist.deserialize(tmp)
+	dyn_stats.deserialize(tmp2)
+	xp_module.fix_rules()
+	travel.fix_infinite_travel()
+	training.fix_old_save()
+	food.fix_old_save()
+
+
+
+func fix_serialization_postload():
+	statlist.fix_serialize()
+	dyn_stats.fix_serialize()
+	xp_module.fix_serialize()
+	
+	reset_rebuild()
+
+
+func fix_import():
+	xp_module.fix_import()
+	travel.fix_import()
+	statlist.fix_import()
+
+
+func repair_skill_panels():
+	skills.repair_skill_panels()
+
+#AI-related stuff
+func need_heal(): #stub. borderlines are subject to tuning
+	if has_status('banish'): 
+		return -1.0
+	var rate = hp * 1.0 / get_stat('hpmax')
+	if rate < 0.2: 
+		return 1.0
+	if rate < 0.4: 
+		return 0.5
+	if rate < 0.6: 
+		return 0.0
+	if rate < 0.8: 
+		return -0.5
+	return -1.0
+
+#core functions
+func hp_get():
+	if hp > get_stat('hpmax'):
+		hp = get_stat('hpmax')
+	return hp
+
+
+func hp_set(value):
+	if npc_reference == 'combat_global': 
+		return
+	if hp <= 0:
+		if value <= hp:
+			return
+		else:
+			hp = value
+			return
+	hp = min(value, get_stat('hpmax'))
+	if has_status('last_stand') and hp < 0.1 * get_stat('hpmax'):
+		hp = int(ceil(0.1 * get_stat('hpmax')))
+	if displaynode != null:
+		displaynode.update_hp()
+	if hp <= 0:
+		if has_status('reincarnate'):
+			hp = get_stat('hpmax')
+			remove_temp_effect_tag('reincarnate')
+#            play_sfx('reborn')
+			if displaynode != null:
+				displaynode.update_hp()
+				displaynode.rebuildbuffs()
+		else:
+			death()
+	else:
+		defeated = false
+
+
+func mp_set(value):
+	if npc_reference == 'combat_global': return
+	mp = clamp(value, 0, get_stat('mpmax'))
+	if displaynode != null:
+		displaynode.update_mana()
+
+
+func death():
+	process_event(variables.TR_DEATH)
+	effects_pool.process_event(variables.TR_DEATH, self)
+#	process_event(variables.TR_COMBAT_F)
+	if npc_reference != null:
+		input_handler.emit_signal("EnemyKilled", npc_reference)
+	if displaynode != null:
+		displaynode.defeat()
+	if input_handler.combat_node != null:
+		if has_status('fastheal'):
+			apply_effect_code('e_g_injury_delay', {duration = 8})
+		else:
+			apply_effect_code('e_g_injury_delay', {duration = 12})
+		#in this case check for permadeath is not here but in various finish combat methods
+	else:
+		if !ResourceScripts.game_globals.diff_permadeath:
+			if has_status('fastheal'):
+				apply_effect_code('e_grave_injury', {duration = 8})
+			else:
+				apply_effect_code('e_grave_injury', {duration = 12})
+		else:
+			killed(false)
+		#add permadeath check here
+
+
+func killed(direct_call = true):
+	if direct_call: 
+		process_event(variables.TR_DEATH)
+	enthrall.cleanup()
+	ResourceScripts.game_party.check_breakdown_on_char_loss(self)
+	equipment.clear_equip()
+	training.clear_training()
+	ResourceScripts.game_party.add_fate(id, tr("SIBLINGMODULEFATEDEAD"))
+	is_active = false
+	ResourceScripts.game_party.character_order.erase(id)
+	characters_pool.call_deferred('cleanup')
+	input_handler.update_slave_list()
+	if is_master():
+		input_handler.interactive_message('generic_lose_scene', '', {})
+
+func teleport(data):
+	var locdata = ResourceScripts.game_world.find_location_by_data(data)
+	if locdata.area == null or locdata.location == null:
+		print("teleportation to %s failed" % str(data))
+		return
+	xp_module.remove_from_task()
+	travel.location = locdata.location
+	travel.area = locdata.area # I think it's wrong @Sphinx 
+	#error was in getting locdata 
+#	travel.area = locdata.area.code
+	travel.travel_time = 0
+	globals.emit_signal("slave_arrived", self)
+	input_handler.update_slave_list()
+	#add logging if reqired
+
+
+func process_stored_check(check): #compatibility stub
+	return training.check_stored_reqs(check)
+
+
+func process_check(check): #compatibility stub
+	return checkreqs(check)
+
+
+func checkreqs(arg, ignore_npc_stats_gear = false): #additional flag is never used
+	if typeof(arg) == TYPE_ARRAY:
+		var check = true
+		for i in arg:
+			if i.has('orflag'):
+				check = check or valuecheck(i, ignore_npc_stats_gear)
+			else:
+				check = check and valuecheck(i, ignore_npc_stats_gear)
+		return check
+	else:
+		return valuecheck(arg, ignore_npc_stats_gear)
+
+
+func valuecheck(ch, ignore_npc_stats_gear = false): #additional flag is never used
+	if ch.has('master_check') and ch.master_check and !is_master():
+		return ResourceScripts.game_party.get_master().valuecheck(ch, ignore_npc_stats_gear)
+	var i = ch.duplicate()
+	var check = true
+	match i.code:
+		'false':
+			return false
+		'stat':
+			if i.stat in ['tame_factor','authority_factor'] && is_master():
+				return true
+			if typeof(i.value) == TYPE_ARRAY and i.operant != 'in': 
+				i.value = calculate_number_from_string_array(i.value)
+			if ignore_npc_stats_gear:
+#				check = input_handler.operate(i.operant, get_stat_nobonus(i.stat), i.value)
+				check = input_handler.operate(i.operant, get_stat(i.stat, true), i.value) 
+			else:
+				check = input_handler.operate(i.operant, get_stat(i.stat), i.value)
+		'stat_in_set':
+			check = i.value.has(get_stat(i.stat))
+		'stat_index':
+			if typeof(i.value) == TYPE_ARRAY: i.value = calculate_number_from_string_array(i.value)
+			check = input_handler.operate(i.operant, get_stat(i.stat)[i.index], i.value)
+		'has_profession':
+			if i.has("profession"):
+				check = has_profession(i.profession) == i.check
+			if i.has("value"):
+				check = has_profession(i.value) == i.check
+		'has_any_profession':
+			check = false
+			for k in i.value:
+				if has_profession(k):
+					check = true
+		'has_skill':
+			if i.has('learned') and i.learned:
+				return skills.get_learned_skills('all').has(i.value) == i.check
+			return dyn_stats.has_skill(i.value) == i.check
+		'race_is_beast':
+			check = races.racelist[get_stat('race')].tags.has('beast') == i.check
+		'is_shortstack':#is in use?
+			check = (get_stat('height') in ['tiny','petite']) == i.check
+		'gear_equiped':
+			if i.has('param'): check = equipment.check_gear_equipped(i.value, i.param) == i.check
+			else: check = equipment.check_gear_equipped(i.value) == i.check
+		'shield_with_evasion_bonus':
+			check = has_shield_with_evasion_bonus() == i.check
+		'global_profession_limit':
+			check = ResourceScripts.game_party.check_profession_limit(i.profession, i.value)
+		'race':
+			check = (get_stat('race') == i.race) == i.check
+		'one_of_races':
+			check = get_stat('race') in i.value
+		'is_free':
+			check = (is_free() == i.check)
+		'is_at_location':
+			if variables.allow_remote_intereaction == true and i.check: check = true
+			else: check = check_location(i.value, true) == i.check
+		'location_param':
+			var data = ResourceScripts.world_gen.get_location_from_code(get_location())
+			return data.has(i.param) and data[i.param] == i.value
+		'is_id':
+			check = input_handler.operate(i.operant, id, i.value)
+		'long_tail':
+			check = variables.longtails.has(get_stat('tail')) == i.check
+		'long_ears':
+			check = variables.longears.has(get_stat('ears')) == i.check
+		'hair_length':
+			check = (get_stat('hair_length') in i.value) == i.check
+		'is_humanoid':
+			check = (get_stat('racegroup') == 'humanoid') == i.check
+		'is_dead':
+			check = (is_active != i.check)
+		'cant_spawn_naturally':
+			check = !ignore_npc_stats_gear
+		'sex':
+			check = input_handler.operate(i.operant, get_stat('sex'), i.value)
+		'is_master':
+			check = has_profession('master') == i.check
+		'rules':
+			check = input_handler.globalsettings[i.type] == i.check
+		'bodypart':
+			check = input_handler.operate(i.operant, get_stat(i.part), i.value)
+		'trait':
+			check = check_trait(i.trait) == i.check
+		'disabled':
+			check = !i.check
+		'has_status':
+			check = has_status(i.status) == i.check
+		'buff_number':
+			if has_status(i.status):
+				check = input_handler.operate(i.operant, dyn_stats.get_buff_number(i.status), i.value)
+			else:
+				check = input_handler.operate(i.operant, 0, i.value)
+		'slave_type':
+			check = input_handler.operate(i.operant, get_stat('slave_class'), i.value)
+		'population':
+			check = input_handler.operate(i.operant, ResourceScripts.game_party.characters.size(), i.value)
+		'random':
+			if typeof(i.value) == TYPE_ARRAY: i.value = calculate_number_from_string_array(i.value)
+			check = globals.rng.randf()*100 <= i.value
+		'virgin':
+			check = (get_stat('vaginal_virgin_lost') == null) == i.check
+		'class_unlocked':
+			return ResourceScripts.game_progress.if_class_unlocked(i.class, i.check, i.operant)
+		'has_wooden_gear':
+			return equipment.check_wooden_gear_equipped()
+		'unique':
+			return get_stat('unique') == i.value
+		'is_unique':
+			check = is_unique() == i.value
+		'body_image':
+			return input_handler.operate(i.operant, get_stat('body_image'), i.value)
+		'in_combat_party':
+			if variables.allow_remote_intereaction == true and i.value: check = true
+			else: check = (combat_position in range(1, 7)) == i.value
+		'setting':
+			return input_handler.globalsettings[i.type] == i.value
+		'has_coverage':
+			var coverage = get_stat('skin_coverage')
+			return (coverage.find(i.coverage) != -1) == i.check
+		'lone_wolf':
+			if input_handler.combat_node == null:
+				return !i.check
+			return (input_handler.combat_node.playergroupcounter == 1) == i.check
+		'workrule':
+			return check_work_rule(i.value) == i.check
+		'check_stored':
+			return training.check_stored_reqs(i.value)
+		'is_immune':
+			return dyn_stats.check_status_immunity(i.status) == i.check
+		'has_relationship':
+#			return true
+			var tmp = ResourceScripts.game_party.find_all_relationship(id)
+			var tres = false
+			for rec in tmp:
+				if rec.relationship == i.value:
+					tres = true
+					break
+			return tres == i.check
+		'work':
+			if i.has("check"):
+				return (get_work() == i.value) == i.check
+			return get_work() == i.value
+		'can_add_thrall':
+			return enthrall.can_add_thrall() == i.check
+		'or_list':
+			var or_check = false
+			for j in i.or_list:
+				or_check = or_check or valuecheck(j, ignore_npc_stats_gear)
+			return or_check
+		'is_in_ranged_zone':
+			check = (position in range(4,7) || position in range(10,13)) == i.check
+		'in_front_of_someone':
+			if input_handler.combat_node == null:
+				check = false
+			if (position in range(4,7) || position in range(10,13)):
+				check = false
+			else:
+				var char_behind = input_handler.combat_node.get_char_by_pos(position + 3)
+				var char_alive = false
+				if char_behind != null: 
+					char_alive = !char_behind.is_koed()
+				check = char_alive == i.check
+		'char_in_front_has_status':
+			if input_handler.combat_node == null:
+				return !i.check
+			if !(position in range(4,7) || position in range(10,13)):
+				return !i.check #frontrow has no one in front of it
+			var char_in_front = input_handler.combat_node.get_char_by_pos(position - 3)
+			if char_in_front == null:
+				return !i.check
+			check = char_in_front.has_stored_status(i.status) == i.check
+		'group_amount':
+			if input_handler.combat_node == null:
+				return false
+			var amount = 0
+			if i.has("alive"):
+				amount = input_handler.combat_node.get_group_amount(combatgroup, i.alive)
+			else:
+				amount = input_handler.combat_node.get_group_amount(combatgroup)
+			check = input_handler.operate(i.operant, amount, i.value)
+	return check
+
+
+func decipher_reqs(reqs, colorcode = false, purestat = false):
+	var text = ''
+	for i in reqs:
+		var text2 = ''
+#		if i.has('orflag'):
+#			check = check or valuecheck(i)
+#		else:
+#			check = check and valuecheck(i)
+#		if i.has('orflag'):
+#			continue
+		text2 = decipher_single(i)
+		if text2 == '':
+			continue
+		if colorcode == true:
+			var passed = checkreqs([i], purestat)
+			if i.code == 'has_profession' and i.check == false:
+				passed = !has_profession(i.profession)
+			if i.code == 'race' and i.check == false:
+				passed = get_stat('race') != i.race
+			if passed:
+				text2 = '{color=green|' + text2 + '}'
+			else:
+				text2 = '{color=red|' + text2 + '}'
+		text += text2 + '\n'
+	return globals.TextEncoder(text.substr(0, text.length()-1))
+
+
+func decipher_single(ch):
+	var i = ch.duplicate()
+	var text2 = ''
+	match i.code:
+		'stat':
+			var skip_highlow = false
+			if typeof(i.value) == TYPE_ARRAY: i.value = calculate_number_from_string_array(i.value)
+			if i.stat.find("factor") > 0:
+				text2 += statdata.statdata[i.stat].name + ': ' + tr(ResourceScripts.descriptions.factor_descripts[i.value]) + " "
+			elif i.stat.find("metrics") >= 0:
+				text2 += tr(i.stat.to_upper() + "_NAME") % [get_stat(i.stat),i.value]
+				skip_highlow = true
+			else:
+				text2 += statdata.statdata[i.stat].name + ': ' + str(i.value) + " "
+			if skip_highlow == true:
+				continue
+			match i.operant:
+				'gte':
+					text2 += tr("REQORHIGHER")
+				'lte':
+					text2 += tr("REQORLOWER")
+		
+		'stat_in_set':
+			if i.stat == 'personality':
+				text2 += tr("STATPERSONALITY") + ": "
+				for k in i.value:
+					text2 += tr("PERSONALITYNAME" + k.to_upper()) + ", "
+				text2 = text2.substr(0, text2.length()-2)
+		
+		'has_profession':
+			if i.check == true:
+				text2 += tr("REQHASCLASS")+': ' + classesdata.professions[i.profession].name
+			else:
+				text2 += tr("REQCONFLICTCLASS")+': ' + classesdata.professions[i.profession].name
+		'has_any_profession':
+			text2 += tr('REQHASANYCLASS')+": "
+			for k in i.value:
+				text2 += classesdata.professions[k].name + ", "
+			text2 = text2.substr(0, text2.length()-2)
+		'race':
+			if i.check:
+				text2 += tr("REQRACE") + ': ' + races.racelist[i.race].name
+			else:
+				text2 += tr("REQCONFLICTRACE") + ': ' + races.racelist[i.race].name
+		'race_is_beast':
+			if i.check == true:
+				text2 += tr("REQRACEISBEAST") + ''
+			else:
+				continue
+		'gear_equiped': #to fix non-default param
+			if i.check:
+				text2 += tr("REQMUSTHAVEGEAR") + ' '
+			else:
+				text2 += tr("REQMUSTHAVEGEAR_FALSE") + ' '
+			if i.has('param'):
+				if i.param == 'geartype':
+					text2 += tr("REQMUSTHAVEGEARTYPE") + ' ' + tr("REQMUSTHAVEGEARTYPE_" + i.value.to_upper()) + "."
+			else:
+				text2 += Items.itemlist[i.value].name + "."
+		'has_skill':
+			var skill_name = Skilldata.get_template(i.value, self).name
+			if i.check:
+				text2 += "%s: %s." % [tr("REQHASSKILL"), skill_name]
+			else:
+				text2 += "%s: %s." % [tr("REQHASSKILL_FALSE"), skill_name]
+		'global_profession_limit':
+			text2 += tr("REQPROFLIMIT")+' ' + str(i.value) + " " + classesdata.professions[i.profession].name + " " + tr("REQPROFLIMIT2") + "."
+		'one_of_races':
+			text2 += tr("REQONEOFRACES")+": "
+			for k in i.value:
+				text2 += races.racelist[k.replace(" ","")].name + ', '
+			text2 = text2.substr(0, text2.length()-2) + '. '
+		'trait':
+			text2 += tr("REQTRAIT")+": " + Traitdata.traits[i.trait].name
+		'population':
+			text2 += tr("REQPOPULATION")+": " + str(i.value)
+		'sex':
+			match i.operant:
+				'neq':
+					text2 += tr("REQSEX")+": " + i.value.capitalize() + "."
+		'virgin':
+			match i.check:
+				false:
+					text2 += tr("REQVIRGINFALSE")
+	return text2
+
+
+func make_description():
+	input_handler.text_characters.clear()
+	input_handler.text_characters.append(self)
+	return globals.TextEncoder(translate(ResourceScripts.descriptions.create_character_description(self)))
+
+
+func show_race_description():
+	var race = get_stat('race')
+	var temprace = races.racelist[race]
+	var text = ''
+	if temprace.tags.has('beast'):
+		if race.find("Beastkin") >= 0:
+			text += tr("RACEBEASTKINDESCRIPT") + "\n\n"
+		elif race.find("Halfkin") >= 0:
+			text += tr("RACEHALFKINDESCRIPT") + "\n\n"
+	text += temprace.descript
+	text += "\n\n" + tr("RACE_BONUSES") + ": " + globals.build_desc_for_bonusstats(temprace.race_bonus)
+	if temprace.has("combat_skills"):
+		text += "\n" + tr("COMBAT_ABILS_LABEL") + ": "
+		for i in temprace.combat_skills:
+			text += Skilldata.Skilllist[i].name + "; "
+		text = text.substr(0, text.length() - 2) + "."
+	return text
+
+
+func escape_actions():
+	remove_from_work_quest()
+	remove_from_task()
+	remove_from_travel()
+	ResourceScripts.game_party.add_fate(id, tr("SIBLINGMODULEFATEESCAPE"))
+	is_active = false #for now, to replace with corresponding mechanic
+	characters_pool.cleanup()
+
+func predict_food():
+	return food.predict_food()
+
+func toggle_food(foodcode):
+	food.toggle_food(foodcode)
+
+func get_filter_for_food(code):
+	return food.get_filter_for_food(code)
+
+func get_food_demand():
+	return food.get_demand()
+
+func pretick():
+	process_event(variables.TR_TICK)
+
+
+func tick(): #work ticks are not here - as they are called in tasks order, not in character
+	if is_on_quest():
+		xp_module.quest_tick()
+	#food runs before the regen, so a character that starves this turn loses this turn's
+	#health and half of this turn's mana rather than the next one's
+	food.tick()
+	self.hp += get_stat('hp_reg')
+	self.mp += get_stat('mp_reg')
+	#yet again workaround for effects, that should already be in action, but they don't
+	call_deferred('deferred_brk_check_food')
+	
+	statlist.tick()
+	if get_work() == 'travel':
+		#fatigue -= 1
+		travel.tick()
+		return
+	
+	if get_work() == '':
+		rest_tick()
+	
+	minor_training_tick()
+
+
+func rest_tick():
+	self.hp += get_stat('hp_reg') * 2
+	self.mp += get_stat('mp_reg') * 2
+	for e in find_temp_effect_tag('addition_rest_tick'):
+		var eff = effects_pool.get_effect_by_id(e)
+		eff.process_tick(variables.TR_TICK)
+	if dyn_stats.delay_rebuild:
+		dyn_stats.reset_rebuild()
+
+
+func translate(text, number = -1):
+	text = statlist.translate(text, number)
+	if text.find('[price]') != -1:
+		text = text.replace("[price]", str(calculate_price(true))) #need another placeholder for a non-shop value. for now it is not used, but may be handy 
+	if text.find("[lovers_list]") != -1:
+		text = text.replace("[lovers_list]", ResourceScripts.game_party.build_relationship_buff_names_text(self, ['lovers', 'freelovers']))
+	if text.find("[friends_list]") != -1:
+		text = text.replace("[friends_list]", ResourceScripts.game_party.build_relationship_buff_names_text(self, ['friends']))
+	if text.find("[rivals_list]") != -1:
+		text = text.replace("[rivals_list]", ResourceScripts.game_party.build_relationship_buff_names_text(self, ['rivals']))
+	if text.find('[spouse') != -1:
+		if !has_profession('master'):
+			print ("active char is not master")
+			return text
+		if ResourceScripts.game_progress.spouse == null:
+			print ("spouse not set")
+			return text
+		var spouse = characters_pool.get_char_by_id(ResourceScripts.game_progress.spouse)
+		if spouse == null or !spouse.is_active or !spouse.is_players_character:
+			print ("no spouse alive")
+			return text
+		text = text.replace("[spouse", "[")
+		return spouse.translate(text, number)
+	return text
+
+
+func calculate_price(shopflag = false, no_fame = false, desc_ready = false):
+	var temp_text
+	if desc_ready:
+		price_compo_text = ''
+		temp_text = ''
+	var value = 0
+	var bonus_data = dyn_stats.get_stat_data('price').bonuses
+	var tr_mul1 = 0
+	var tr_mul2 = 0
+	var mod_mul = 1.0
+	var mod_mul2 = 0.0
+	
+	#dyn bonuses
+	if bonus_data.has('add'):
+		for rec in bonus_data.add:
+			value += rec.value
+			if desc_ready:
+				if rec.value > 0:
+					price_compo_text += '%s: {color=green|+%s}\n' % [globals.get_tr_src(rec.src_type, rec.src_value)[1], rec.value]
+				else:
+					price_compo_text += '%s: {color=red|%s}\n' % [globals.get_tr_src(rec.src_type, rec.src_value)[1], rec.value]
+	if bonus_data.has('add_part'):
+		for rec in bonus_data.add_part:
+			mod_mul += rec.value
+			if desc_ready:
+				if rec.value > 0:
+					temp_text += '   %s: {color=green|+%s%%}\n' % [globals.get_tr_src(rec.src_type, rec.src_value)[1], rec.value * 100]
+				else:
+					temp_text += '   %s: {color=red|%s%%}\n' % [globals.get_tr_src(rec.src_type, rec.src_value)[1], rec.value * 100]
+	if bonus_data.has('add_part2'):
+		for rec in bonus_data.add_part2:
+			mod_mul += rec.value
+			if desc_ready:
+				if rec.value > 0:
+					temp_text += '   %s: {color=green|+%s%%}\n' % [globals.get_tr_src(rec.src_type, rec.src_value)[1], rec.value * 100]
+				else:
+					temp_text += '   %s: {color=red|%s%%}\n' % [globals.get_tr_src(rec.src_type, rec.src_value)[1], rec.value * 100]
+	
+	#traits bonuses
+	tr_mul1 = get_traits_by_tag('positive').size() 
+	tr_mul2 = get_traits_by_tag('negative').size()
+	var tr_mul1_mul = min(tr_mul1 * 0.2, 0.6)
+	var tr_mul2_mul = tr_mul2 * 0.2
+	mod_mul += tr_mul1_mul - tr_mul2_mul
+	if desc_ready:
+		temp_text += '   %s: %d ({color=green|+%s%%})\n' % [tr('PRICEDESC_TRAITS_POS'), tr_mul1, tr_mul1_mul * 100]
+		temp_text += '   %s: %d ({color=red|-%s%%})\n' % [tr('PRICEDESC_TRAITS_NEG'), tr_mul2, tr_mul2_mul * 100]
+	if shopflag:
+		if has_status('virgin'):
+			mod_mul2 += 0.25
+			if desc_ready:
+				temp_text += '   %s: {color=green|+25%%}\n' % tr('BODYPARTVAGINAL_VIRGINTRUE_TRUE')
+		mod_mul += mod_mul2
+	else:
+		if has_status('soulbind'):
+			mod_mul -= 0.9
+			if desc_ready:
+				temp_text += '   %s: {color=red|-90%%}\n' % tr('TRAITLOYALTY_SOULBIND')
+	value *= mod_mul
+	if desc_ready:
+		var pre_text = (tr('PRICEDESC_CUMULATIVE') % '{color=yellow|%s%%}') + '\n%s'
+		price_compo_text += pre_text % [(mod_mul-1) * 100, temp_text]
+	
+	#growth bonuse
+	value = value * variables.growth_factor_cost_mod[get_stat('growth_factor')]
+	if desc_ready:
+		price_compo_text += '%s: {color=green|+%s%%}\n' % [tr('STATGROWTH_FACTOR'),
+			(variables.growth_factor_cost_mod[get_stat('growth_factor')] - 1) * 100]
+	
+	#fame bonuse
+	if !no_fame or !has_status('no_fame'):
+		value += value * get_fame_bonus('price_bonus')
+		if desc_ready:
+			price_compo_text += '%s: {color=green|+%s%%}\n' % [
+				tr('STATFAME'), get_fame_bonus('price_bonus') * 100]
+
+	if get_stat('slave_class') in ['slave', 'slave_trained'] and !check_trait('training_broke_in'):
+		value *= (1.0 / 3.0)
+		if desc_ready:
+			price_compo_text += '%s: {color=red|-66%%}\n' % tr('PRICEDESC_NOT_BROKEN_IN')
+
+	if desc_ready and round(value) < 50:
+		price_compo_text += "%s %s." % [tr('PRICEDESC_LESS'), 50]
+	return max(50,round(value))
+
+func get_price_composition():
+	return price_compo_text
+
+func apply_atomic(template):
+	if npc_reference == 'combat_global':
+		return
+	if input_handler.combat_node != null and input_handler.combat_node.ActionQueue != null and template.type != 'remove_all_effects':
+		input_handler.combat_node.ActionQueue.add_atomic(template, id)
+	else:
+		affect_char(template)
+
+func manifest_and_log(text):
+	globals.manifest_and_log("char", "%s: %s" % [get_short_name(), text], self)
+
+func log_me(text):
+	globals.text_log_add("char", "%s: %s" % [get_short_name(), text])
+
+func affect_char(template, manifest = false):
+	match template.type:
+		'damage':
+			var tval = deal_damage(template.value, template.source)
+			if input_handler.combat_node != null:
+				var log_str
+				if template.value >= 0: log_str = tr('LOG_COMBAT_LOSE_HP')
+				else: log_str = tr('LOG_COMBAT_HEAL')
+				input_handler.combat_node.combatlogadd(log_str % [get_short_name(), int(tval)])
+			if manifest:
+				var log_str
+				if template.value >= 0: log_str = tr('LOG_LOSE_HP')
+				else: log_str = tr('LOG_HEAL')
+				globals.text_log_add('char', log_str % int(tval))
+		'damage_percent':
+			var tval = deal_damage((template.value / 100.0) * get_stat('hpmax'))
+			if manifest:
+				var log_str
+				if template.value >= 0: log_str = tr('LOG_LOSE_HP')
+				else: log_str = tr('LOG_HEAL')
+				globals.text_log_add('char', log_str % int(tval))
+		'heal':
+			var tval = heal(template.value)
+			if input_handler.combat_node != null:
+				var log_str
+				if template.value >= 0: log_str = tr('LOG_COMBAT_HEAL')
+				else: log_str = tr('LOG_COMBAT_LOSE_HP')
+				input_handler.combat_node.combatlogadd(log_str % [get_short_name(), int(tval)])
+			if manifest:
+				var log_str
+				if template.value >= 0: log_str = tr('LOG_HEAL')
+				else: log_str = tr('LOG_LOSE_HP')
+				globals.text_log_add('char', log_str % int(tval))
+		'mana':
+			var tval = mana_update(template.value)
+			if input_handler.combat_node != null:
+				input_handler.combat_node.combatlogadd(tr("LOG_COMBAT_MANA") % [get_short_name(), int(tval)])
+			if manifest: globals.text_log_add('char', tr("LOG_MANA") % int(tval))
+		'damage_mana_percent':
+			var tval = mana_update(-template.value * get_stat('mpmax'))
+			if manifest: globals.text_log_add('char', tr("LOG_MANA") % int(tval))
+		'stat', 'stat_add':
+			add_stat(template.stat, template.value)
+			if manifest:
+				var str_val
+				if template.value > 0: str_val = "+%s" % template.value
+				else: str_val = String(template.value)
+				globals.text_log_add('char', "%s %s" % [
+					globals.get_stat_name(template.stat), str_val])
+		'stat_set':
+			set_stat(template.stat, template.value)
+			if manifest:
+				globals.text_log_add('char', tr("LOG_SET") % [
+					globals.get_stat_name(template.stat), template.value])
+		'stat_add_p':
+			add_part_stat(template.stat, template.value)
+			if manifest:
+				globals.text_log_add('char', tr("LOG_ADD_PART") % [
+					template.value, globals.get_stat_name(template.stat)])
+		'stat_mul':#do not mix add_p and mul for the sake of logic
+			mul_stat(template.stat, template.value)
+			if manifest:
+				globals.text_log_add('char', "%s * %s" % [
+					globals.get_stat_name(template.stat), template.value])
+		'signal':
+			#stub for signal emitting
+			globals.emit_signal(template.value)
+		'event':
+			process_event(template.value)
+		'resurrect':
+			resurrect(template.value)
+#			if !defeated: return
+#			self.hp = template.value
+#			defeated = false
+#			process_event(variables.TR_RES)
+		'kill':
+			killed()
+		'use_combat_skill':
+			if input_handler.combat_node == null: 
+				return
+			if skills.combat_cooldowns.has(template.skill): 
+				return
+#			input_handler.combat_node.use_skill(template.skill, self, template.target)
+			var s_id = template.skill
+			if s_id is Array:
+				s_id = input_handler.random_from_array(s_id)
+			var skill = Skilldata.get_template_combat(s_id, self)
+			var tmp_handler = input_handler.combat_node.ActionQueue.add_skill_callback()
+			tmp_handler.mode = variables.SKILL_EFFECT
+			tmp_handler.setup_caster(self)
+			tmp_handler.createfromskill(skill)
+			if template.has('target'):
+				tmp_handler.setup_target(template.target)
+			else:
+				tmp_handler.setup_target(self)
+		'use_social_skill':
+			if !check_location('mansion'): return
+			#use_social_skill(template.value, null)
+			skills.prepared_act.push_back(template.skill)
+		'end_turn':
+			if input_handler.combat_node == null: 
+				return
+			input_handler.combat_node.ActionQueue.add_end_turn()
+		'transform_into':
+			if input_handler.combat_node == null: 
+				return
+			input_handler.combat_node.transform_unit(position, template.unit)
+		'sfx':
+			play_sfx(template.value)
+		'effect':
+			var args = {}
+			if template.has('override'):
+				args = template.override.duplicate()
+			apply_effect_code(template.value, args)
+		'remove_effect':
+			remove_temp_effect_tag(template.value)
+		'remove_all_effects':
+			remove_all_temp_effects_tag(template.value)
+		'teleport':
+			teleport(template.value)
+		'set_availability':
+			if template.value:
+				xp_module.make_avaliable()
+			else:
+				var duration = -1
+				if template.has('duration'):
+					duration = template.duration
+				xp_module.make_unavaliable(duration)
+		'set_as_spouse':
+			ResourceScripts.game_progress.spouse = id
+		'escape':
+			escape_actions()
+		'remove_trait':
+			remove_trait(template.trait)
+		'add_trait':
+			add_trait(template.trait)
+		'unlock_trait':
+			training.unlock_trait(template.trait)
+		'add_sex_trait':
+			add_sex_trait(template.trait, true)
+		'unlock_sex_trait':
+			unlock_sex_trait(template.trait)
+		'add_class':
+			unlock_class(template.class)
+		'remove_class':
+			remove_class(template.class)
+		'set_tutelage':
+			xp_module.assign_to_learning(template.value)
+			input_handler.rebuild_slave_list()
+		'add_counter':
+			if dyn_stats.counters.size() <= template.index + 1:
+				dyn_stats.counters.resize(template.index + 1)
+			if dyn_stats.counters[template.index] == null: 
+				dyn_stats.counters[template.index] = template.value
+			else:
+				dyn_stats.counters[template.index] += template.value
+		'add_soc_skill':
+			learn_skill(template.skill)
+		'remove_soc_skill':
+			unlearn_skill(template.skill)
+		'add_combat_skill':
+			learn_c_skill(template.skill)
+		'make_relative_of':
+			var rel_char = template.value
+			if rel_char is String:
+				rel_char = characters_pool.get_char_by_id(rel_char)
+			if rel_char != null:
+				make_relative_of(rel_char, template.relation)
+				input_handler.update_slave_panel()
+				input_handler.update_slave_list()
+		'quest':
+			assign_to_quest_and_make_unavalible({id = template.id, name = template.name}, template.duration)
+		'slavetype':
+			set_slave_category(template.value)
+		'remove':
+			ResourceScripts.game_party.add_fate(id, tr("SIBLINGMODULEFATEREMOVED"))
+			ResourceScripts.game_party.remove_slave(self, true)
+			input_handler.slave_list_node.rebuild()
+		'turn_into_unique':
+			turn_into_unique(template.value)
+		'impregnate':
+			globals.impregnate(ResourceScripts.game_party.get_master(), self, true)
+		'reset_cooldowns':
+			skills.reset_cooldowns()
+		'dungeon_effect':
+			if gui_controller.exploration_dungeon != null and input_handler.exploration_node == gui_controller.exploration_dungeon:
+				match template.value:
+					'reveal_map':
+						gui_controller.exploration_dungeon.reveal_map(self)
+#					'set_intimidate':
+#						gui_controller.exploration_dungeon.set_intimidate()
+		'location_effect':
+			match template.value:
+				'gather_res':
+					ResourceScripts.game_world.gather_res(get_location(), get_stat('matk') * 10)
+				'pay_stamina':
+					var data = ResourceScripts.world_gen.get_location_from_code(get_location())
+					data.stamina -= template.cost
+					if manifest:
+						globals.manifest_and_log("dungeon", "%s stamina spent in %s" % [template.cost, tr(data.name)])
+		'add_combat_log': #until we got proper midfight dialogue system, this will have to do.
+			if input_handler.combat_node == null: 
+				return
+			var new_log_text = tr(template.text)
+			if new_log_text.count('%s') > 0: #in case name is needed
+				new_log_text = new_log_text % get_short_name()
+			input_handler.combat_node.combatlogadd(new_log_text)
+
+
+func is_koed():
+	return (hp <= 0) or defeated or !is_active
+
+
+func calculate_number_from_string_array(arr):
+	var array = arr.duplicate()
+	var endvalue = 0
+	var firstrun = true
+	var singleop = ''
+	for i in array:
+		if typeof(i) == TYPE_ARRAY:
+			i = str(calculate_number_from_string_array(i))
+		if i in ['+','-','*','/']:
+			singleop = i
+			continue
+		var modvalue = i
+		if i.find('caster') >= 0 or i.find('self') >= 0:
+			i = i.split('.')
+			if i[0] == 'caster' or i[0] == 'self':
+				#modvalue = str(self[i[1]])
+				modvalue = str(get_stat(i[1]))
+			elif i[0] == 'target':
+				return ""; #nonexistent yet case of skill value being based completely on target
+		elif (i.find('random') >= 0):
+			i = i.split(' ')
+			modvalue = str(globals.rng.randi_range(0, int(i[1])))
+		if singleop != '':
+			endvalue = input_handler.string_to_math(endvalue, singleop+modvalue)
+			singleop = ''
+			continue
+		if !modvalue[0].is_valid_float():
+			if modvalue[0] == '-' && firstrun == true:
+				endvalue += float(modvalue)
+			else:
+				endvalue = input_handler.string_to_math(endvalue, modvalue)
+		else:
+			endvalue += float(modvalue)
+		firstrun = false
+	return endvalue
+
+
+func set_shield(value):
+	if shield == value: return
+	if value <= 0: process_event(variables.TR_SHIELD_DOWN)
+	shield = max(0, value)
+
+
+func deal_damage(value, source = 'normal'):
+#	print(source)
+	if npc_reference == 'combat_global': return null
+	if has_status('warded') and !has_status('ward'):
+		return 0
+	var tmp = hp
+	if ResourceScripts.game_party.characters.has(self.id) && ResourceScripts.game_globals.invincible_player:
+		return 0
+	value *= (1.0 - get_stat('damage_reduction')/100.0)
+	if source != 'true':
+		value *= (1.0 - get_stat('resist_' + source)/100.0)
+	value = int(value);
+	if value > 0:
+		if shield > value:
+			self.shield -= value
+			return 0
+		else:
+			value -= shield
+			self.shield = 0
+		process_event(variables.TR_DMG)
+		self.hp -= value
+		tmp = tmp - hp
+		if displaynode != null and !defeated:
+			displaynode.setup_overlay(source)
+		return tmp
+	else:
+		return heal(-value)
+
+
+func heal(value):
+	var tmp = hp
+	value = round(value)
+	if value < 0: return deal_damage(-value, 'true')
+	self.hp += value
+	tmp = hp - tmp
+	process_event(variables.TR_HEAL)
+	return tmp
+
+
+func mana_update(value):
+	var tmp = mp
+	value = round(value)
+	self.mp += value
+	tmp = mp - tmp
+	#maybe better to rigger heal triggers on this
+	#process_event(variables.TR_HEAL)
+	return tmp
+
+
+func stat_update(stat, value, is_set = false): #for permanent changes
+	var tmp = get_stat(stat)
+	if stat == 'hp':
+		heal(value)
+	elif stat == 'mp':
+		mana_update(value)
+	elif stat == 'base_exp':
+		xp_module.update_exp(value, is_set)
+	elif is_set:
+		set_stat(stat, value)
+	else: 
+		add_stat(stat, value)
+	if statdata.check_compatibility_operant(stat, 'add'):
+		return get_stat(stat) - tmp
+	else:
+		return get_stat(stat)
+
+
+func resurrect(hp_per):
+	if !defeated: 
+		return
+	defeated = false
+	hp = int(get_stat('hpmax') * hp_per /100)
+	if displaynode != null:
+		displaynode.update_hp()
+	process_event(variables.TR_RES)
+	input_handler.emit_signal('fighter_changed')
+
+
+func get_manacost_for_skill(skill):
+	return skills.get_manacost_for_skill(skill)
+
+
+func pay_cost(cost):
+	for st in cost:
+		if st == 'money':
+			 ResourceScripts.game_res.money -= cost.money
+		elif st == 'mp':
+			mp -= int(cost.mp)
+			if displaynode != null:
+				displaynode.update_mana()
+		else: 
+			add_stat(st, -cost[st])
+
+
+func check_cost(cost):
+	for st in cost:
+		if st == 'money':
+			if ResourceScripts.game_res.money < cost[st]:
+				return false
+		elif st == 'mp': 
+			if mp < int(cost[st]): 
+				return false
+		elif get_stat(st) < cost[st]: 
+			return false
+	return true
+
+
+func check_skill_availability(s_code, target):
+	var check = true
+	
+	var template = Skilldata.get_template(s_code, self)
+	var descript = ''
+	
+	if !check_cost(template.cost):
+		descript = get_short_name() + ": " + tr("CANT_PAY_COSTS_LABEL") + "'"
+		check = false
+	if skills.social_skills_charges.has(s_code) && skills.social_skills_charges[s_code] >= template.charges:
+		descript = get_short_name() + ": " + template.name + " - " + tr("NO_CHARGES_LEFT_LABEL") + "."
+		check = false
+	if template.has('globallimit') && ResourceScripts.game_party.global_skills_used.has(s_code) && ResourceScripts.game_party.global_skills_used[s_code] >= template.globallimit:
+		descript = get_short_name() + ": " + tr("CANT_USE_TODAY_LABEL") + "."
+		check = false
+	
+	if !checkreqs(template.reqs):
+		check = false
+		descript = get_short_name() + ": " + tr("REQS_NOT_MET_LABEL") + "."
+	
+	if !target.checkreqs(template.targetreqs):
+		check = false
+		descript = target.get_short_name() + ": " + tr("TARGET_REQS_NOT_MET_LABEL") + "."
+	
+	return {check = check, descript = descript}
+
+
+func calculate_linked_chars_by_effect(e_name):
+	return effects_pool.get_n_effects_linked_to(id, e_name).size()
+
+
+func lockpick_chance(): #used for chest opening
+	var base_chance = randf()*5+5 #5-10
+	var secondary_chance = get_stat('wits')/5 #0-24
+	if check_trait('lockpicking'):
+		secondary_chance = secondary_chance*4 + (randf()*5+5) #max 101-106
+	
+	return base_chance + secondary_chance
+
+
+func fill_ai(data):
+	match variables.ai_setup:
+		'off':
+			ai.set_single_state({})
+		'new':
+			ai.set_single_state(data)
+		'old':
+			var newdata = {}
+			for arr in data:
+				newdata[arr[0]] = arr[1]
+			ai.set_single_state(newdata)
+
+
+func take_virginity(type, partner, breakable = false):
+	if get_stat(type + '_virgin_lost') == null:
+		set_stat(type + "_virgin_lost", partner)
+		if get_stat('metrics_partners').has(partner) == false && partner.begins_with("hid"):
+			statlist.update_stat('metrics_partners', partner, 'append')
+		if !ResourceScripts.game_party.relativesdata.has(partner) && partner.begins_with("hid"):
+			ResourceScripts.game_party.createrelativesdata(characters_pool.get_char_by_id(partner))
+
+
+func add_partner(partner):
+	if partner == 'master' && get_stat('metrics_partners').has(ResourceScripts.game_party.get_master().id) == false:
+		partner = ResourceScripts.game_party.get_master().id
+	if get_stat('metrics_partners').has(partner) == false && partner.begins_with("hid"):
+		statlist.update_stat('metrics_partners', partner, 'append')
+
+
+func get_learned_skills(cat):
+	return skills.get_learned_skills(cat)
+
+func get_combat_skills():
+	return dyn_stats.get_combat_skills()
+
+
+func get_social_skills():
+	return dyn_stats.get_social_skills()
+
+
+func get_explore_skills():
+	return dyn_stats.get_explore_skills()
+
+
+func fix_skillpanels(list_soc_add, list_combat_add, list_soc_remove, list_combat_remove):
+	skills.fix_skillpanels(list_soc_add, list_combat_add, list_soc_remove, list_combat_remove)
+
+func update_portrait(ragdoll): # for ragdolls
+	if !get_stat('dynamic_portrait'):
+		return
+	if !get_stat('portrait_update'):
+		return
+	
+	var path = 'portrait_' + id
+	set_stat('portrait_update', false)
+	set_stat('icon_image', variables.portraits_folder + path + '.png')
+	ragdoll.save_portrait(path)
+
+
+func check_portrait():
+	var path = get_stat('icon_image')
+	if path == null:
+		return false
+	if !(path.is_abs_path() or path.is_rel_path()): #portrait is not path - so it must exist
+		return true
+	if File.new().file_exists(path): 
+		return true
+	return false
+
+
+func update_prt():
+	if get_stat("unique") == null or get_stat("player_selected_icon"):
+		return
+	if get_stat("player_selected_body"):
+		return
+	var prt_name: String
+	var variation = "default"
+	if has_work_rule('nudity'):
+		variation = "nude"
+	if get_stat("unique_variation") != null:
+		variation = get_stat("unique_variation")
+	
+	# check for unique nude portrait for example cali_nude_collar_prt
+	if has_work_rule('nudity') and variation != "default":
+		if images.portraits.keys().has("%s_%s_%s_prt" % [get_stat("unique"), "nude", variation]):
+			variation = "nude_%s" % get_stat("unique_variation")
+	
+	# check for unique wedding portrait
+	if ResourceScripts.game_progress.spouse != null && globals.valuecheck({type = 'has_spouse', check = true}) && !ResourceScripts.game_progress.marriage_completed:
+		var spouse_person = characters_pool.get_char_by_id(ResourceScripts.game_progress.spouse)
+		if spouse_person.get_stat('unique') == get_stat('unique'):
+			variation = "wed"
+	
+	if get_stat("personality") != "neutral":
+		prt_name = "%s_%s_prt_%s" % [get_stat("unique"), variation, get_stat("personality")]
+	elif variation == "default":
+		prt_name = "%s_prt" % [get_stat("unique")]
+	else: # example daisy_maid_prt
+		prt_name = "%s_%s_prt" % [get_stat("unique"), variation]
+	
+	if images.portraits.keys().has(prt_name):
+		set_stat('icon_image', images.portraits[prt_name])
+#	else:
+#		print_debug("Failed to find a %s portrait" % prt_name)
+
+func is_in_game_party():
+	#almost same as is_players_character, but not quite.
+	#Summons are is_players_character but not is_in_game_party
+	return ResourceScripts.game_party.has_char(id)
+
+
+#Breakdown. Maybe should be withdrawn to separate module
+func try_breakdown(event):
+	if xp_module.is_unavaliable(): return
+	if event in get_stat('breakdown_disabled'): return
+	
+	var info = variables.breakdown_info[event]
+#	var chance = info.chance * get_stat('breakdown_chance_mod')
+#	print("%s try_breakdown on %s with %s" % [get_short_name(), event, chance])
+	if randf() <= info.chance * get_stat('breakdown_chance_mod'):
+		input_handler.ActivateTutorial("TUTORIALLIST10")
+		xp_module.make_unavaliable(get_stat('breakdown_time'))
+		var scene_data = scenedata.scenedict['breakdown_event'].duplicate(true)
+		scene_data.text = info.text
+		#mind, that direct-type events don't put themselvs to seen_events
+		input_handler.interactive_message(scene_data, 'direct', {
+			scene_characters_add = [id], set_active_character = id
+		})
+
+func try_breakdown_on_char_loss(lost_char):
+	if xp_module.is_unavaliable(): return
+	
+	if ResourceScripts.game_party.check_relationship_status(id, lost_char.id, 'friends'):
+		try_breakdown('brk_lose_friend')
+	elif ResourceScripts.game_party.check_if_relationship_in(id, lost_char.id, ['lovers', 'freelovers']):
+		try_breakdown('brk_lose_lover')
+	elif ResourceScripts.game_party.checkifrelatives(id, lost_char.id):
+		try_breakdown('brk_lose_relative')
+
+func deferred_brk_check_food():
+	if has_status('food_demand_unmet'):
+		try_breakdown('brk_dislike_food')
+
+func try_breakdown_on_enthrall():
+#	if xp_module.is_unavaliable(): return#has it in try_breakdown()
+	try_breakdown('brk_enthrall')
+
+func try_breakdown_on_release():
+#	if xp_module.is_unavaliable(): return#has it in try_breakdown()
+	try_breakdown('brk_enthrall_release')
+
+#Fame. Maybe should be withdrawn to separate module
+func get_stat_upgrade_price(stat_level):
+	var base_price = variables.base_stat_upg_price
+	var upg_price = base_price
+	for rarity in variables.race_stat_upg_bonus_priority:
+		if races.racelist[get_stat('race')].race_tags.has(rarity):
+			upg_price += base_price * variables.race_stat_upg_bonuses[rarity]
+			break
+	if variables.level_stat_upg_bonuses.has(stat_level):
+		upg_price += base_price * variables.level_stat_upg_bonuses[stat_level]
+	if is_unique():
+		upg_price += upg_price * variables.stat_upg_unique_bonus
+	
+	return upg_price
+
+func get_upkeep():
+	return int(get_fame_bonus('upkeep') * get_upkeep_multiplier())
+
+func get_value_upkeep():
+	return int(calculate_price(false, false, false) * variables.value_upkeep_rate * get_upkeep_multiplier())
+
+func get_upkeep_multiplier():
+	if has_status('standing_beloved'):
+		return 0.5
+	return 1.0
+
+func get_weekly_tax():
+	if !is_active:
+		return 0
+	if get_stat('slave_class') != 'servant':
+		return 0
+	return get_upkeep() + get_value_upkeep()
+
+func get_fame_bonus(bonus_name):
+	var fame_tier = variables.fame_tiers[get_stat('fame')]
+	if !fame_tier.has(bonus_name):
+		return 0.0
+	return fame_tier[bonus_name]
+
+func try_rise_fame(event = null):
+	if has_status('no_fame'):
+		return
+	if is_master() and event and event != 'story':
+		#'story' event not actually used for now,
+		#as master gets his fame though check_masters_story_fame()
+		#but I'll leave this mechanic for clarity
+		return
+	
+	set_stat("fame_degrade_timer", 0)
+	var cur_fame = get_stat("fame")
+	var fame_rise_cap = variables.fame_rise_events.get(event, null)
+	if event == 'service' and check_trait('courtesan'):
+		fame_rise_cap = variables.courtesan_fame_rise_service_cap
+	if event and fame_rise_cap != null and cur_fame >= fame_rise_cap:
+		return
+	if !variables.fame_tiers.has(cur_fame + 1):
+		return
+	#only service for now has chance-based fame rise,
+	#if it's to be changed, chance mechanics should be unified
+	if event and event == 'service':
+		if randf() > variables.fame_rise_chance_service:
+			return
+	
+	add_stat("fame", 1)
+	log_me(translate(tr("FAME_RISE_MANIFEST")) % tr(get_fame_bonus('name')))
+
+func fame_degrade_tick():
+	if has_status('stable_fame'):
+		return
+	var cur_fame = get_stat("fame")
+	if !variables.fame_tiers.has(cur_fame + 1):#should mean it is max
+		return
+	if !variables.fame_tiers.has(cur_fame - 1):#should mean it is min
+		return
+	
+	if get_stat("fame_degrade_timer") + 1 < variables.fame_degrade_time:
+		add_stat("fame_degrade_timer", 1)
+		return
+	
+	set_stat("fame_degrade_timer", 0)
+	add_stat("fame", -1)
+	log_me(translate(tr("FAME_DEGRADE_MANIFEST")) % tr(get_fame_bonus('name')))
+
+func get_fame_bonus_desc():
+	return ResourceScripts.descriptions.get_fame_tier_bonus(get_stat("fame"))
+
+#Minor training. Maybe should be withdrawn to separate module
+var minor_training_timer = 0#in turns
+var cur_minor_training
+
+func get_minor_training_max():
+	var value = variables.minor_trainings_base + floor(get_stat('growth_factor') * variables.minor_trainings_per_growth)
+	if training.is_slave():
+		value = min(value, 2)
+	return value
+
+func get_minor_training_count():
+	return get_traits_by_tag('minor_training').size()
+
+func reset_minor_training():
+	for minor_tr in get_traits_by_tag('minor_training'):
+		remove_trait(minor_tr)
+
+func get_minor_training_time():
+	return variables.minor_trainings_time_base - variables.minor_trainings_time_per_wits * get_stat('wits_factor')
+
+func is_in_minor_training():
+	return cur_minor_training != null
+
+func get_minor_training_in_progress():
+	return cur_minor_training
+
+func get_minor_training_time_left():
+	return minor_training_timer
+
+func start_minor_training(minor_tr):
+	cur_minor_training = minor_tr
+	minor_training_timer = get_minor_training_time()
+
+func finish_minor_training():
+	if cur_minor_training == null:
+		return
+	add_trait(cur_minor_training)
+	var data = Traitdata.traits[cur_minor_training]
+	var args = {
+		current_trait = cur_minor_training,
+		person = self
+	}
+	input_handler.play_animation("trait_aquired", args)
+	var trait_data = Traitdata.traits[cur_minor_training]
+	globals.text_log_add('char', "%s: %s" % [
+		get_short_name(),
+		tr("MINORTRAIN_TRAIT_AQUIRED") % tr(trait_data.name)
+	])
+	
+	cur_minor_training = null
+
+func minor_training_tick():
+	if cur_minor_training == null:
+		return
+	minor_training_timer -= 1
+	if minor_training_timer <= 0:
+		finish_minor_training()
+
+func has_info_bonus_mastery(mastery):
+	return dyn_stats.has_info_bonus_mastery(mastery)
+
+func get_info_bonus_mastery(mastery):
+	return dyn_stats.get_info_bonus_mastery(mastery)
+
+func try_get_bonus_mastery_desc(mastery):
+	return dyn_stats.try_get_bonus_mastery_desc(mastery)

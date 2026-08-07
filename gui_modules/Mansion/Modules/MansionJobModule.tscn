@@ -1,0 +1,1725 @@
+[gd_scene load_steps=82 format=2]
+
+[ext_resource path="res://assets/Fonts_v2/PT_Sans/PTSans-Regular.ttf" type="DynamicFontData" id=1]
+[ext_resource path="res://assets/Themes_v2/EmptyTexture.tres" type="StyleBox" id=2]
+[ext_resource path="res://assets/Themes_v2/UNIVERSAL/Panel_Square.tres" type="StyleBox" id=3]
+[ext_resource path="res://assets/Fonts_v2/Noto_Sans_SC/NotoSansSC-Medium.otf" type="DynamicFontData" id=4]
+[ext_resource path="res://assets/Textures_v2/Universal/Icons/divider_navi_player.png" type="Texture" id=5]
+[ext_resource path="res://assets/Textures_v2/ANIMATIONS/ClassAchieved/panel_class.png" type="Texture" id=6]
+[ext_resource path="res://assets/Textures_v2/JOB_MODULE/panel_job_big.png" type="Texture" id=7]
+[ext_resource path="res://assets/Themes_v2/UNIVERSAL/VScrollBar.tres" type="Theme" id=8]
+[ext_resource path="res://assets/Fonts_v2/FontThemes/MainMiddle.tres" type="DynamicFont" id=9]
+[ext_resource path="res://assets/images/gui/inventory/icon_armor1.png" type="Texture" id=10]
+[ext_resource path="res://assets/Textures_v2/JOB_MODULE/button_job_chars_pressed.png" type="Texture" id=11]
+[ext_resource path="res://assets/Textures_v2/JOB_MODULE/button_job_chars_hover.png" type="Texture" id=12]
+[ext_resource path="res://gui_modules/Mansion/Scripts/MansionJobModule.gd" type="Script" id=13]
+[ext_resource path="res://assets/Textures_v2/JOB_MODULE/button_job_chars.png" type="Texture" id=14]
+[ext_resource path="res://assets/Fonts_v2/PT_Sans/PT_30.tres" type="DynamicFont" id=15]
+[ext_resource path="res://assets/images/iconsitems/Wood.png" type="Texture" id=16]
+[ext_resource path="res://assets/images/backgrounds/crypt4.png" type="Texture" id=17]
+[ext_resource path="res://assets/Textures_v2/JOB_MODULE/button_job_sqr.png" type="Texture" id=18]
+[ext_resource path="res://assets/Textures_v2/JOB_MODULE/button_job_sqr_pressed.png" type="Texture" id=19]
+[ext_resource path="res://assets/Themes_v2/MANSION/M_Job_BG.tres" type="StyleBox" id=20]
+[ext_resource path="res://assets/Textures_v2/JOB_MODULE/button_job_sqr_hover.png" type="Texture" id=21]
+[ext_resource path="res://assets/Textures_v2/JOB_MODULE/panel_job_image.png" type="Texture" id=22]
+[ext_resource path="res://assets/Themes_v2/UNIVERSAL/DecorButton.tres" type="Theme" id=23]
+[ext_resource path="res://assets/Textures_v2/Universal/Buttons/buttonbig_inventory.png" type="Texture" id=24]
+[ext_resource path="res://assets/Textures_v2/JOB_MODULE/icon_job_worktool.png" type="Texture" id=25]
+[ext_resource path="res://assets/Textures_v2/JOB_MODULE/icon_job_workspeed.png" type="Texture" id=26]
+[ext_resource path="res://assets/Textures_v2/Universal/Buttons/buttonbig_inventory_pressed.png" type="Texture" id=27]
+[ext_resource path="res://assets/Textures_v2/Universal/Buttons/buttonbig_inventory_hover.png" type="Texture" id=28]
+[ext_resource path="res://assets/Fonts_v2/FontThemes/TitlesMiddle.tres" type="DynamicFont" id=29]
+[ext_resource path="res://assets/Textures_v2/MANSION/Craft/Buttons/frame_tool.png" type="Texture" id=30]
+[ext_resource path="res://assets/images/gui/gui icons/icon_wits.png" type="Texture" id=31]
+[ext_resource path="res://assets/images/gui/inventory/icon_craft64x64.png" type="Texture" id=32]
+[ext_resource path="res://assets/Textures_v2/JOB_MODULE/button_job_illustration.png" type="Texture" id=33]
+[ext_resource path="res://assets/Textures_v2/JOB_MODULE/button_job_illustration_back.png" type="Texture" id=34]
+[ext_resource path="res://assets/Textures_v2/JOB_MODULE/button_job_illustration_hover.png" type="Texture" id=35]
+[ext_resource path="res://assets/Textures_v2/MANSION/CharacterList/Bars/hpmp_icon_hp.png" type="Texture" id=36]
+[ext_resource path="res://assets/Textures_v2/MANSION/CharacterList/Icons/hpmp_icon.png" type="Texture" id=37]
+[ext_resource path="res://assets/Textures_v2/MANSION/CharacterList/Bars/hpmp_icon_mp.png" type="Texture" id=38]
+[ext_resource path="res://assets/Textures_v2/ANIMATIONS/TaskCompleted/panel_complete.png" type="Texture" id=39]
+[ext_resource path="res://assets/Textures_v2/JOB_MODULE/button_job_chars_disabled.png" type="Texture" id=40]
+[ext_resource path="res://assets/Themes_v2/MANSION/Sex_Buttons_Font.tres" type="DynamicFont" id=41]
+[ext_resource path="res://assets/Themes_v2/UNIVERSAL/CheckBox.tres" type="Theme" id=42]
+[ext_resource path="res://assets/Textures_v2/icon_question_small.png" type="Texture" id=43]
+[ext_resource path="res://MainFont.tres" type="DynamicFont" id=44]
+[ext_resource path="res://assets/Textures_v2/JOB_MODULE/farm/panel_farm.png" type="Texture" id=45]
+[ext_resource path="res://assets/Textures_v2/JOB_MODULE/farm/button_hero_disabled.png" type="Texture" id=46]
+[ext_resource path="res://assets/Textures_v2/JOB_MODULE/farm/button_hero_pressed.png" type="Texture" id=47]
+[ext_resource path="res://assets/Textures_v2/JOB_MODULE/farm/button_hero_hover.png" type="Texture" id=48]
+[ext_resource path="res://assets/Themes_v2/UNIVERSAL/PT_24.tres" type="DynamicFont" id=49]
+[ext_resource path="res://assets/Textures_v2/JOB_MODULE/farm/button_product.png" type="Texture" id=50]
+[ext_resource path="res://assets/Textures_v2/JOB_MODULE/farm/button_product_hover.png" type="Texture" id=51]
+[ext_resource path="res://assets/Textures_v2/JOB_MODULE/farm/button_product_pressed.png" type="Texture" id=52]
+[ext_resource path="res://assets/Themes_v2/UNIVERSAL/PT_20_normal.tres" type="DynamicFont" id=53]
+[ext_resource path="res://assets/Textures_v2/JOB_MODULE/occupation/button_resource_hover.png" type="Texture" id=54]
+[ext_resource path="res://assets/Textures_v2/JOB_MODULE/occupation/button_resource.png" type="Texture" id=55]
+[ext_resource path="res://assets/Themes_v2/UNIVERSAL/HScrollBar.tres" type="Theme" id=56]
+[ext_resource path="res://assets/Textures_v2/JOB_MODULE/farm/button_hero_disabled_1.png" type="Texture" id=57]
+[ext_resource path="res://assets/Textures_v2/JOB_MODULE/icon_question_small.png" type="Texture" id=58]
+[ext_resource path="res://assets/Fonts_v2/FontThemes/NOTO_SANS_Regular_16px.tres" type="DynamicFont" id=59]
+[ext_resource path="res://assets/Textures_v2/CHAR_CREATION/Buttons/buttonsmall_pressed.png" type="Texture" id=60]
+[ext_resource path="res://assets/Textures_v2/CHAR_CREATION/Buttons/buttonsmall_hover.png" type="Texture" id=61]
+[ext_resource path="res://dragarraytemplate.gd" type="Script" id=62]
+[ext_resource path="res://assets/Textures_v2/CHAR_CREATION/Buttons/buttonsmall.png" type="Texture" id=63]
+[ext_resource path="res://assets/Textures_v2/Universal/Panels/panel_simple.png" type="Texture" id=64]
+[ext_resource path="res://gui_modules/Mansion/Scripts/dragprioritytemplate.gd" type="Script" id=65]
+[ext_resource path="res://assets/Textures_v2/CHAR_INFO/character/icon_question_small.png" type="Texture" id=66]
+[ext_resource path="res://assets/Textures_v2/Universal/Buttons/arrow_navigator.png" type="Texture" id=67]
+[ext_resource path="res://assets/images/gui/game1bg2.png" type="Texture" id=68]
+
+[sub_resource type="StyleBoxTexture" id=1]
+
+[sub_resource type="DynamicFont" id=13]
+size = 32
+font_data = ExtResource( 1 )
+
+[sub_resource type="DynamicFont" id=2]
+size = 24
+font_data = ExtResource( 1 )
+
+[sub_resource type="DynamicFont" id=3]
+size = 30
+font_data = ExtResource( 1 )
+fallback/0 = ExtResource( 4 )
+
+[sub_resource type="DynamicFontData" id=4]
+font_path = "res://assets/Fonts_v2/Ledger/Ledger-Regular.ttf"
+
+[sub_resource type="DynamicFont" id=5]
+size = 42
+use_filter = true
+font_data = SubResource( 4 )
+fallback/0 = ExtResource( 4 )
+
+[sub_resource type="DynamicFontData" id=6]
+font_path = "res://assets/Fonts_v2/PT_Sans/PTSans-Regular.ttf"
+
+[sub_resource type="DynamicFont" id=7]
+size = 18
+font_data = SubResource( 6 )
+
+[sub_resource type="StyleBoxTexture" id=8]
+
+[sub_resource type="StyleBoxTexture" id=9]
+
+[sub_resource type="StyleBoxTexture" id=10]
+
+[sub_resource type="StyleBoxTexture" id=11]
+
+[sub_resource type="StyleBoxTexture" id=12]
+
+[node name="MansionJobModule" type="Panel"]
+margin_right = 1920.0
+margin_bottom = 1080.0
+custom_styles/panel = SubResource( 1 )
+script = ExtResource( 13 )
+
+[node name="TextureRect" type="TextureRect" parent="."]
+modulate = Color( 1, 1, 1, 0.305882 )
+margin_right = 1916.0
+margin_bottom = 1077.0
+texture = ExtResource( 68 )
+expand = true
+stretch_mode = 6
+
+[node name="Frame" type="TextureRect" parent="."]
+margin_left = 30.0
+margin_top = 30.0
+margin_right = 70.0
+margin_bottom = 70.0
+texture = ExtResource( 7 )
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="JobBG" type="Panel" parent="."]
+show_behind_parent = true
+margin_right = 1920.0
+margin_bottom = 1080.0
+custom_styles/panel = ExtResource( 20 )
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Frame_farm" type="TextureRect" parent="."]
+visible = false
+margin_left = 30.0
+margin_top = 30.0
+margin_right = 1890.0
+margin_bottom = 1050.0
+texture = ExtResource( 45 )
+
+[node name="Farm_scroll" type="ScrollContainer" parent="Frame_farm"]
+margin_left = 44.0
+margin_top = 204.0
+margin_right = 1281.0
+margin_bottom = 347.0
+theme = ExtResource( 56 )
+scroll_vertical_enabled = false
+
+[node name="FarmSlots" type="HBoxContainer" parent="Frame_farm/Farm_scroll"]
+
+[node name="Button" type="TextureButton" parent="Frame_farm/Farm_scroll/FarmSlots"]
+visible = false
+margin_right = 135.0
+margin_bottom = 135.0
+rect_min_size = Vector2( 135, 135 )
+toggle_mode = true
+texture_normal = ExtResource( 57 )
+texture_pressed = ExtResource( 47 )
+texture_hover = ExtResource( 48 )
+texture_disabled = ExtResource( 46 )
+expand = true
+stretch_mode = 3
+
+[node name="icon" type="TextureRect" parent="Frame_farm/Farm_scroll/FarmSlots/Button"]
+margin_left = 14.0
+margin_top = 13.0
+margin_right = 121.0
+margin_bottom = 120.0
+expand = true
+
+[node name="char_panel" type="Control" parent="Frame_farm"]
+margin_right = 40.0
+margin_bottom = 40.0
+
+[node name="Label" type="Label" parent="Frame_farm/char_panel"]
+margin_left = 47.6603
+margin_top = 385.754
+margin_right = 333.66
+margin_bottom = 422.754
+custom_fonts/font = ExtResource( 49 )
+text = "Avaliable productions"
+
+[node name="Choose" type="TextureButton" parent="Frame_farm/char_panel"]
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+margin_left = 543.5
+margin_top = 901.0
+margin_right = 740.5
+margin_bottom = 960.0
+theme = ExtResource( 23 )
+texture_normal = ExtResource( 24 )
+texture_pressed = ExtResource( 27 )
+texture_hover = ExtResource( 28 )
+
+[node name="Label" type="Label" parent="Frame_farm/char_panel/Choose"]
+margin_top = -2.0
+margin_right = 197.0
+margin_bottom = 57.0
+custom_colors/font_color = Color( 0.976471, 0.882353, 0.505882, 1 )
+custom_fonts/font = ExtResource( 29 )
+text = "FARMCHOOSE"
+align = 1
+valign = 1
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Remove" type="TextureButton" parent="Frame_farm/char_panel"]
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+margin_left = 543.5
+margin_top = 901.0
+margin_right = 740.5
+margin_bottom = 960.0
+theme = ExtResource( 23 )
+texture_normal = ExtResource( 24 )
+texture_pressed = ExtResource( 27 )
+texture_hover = ExtResource( 28 )
+
+[node name="Label" type="Label" parent="Frame_farm/char_panel/Remove"]
+margin_top = -2.0
+margin_right = 197.0
+margin_bottom = 57.0
+custom_colors/font_color = Color( 0.976471, 0.882353, 0.505882, 1 )
+custom_fonts/font = ExtResource( 29 )
+text = "FARMREMOVE"
+align = 1
+valign = 1
+
+[node name="ScrollContainer" type="ScrollContainer" parent="Frame_farm/char_panel"]
+margin_left = 45.0
+margin_top = 435.0
+margin_right = 703.0
+margin_bottom = 900.0
+theme = ExtResource( 8 )
+scroll_horizontal_enabled = false
+
+[node name="farm_rules" type="VBoxContainer" parent="Frame_farm/char_panel/ScrollContainer"]
+
+[node name="Button" type="TextureButton" parent="Frame_farm/char_panel/ScrollContainer/farm_rules"]
+visible = false
+margin_right = 630.0
+margin_bottom = 100.0
+toggle_mode = true
+texture_normal = ExtResource( 50 )
+texture_pressed = ExtResource( 52 )
+texture_hover = ExtResource( 51 )
+
+[node name="icon" type="TextureRect" parent="Frame_farm/char_panel/ScrollContainer/farm_rules/Button"]
+margin_left = 8.0
+margin_top = 7.0
+margin_right = 94.0
+margin_bottom = 92.0
+mouse_filter = 2
+expand = true
+
+[node name="HBoxContainer" type="HBoxContainer" parent="Frame_farm/char_panel/ScrollContainer/farm_rules/Button"]
+margin_left = 102.0
+margin_top = 5.0
+margin_right = 623.0
+margin_bottom = 90.0
+
+[node name="res_name" type="Label" parent="Frame_farm/char_panel/ScrollContainer/farm_rules/Button/HBoxContainer"]
+margin_top = 26.0
+margin_right = 258.0
+margin_bottom = 58.0
+size_flags_horizontal = 3
+custom_fonts/font = ExtResource( 49 )
+text = "res_name"
+
+[node name="amount" type="Label" parent="Frame_farm/char_panel/ScrollContainer/farm_rules/Button/HBoxContainer"]
+margin_left = 262.0
+margin_top = 26.0
+margin_right = 521.0
+margin_bottom = 58.0
+size_flags_horizontal = 3
+custom_fonts/font = ExtResource( 49 )
+text = "production: 25 per turn"
+align = 2
+
+[node name="desc" type="RichTextLabel" parent="Frame_farm/char_panel"]
+margin_left = 823.0
+margin_top = 410.0
+margin_right = 1273.0
+margin_bottom = 878.0
+custom_fonts/normal_font = SubResource( 13 )
+bbcode_enabled = true
+
+[node name="Resourses" type="ScrollContainer" parent="."]
+visible = false
+light_mask = 0
+margin_left = 923.0
+margin_top = 265.0
+margin_right = 1316.0
+margin_bottom = 725.0
+theme = ExtResource( 8 )
+scroll_horizontal_enabled = false
+
+[node name="GridContainer" type="GridContainer" parent="Resourses"]
+light_mask = 0
+margin_right = 393.0
+size_flags_horizontal = 3
+custom_constants/vseparation = 20
+custom_constants/hseparation = 20
+columns = 3
+
+[node name="Button" type="TextureButton" parent="Resourses/GridContainer"]
+visible = false
+light_mask = 0
+margin_right = 100.0
+margin_bottom = 100.0
+rect_min_size = Vector2( 50, 50 )
+toggle_mode = true
+texture_normal = ExtResource( 18 )
+texture_pressed = ExtResource( 19 )
+texture_hover = ExtResource( 21 )
+
+[node name="TextureRect2" type="TextureRect" parent="Resourses/GridContainer/Button"]
+show_behind_parent = true
+margin_right = 101.0
+margin_bottom = 100.0
+texture = ExtResource( 30 )
+expand = true
+stretch_mode = 6
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="TextureRect" type="TextureRect" parent="Resourses/GridContainer/Button"]
+margin_left = 5.0
+margin_top = 5.0
+margin_right = 95.0
+margin_bottom = 95.0
+rect_min_size = Vector2( 5, 0 )
+texture = ExtResource( 16 )
+expand = true
+stretch_mode = 7
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Label" type="Label" parent="Resourses/GridContainer/Button"]
+margin_left = 21.0181
+margin_top = 2.97345
+margin_right = 95.0181
+margin_bottom = 34.9734
+custom_colors/font_color_shadow = Color( 0, 0, 0, 1 )
+custom_constants/shadow_offset_x = 1
+custom_constants/shadow_offset_y = 1
+custom_fonts/font = SubResource( 2 )
+align = 2
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="NavigationModule" type="Panel" parent="."]
+anchor_right = 1.0
+anchor_bottom = 1.0
+margin_left = 68.0
+margin_top = 168.0
+margin_right = -602.0
+margin_bottom = -857.0
+custom_styles/panel = ExtResource( 3 )
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Background" type="Panel" parent="NavigationModule"]
+visible = false
+self_modulate = Color( 0, 0, 0, 0.705882 )
+show_behind_parent = true
+margin_right = 1450.0
+margin_bottom = 55.0
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Background2" type="TextureRect" parent="NavigationModule"]
+visible = false
+self_modulate = Color( 0, 0, 0, 0.705882 )
+show_behind_parent = true
+margin_right = 1250.0
+margin_bottom = 55.0
+texture = ExtResource( 6 )
+expand = true
+stretch_mode = 7
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="VSeparator" type="TextureRect" parent="NavigationModule"]
+visible = false
+margin_left = 13.0
+margin_top = -1.0
+margin_right = 53.0
+margin_bottom = 54.0
+texture = ExtResource( 5 )
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="NavigationContainer" type="ScrollContainer" parent="NavigationModule"]
+margin_left = 15.0
+margin_top = -4.0
+margin_right = 1247.0
+margin_bottom = 56.0
+theme = ExtResource( 56 )
+scroll_vertical_enabled = false
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="AreaSelection" type="HBoxContainer" parent="NavigationModule/NavigationContainer"]
+custom_constants/separation = 14
+
+[node name="Button" type="Button" parent="NavigationModule/NavigationContainer/AreaSelection"]
+visible = false
+margin_right = 128.0
+margin_bottom = 60.0
+rect_min_size = Vector2( 0, 55 )
+custom_colors/font_color = Color( 0.6, 0.513726, 0.435294, 1 )
+custom_colors/font_color_hover = Color( 0.976471, 0.882353, 0.505882, 1 )
+custom_colors/font_color_pressed = Color( 0.976471, 0.882353, 0.505882, 1 )
+custom_fonts/font = SubResource( 3 )
+custom_styles/hover = ExtResource( 2 )
+custom_styles/pressed = ExtResource( 2 )
+custom_styles/focus = ExtResource( 2 )
+custom_styles/disabled = ExtResource( 2 )
+custom_styles/normal = ExtResource( 2 )
+toggle_mode = true
+text = "Mansion"
+
+[node name="Landscape" type="TextureRect" parent="."]
+visible = false
+self_modulate = Color( 1, 1, 1, 0.819608 )
+margin_left = 68.0
+margin_top = 270.0
+margin_right = 868.0
+margin_bottom = 720.0
+texture = ExtResource( 17 )
+expand = true
+stretch_mode = 7
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="LandscapeFrame" type="TextureRect" parent="."]
+visible = false
+margin_left = 68.0
+margin_top = 270.0
+margin_right = 868.0
+margin_bottom = 720.0
+texture = ExtResource( 22 )
+expand = true
+stretch_mode = 7
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="CharacterList" type="ScrollContainer" parent="."]
+light_mask = 0
+margin_left = 1390.88
+margin_top = 169.0
+margin_right = 1830.88
+margin_bottom = 889.0
+theme = ExtResource( 8 )
+scroll_horizontal_enabled = false
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="GridContainer" type="VBoxContainer" parent="CharacterList"]
+light_mask = 0
+margin_right = 440.0
+size_flags_horizontal = 3
+
+[node name="Button" type="TextureButton" parent="CharacterList/GridContainer"]
+visible = false
+light_mask = 0
+margin_right = 440.0
+margin_bottom = 52.0
+rect_min_size = Vector2( 50, 50 )
+texture_normal = ExtResource( 14 )
+texture_pressed = ExtResource( 11 )
+texture_hover = ExtResource( 12 )
+texture_disabled = ExtResource( 40 )
+
+[node name="Name" type="Label" parent="CharacterList/GridContainer/Button"]
+light_mask = 0
+margin_left = 104.0
+margin_top = 8.0
+margin_right = 248.0
+margin_bottom = 44.0
+custom_colors/font_color_shadow = Color( 0, 0, 0, 1 )
+custom_fonts/font = ExtResource( 9 )
+align = 1
+clip_text = true
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Icon" type="TextureRect" parent="CharacterList/GridContainer/Button"]
+light_mask = 0
+margin_left = 7.0
+margin_top = 5.0
+margin_right = 47.0
+margin_bottom = 45.0
+mouse_filter = 2
+texture = ExtResource( 10 )
+expand = true
+stretch_mode = 6
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Speed" type="Label" parent="CharacterList/GridContainer/Button"]
+margin_left = 236.0
+margin_top = 8.992
+margin_right = 347.0
+margin_bottom = 43.992
+custom_fonts/font = ExtResource( 9 )
+align = 1
+clip_text = true
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="stats" type="TextureRect" parent="CharacterList/GridContainer/Button"]
+margin_left = 55.0
+margin_top = 5.0
+margin_right = 95.0
+margin_bottom = 45.0
+texture = ExtResource( 37 )
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="hp" type="TextureProgress" parent="CharacterList/GridContainer/Button/stats"]
+show_behind_parent = true
+margin_left = 2.44171
+margin_top = 2.07547
+margin_right = 42.4417
+margin_bottom = 42.0755
+value = 100.0
+texture_progress = ExtResource( 36 )
+fill_mode = 3
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="mp" type="TextureProgress" parent="CharacterList/GridContainer/Button/stats"]
+show_behind_parent = true
+margin_left = 22.4639
+margin_top = 1.83129
+margin_right = 62.4639
+margin_bottom = 41.8313
+value = 100.0
+texture_progress = ExtResource( 38 )
+fill_mode = 3
+
+[node name="Status" type="TextureRect" parent="CharacterList/GridContainer/Button"]
+margin_left = 393.423
+margin_top = 4.92862
+margin_right = 433.423
+margin_bottom = 44.9286
+expand = true
+stretch_mode = 6
+
+[node name="OccupationLabel" type="Label" parent="."]
+visible = false
+margin_left = 564.0
+margin_top = 45.0
+margin_right = 802.0
+margin_bottom = 107.0
+custom_colors/font_color = Color( 0.976471, 0.882353, 0.505882, 1 )
+custom_fonts/font = SubResource( 5 )
+text = "MSLMOCCU"
+
+[node name="CharacterListLabel" type="Label" parent="."]
+margin_left = 1480.0
+margin_top = 45.0
+margin_right = 1763.0
+margin_bottom = 107.0
+custom_colors/font_color = Color( 0.976471, 0.882353, 0.505882, 1 )
+custom_fonts/font = SubResource( 5 )
+text = "SWITCHLIST"
+align = 1
+
+[node name="DescriptionLabel" type="RichTextLabel" parent="."]
+visible = false
+margin_left = 68.0
+margin_top = 779.665
+margin_right = 1309.0
+margin_bottom = 880.665
+custom_fonts/normal_font = ExtResource( 15 )
+bbcode_enabled = true
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="gridcontainerpanel" type="TextureRect" parent="."]
+visible = false
+self_modulate = Color( 1, 1, 1, 0.52549 )
+margin_left = 67.0
+margin_top = 627.0
+margin_right = 868.0
+margin_bottom = 716.0
+texture = ExtResource( 39 )
+expand = true
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="GridContainer2" type="GridContainer" parent="."]
+visible = false
+light_mask = 0
+margin_left = 84.0
+margin_top = 629.0
+margin_right = 871.0
+margin_bottom = 714.0
+size_flags_horizontal = 3
+custom_constants/vseparation = 0
+custom_constants/hseparation = 18
+columns = 10
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Button" type="TextureButton" parent="GridContainer2"]
+visible = false
+light_mask = 0
+margin_right = 80.0
+margin_bottom = 80.0
+rect_min_size = Vector2( 50, 50 )
+toggle_mode = true
+texture_normal = ExtResource( 33 )
+texture_hover = ExtResource( 35 )
+
+[node name="TextureRect" type="TextureRect" parent="GridContainer2/Button"]
+margin_right = 80.0
+margin_bottom = 80.0
+rect_min_size = Vector2( 5, 0 )
+texture = ExtResource( 34 )
+expand = true
+stretch_mode = 6
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Label" type="Label" parent="GridContainer2/Button"]
+margin_left = 4.05946
+margin_top = 56.7953
+margin_right = 78.0595
+margin_bottom = 78.7953
+custom_colors/font_color_shadow = Color( 0, 0, 0, 1 )
+custom_constants/shadow_offset_x = 1
+custom_constants/shadow_offset_y = 1
+custom_fonts/font = SubResource( 7 )
+clip_text = true
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="CloseButton" type="TextureButton" parent="."]
+margin_left = 1522.0
+margin_top = 973.0
+margin_right = 1719.0
+margin_bottom = 1032.0
+theme = ExtResource( 23 )
+texture_normal = ExtResource( 24 )
+texture_pressed = ExtResource( 27 )
+texture_hover = ExtResource( 28 )
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Label" type="Label" parent="CloseButton"]
+margin_top = -2.0
+margin_right = 197.0
+margin_bottom = 57.0
+custom_colors/font_color = Color( 0.976471, 0.882353, 0.505882, 1 )
+custom_fonts/font = ExtResource( 29 )
+text = "MODCLOSE"
+align = 1
+valign = 1
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Worktool" type="TextureRect" parent="."]
+visible = false
+margin_left = 164.0
+margin_top = 974.0
+margin_right = 228.0
+margin_bottom = 1038.0
+texture = ExtResource( 25 )
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Workunit" type="TextureRect" parent="."]
+visible = false
+margin_left = 446.0
+margin_top = 974.0
+margin_right = 510.0
+margin_bottom = 1038.0
+texture = ExtResource( 26 )
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Workstat" type="TextureRect" parent="."]
+visible = false
+modulate = Color( 0.952941, 0.878431, 0.478431, 1 )
+margin_left = 54.9816
+margin_top = 974.0
+margin_right = 118.982
+margin_bottom = 1038.0
+texture = ExtResource( 31 )
+expand = true
+stretch_mode = 6
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Workmod" type="TextureRect" parent="."]
+visible = false
+margin_left = 657.982
+margin_top = 974.0
+margin_right = 721.982
+margin_bottom = 1038.0
+texture = ExtResource( 32 )
+expand = true
+stretch_mode = 6
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="ToolLabel" type="Label" parent="."]
+margin_left = 236.0
+margin_top = 982.0
+margin_right = 320.0
+margin_bottom = 1033.0
+custom_colors/font_color = Color( 0.976471, 0.882353, 0.505882, 1 )
+custom_fonts/font = ExtResource( 15 )
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="WorkunitLabel" type="Label" parent="."]
+margin_left = 523.0
+margin_top = 982.0
+margin_right = 599.0
+margin_bottom = 1033.0
+custom_colors/font_color = Color( 0.976471, 0.882353, 0.505882, 1 )
+custom_fonts/font = ExtResource( 15 )
+
+[node name="Modlabel" type="Label" parent="."]
+visible = false
+margin_left = 734.0
+margin_top = 982.0
+margin_right = 810.0
+margin_bottom = 1033.0
+mouse_filter = 0
+custom_colors/font_color = Color( 0.976471, 0.882353, 0.505882, 1 )
+custom_fonts/font = ExtResource( 15 )
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="BrothelRules" type="Panel" parent="."]
+visible = false
+self_modulate = Color( 1, 1, 1, 0.823529 )
+margin_left = 78.0
+margin_top = 274.0
+margin_right = 860.0
+margin_bottom = 714.0
+
+[node name="GridContainer" type="GridContainer" parent="BrothelRules"]
+margin_left = 32.2704
+margin_top = 68.5958
+margin_right = 293.27
+margin_bottom = 388.596
+custom_constants/vseparation = 11
+columns = 2
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Button" type="CheckBox" parent="BrothelRules/GridContainer"]
+visible = false
+margin_right = 141.0
+margin_bottom = 48.0
+theme = ExtResource( 42 )
+custom_fonts/font = ExtResource( 41 )
+text = "Test rule"
+
+[node name="sexes_container" type="HBoxContainer" parent="BrothelRules"]
+margin_left = 368.0
+margin_top = 368.0
+margin_right = 757.0
+margin_bottom = 428.0
+
+[node name="males" type="CheckBox" parent="BrothelRules/sexes_container"]
+margin_right = 221.0
+margin_bottom = 60.0
+theme = ExtResource( 42 )
+custom_fonts/font = ExtResource( 41 )
+text = "BROTHELMALES"
+
+[node name="females" type="CheckBox" parent="BrothelRules/sexes_container"]
+margin_left = 225.0
+margin_right = 471.0
+margin_bottom = 60.0
+theme = ExtResource( 42 )
+custom_fonts/font = ExtResource( 41 )
+text = "BROTHELFEMALES"
+
+[node name="futa" type="CheckBox" parent="BrothelRules/sexes_container"]
+margin_left = 475.0
+margin_right = 680.0
+margin_bottom = 60.0
+theme = ExtResource( 42 )
+custom_fonts/font = ExtResource( 41 )
+text = "BROTHELFUTA"
+
+[node name="rulestooltip" type="TextureRect" parent="BrothelRules"]
+margin_left = 0.330963
+margin_top = 6.06903
+margin_right = 48.331
+margin_bottom = 51.069
+texture = ExtResource( 43 )
+expand = true
+stretch_mode = 6
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Label" type="Label" parent="BrothelRules"]
+margin_left = 87.1022
+margin_top = 15.8572
+margin_right = 239.102
+margin_bottom = 39.8572
+custom_fonts/font = ExtResource( 44 )
+text = "Service Rules"
+
+[node name="Label2" type="Label" parent="BrothelRules"]
+margin_left = 423.0
+margin_top = 341.0
+margin_right = 679.0
+margin_bottom = 365.0
+custom_fonts/font = ExtResource( 44 )
+text = "FARMALLOWEDCUSTOMERS"
+align = 1
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="brothel_descript" type="RichTextLabel" parent="BrothelRules"]
+margin_left = 436.385
+margin_top = 17.9955
+margin_right = 777.385
+margin_bottom = 310.995
+custom_fonts/normal_font = ExtResource( 59 )
+bbcode_enabled = true
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="boosters" type="Control" parent="BrothelRules"]
+margin_left = -39.0
+margin_top = 496.0
+margin_right = 1257.0
+margin_bottom = 680.0
+
+[node name="boosterstip" type="TextureRect" parent="BrothelRules/boosters"]
+margin_left = 5.18953
+margin_top = 4.61066
+margin_right = 51.1895
+margin_bottom = 50.6107
+texture = ExtResource( 58 )
+
+[node name="VBoxContainer" type="VBoxContainer" parent="BrothelRules/boosters"]
+margin_left = 54.1225
+margin_top = 6.02032
+margin_right = 576.122
+margin_bottom = 168.02
+
+[node name="Button" type="TextureButton" parent="BrothelRules/boosters/VBoxContainer"]
+visible = false
+margin_right = 522.0
+margin_bottom = 52.0
+toggle_mode = true
+texture_normal = ExtResource( 55 )
+texture_hover = ExtResource( 54 )
+
+[node name="icon" type="TextureRect" parent="BrothelRules/boosters/VBoxContainer/Button"]
+margin_left = 5.66325
+margin_top = 5.19128
+margin_right = 45.6632
+margin_bottom = 45.1913
+expand = true
+
+[node name="Label" type="Label" parent="BrothelRules/boosters/VBoxContainer/Button"]
+margin_left = 55.0
+margin_top = 15.0
+margin_right = 508.0
+margin_bottom = 42.0
+custom_fonts/font = ExtResource( 53 )
+text = "res_name"
+
+[node name="desc" type="RichTextLabel" parent="BrothelRules/boosters"]
+visible = false
+margin_left = 619.709
+margin_top = 9.21826
+margin_right = 1268.71
+margin_bottom = 162.218
+custom_fonts/normal_font = ExtResource( 53 )
+text = "add description"
+
+[node name="CraftRules" type="Panel" parent="."]
+visible = false
+self_modulate = Color( 1, 1, 1, 0.823529 )
+margin_left = 78.0
+margin_top = 274.0
+margin_right = 860.0
+margin_bottom = 714.0
+
+[node name="crafttooltip" type="TextureRect" parent="CraftRules"]
+margin_left = 0.330963
+margin_top = 6.06903
+margin_right = 48.331
+margin_bottom = 51.069
+texture = ExtResource( 43 )
+expand = true
+stretch_mode = 6
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Label" type="Label" parent="CraftRules"]
+margin_left = 87.1022
+margin_top = 15.8572
+margin_right = 239.102
+margin_bottom = 39.8572
+custom_fonts/font = ExtResource( 44 )
+text = "Crafting Rules"
+
+[node name="Label2" type="Label" parent="CraftRules"]
+margin_left = 434.0
+margin_top = 15.8572
+margin_right = 586.0
+margin_bottom = 50.8572
+custom_fonts/font = ExtResource( 44 )
+text = "Predicted task:"
+
+[node name="icon" type="TextureRect" parent="CraftRules"]
+margin_left = 690.0
+margin_top = 10.0
+margin_right = 754.0
+margin_bottom = 74.0
+texture = ExtResource( 43 )
+expand = true
+stretch_mode = 6
+
+[node name="Container" type="VBoxContainer" parent="CraftRules"]
+margin_left = 28.0
+margin_top = 80.0
+margin_right = 749.0
+margin_bottom = 406.0
+
+[node name="Label" type="Label" parent="CraftRules/Container"]
+margin_right = 721.0
+margin_bottom = 35.0
+custom_fonts/font = ExtResource( 44 )
+text = "Material Rules"
+
+[node name="materials" type="GridContainer" parent="CraftRules/Container"]
+margin_top = 39.0
+margin_right = 721.0
+margin_bottom = 171.0
+columns = 8
+
+[node name="Label" type="Label" parent="CraftRules/Container/materials"]
+margin_top = 14.0
+margin_right = 200.0
+margin_bottom = 49.0
+rect_min_size = Vector2( 200, 0 )
+custom_fonts/font = ExtResource( 44 )
+text = "Jobs Priority"
+
+[node name="pos_e_1" type="TextureRect" parent="CraftRules/Container/materials"]
+margin_left = 204.0
+margin_right = 268.0
+margin_bottom = 64.0
+rect_min_size = Vector2( 64, 64 )
+texture = ExtResource( 64 )
+expand = true
+stretch_mode = 6
+script = ExtResource( 65 )
+
+[node name="icon" type="TextureRect" parent="CraftRules/Container/materials/pos_e_1"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+margin_left = 5.0
+margin_top = 5.0
+margin_right = -5.0
+margin_bottom = -5.0
+texture = ExtResource( 66 )
+expand = true
+
+[node name="separator" type="TextureRect" parent="CraftRules/Container/materials"]
+margin_left = 272.0
+margin_right = 304.0
+margin_bottom = 64.0
+texture = ExtResource( 67 )
+stretch_mode = 4
+flip_h = true
+
+[node name="pos_e_2" type="TextureRect" parent="CraftRules/Container/materials"]
+margin_left = 308.0
+margin_right = 372.0
+margin_bottom = 64.0
+rect_min_size = Vector2( 64, 64 )
+texture = ExtResource( 64 )
+expand = true
+stretch_mode = 6
+script = ExtResource( 65 )
+
+[node name="icon" type="TextureRect" parent="CraftRules/Container/materials/pos_e_2"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+margin_left = 5.0
+margin_top = 5.0
+margin_right = -5.0
+margin_bottom = -5.0
+texture = ExtResource( 66 )
+expand = true
+
+[node name="separator2" type="TextureRect" parent="CraftRules/Container/materials"]
+margin_left = 376.0
+margin_right = 408.0
+margin_bottom = 64.0
+texture = ExtResource( 67 )
+stretch_mode = 4
+flip_h = true
+
+[node name="pos_e_3" type="TextureRect" parent="CraftRules/Container/materials"]
+margin_left = 412.0
+margin_right = 476.0
+margin_bottom = 64.0
+rect_min_size = Vector2( 64, 64 )
+texture = ExtResource( 64 )
+expand = true
+stretch_mode = 6
+script = ExtResource( 65 )
+
+[node name="icon" type="TextureRect" parent="CraftRules/Container/materials/pos_e_3"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+margin_left = 5.0
+margin_top = 5.0
+margin_right = -5.0
+margin_bottom = -5.0
+texture = ExtResource( 66 )
+expand = true
+
+[node name="separator3" type="TextureRect" parent="CraftRules/Container/materials"]
+margin_left = 480.0
+margin_right = 512.0
+margin_bottom = 64.0
+texture = ExtResource( 67 )
+stretch_mode = 4
+flip_h = true
+
+[node name="pos_e_4" type="TextureRect" parent="CraftRules/Container/materials"]
+margin_left = 516.0
+margin_right = 580.0
+margin_bottom = 64.0
+rect_min_size = Vector2( 64, 64 )
+texture = ExtResource( 64 )
+expand = true
+stretch_mode = 6
+script = ExtResource( 65 )
+
+[node name="icon" type="TextureRect" parent="CraftRules/Container/materials/pos_e_4"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+margin_left = 5.0
+margin_top = 5.0
+margin_right = -5.0
+margin_bottom = -5.0
+texture = ExtResource( 66 )
+expand = true
+
+[node name="Label2" type="Label" parent="CraftRules/Container/materials"]
+margin_top = 82.0
+margin_right = 200.0
+margin_bottom = 117.0
+custom_fonts/font = ExtResource( 44 )
+text = "Jobs Disabled"
+
+[node name="pos_d_1" type="TextureRect" parent="CraftRules/Container/materials"]
+margin_left = 204.0
+margin_top = 68.0
+margin_right = 268.0
+margin_bottom = 132.0
+rect_min_size = Vector2( 64, 64 )
+texture = ExtResource( 64 )
+expand = true
+stretch_mode = 6
+script = ExtResource( 65 )
+
+[node name="icon" type="TextureRect" parent="CraftRules/Container/materials/pos_d_1"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+margin_left = 5.0
+margin_top = 5.0
+margin_right = -5.0
+margin_bottom = -5.0
+texture = ExtResource( 66 )
+expand = true
+
+[node name="separator4" type="TextureRect" parent="CraftRules/Container/materials"]
+margin_left = 272.0
+margin_top = 68.0
+margin_right = 304.0
+margin_bottom = 132.0
+stretch_mode = 4
+flip_h = true
+
+[node name="pos_d_2" type="TextureRect" parent="CraftRules/Container/materials"]
+margin_left = 308.0
+margin_top = 68.0
+margin_right = 372.0
+margin_bottom = 132.0
+rect_min_size = Vector2( 64, 64 )
+texture = ExtResource( 64 )
+expand = true
+stretch_mode = 6
+script = ExtResource( 65 )
+
+[node name="icon" type="TextureRect" parent="CraftRules/Container/materials/pos_d_2"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+margin_left = 5.0
+margin_top = 5.0
+margin_right = -5.0
+margin_bottom = -5.0
+texture = ExtResource( 66 )
+expand = true
+
+[node name="separator5" type="TextureRect" parent="CraftRules/Container/materials"]
+margin_left = 376.0
+margin_top = 68.0
+margin_right = 408.0
+margin_bottom = 132.0
+stretch_mode = 4
+flip_h = true
+
+[node name="pos_d_3" type="TextureRect" parent="CraftRules/Container/materials"]
+margin_left = 412.0
+margin_top = 68.0
+margin_right = 476.0
+margin_bottom = 132.0
+rect_min_size = Vector2( 64, 64 )
+texture = ExtResource( 64 )
+expand = true
+stretch_mode = 6
+script = ExtResource( 65 )
+
+[node name="icon" type="TextureRect" parent="CraftRules/Container/materials/pos_d_3"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+margin_left = 5.0
+margin_top = 5.0
+margin_right = -5.0
+margin_bottom = -5.0
+texture = ExtResource( 66 )
+expand = true
+
+[node name="separator6" type="TextureRect" parent="CraftRules/Container/materials"]
+margin_left = 480.0
+margin_top = 68.0
+margin_right = 512.0
+margin_bottom = 132.0
+stretch_mode = 4
+flip_h = true
+
+[node name="pos_d_4" type="TextureRect" parent="CraftRules/Container/materials"]
+margin_left = 516.0
+margin_top = 68.0
+margin_right = 580.0
+margin_bottom = 132.0
+rect_min_size = Vector2( 64, 64 )
+texture = ExtResource( 64 )
+expand = true
+stretch_mode = 6
+script = ExtResource( 65 )
+
+[node name="icon" type="TextureRect" parent="CraftRules/Container/materials/pos_d_4"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+margin_left = 5.0
+margin_top = 5.0
+margin_right = -5.0
+margin_bottom = -5.0
+texture = ExtResource( 66 )
+expand = true
+
+[node name="Label2" type="Label" parent="CraftRules/Container"]
+margin_top = 175.0
+margin_right = 721.0
+margin_bottom = 210.0
+custom_fonts/font = ExtResource( 44 )
+text = "Items Rules"
+
+[node name="items" type="GridContainer" parent="CraftRules/Container"]
+margin_top = 214.0
+margin_right = 721.0
+margin_bottom = 346.0
+columns = 10
+
+[node name="Label" type="Label" parent="CraftRules/Container/items"]
+margin_top = 14.0
+margin_right = 200.0
+margin_bottom = 49.0
+rect_min_size = Vector2( 200, 0 )
+custom_fonts/font = ExtResource( 44 )
+text = "Jobs Priority"
+
+[node name="pos_e_1" type="TextureRect" parent="CraftRules/Container/items"]
+margin_left = 204.0
+margin_right = 268.0
+margin_bottom = 64.0
+rect_min_size = Vector2( 64, 64 )
+texture = ExtResource( 64 )
+expand = true
+stretch_mode = 6
+script = ExtResource( 65 )
+
+[node name="icon" type="TextureRect" parent="CraftRules/Container/items/pos_e_1"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+margin_left = 5.0
+margin_top = 5.0
+margin_right = -5.0
+margin_bottom = -5.0
+texture = ExtResource( 66 )
+expand = true
+
+[node name="separator" type="TextureRect" parent="CraftRules/Container/items"]
+margin_left = 272.0
+margin_right = 304.0
+margin_bottom = 64.0
+texture = ExtResource( 67 )
+stretch_mode = 4
+flip_h = true
+
+[node name="pos_e_2" type="TextureRect" parent="CraftRules/Container/items"]
+margin_left = 308.0
+margin_right = 372.0
+margin_bottom = 64.0
+rect_min_size = Vector2( 64, 64 )
+texture = ExtResource( 64 )
+expand = true
+stretch_mode = 6
+script = ExtResource( 65 )
+
+[node name="icon" type="TextureRect" parent="CraftRules/Container/items/pos_e_2"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+margin_left = 5.0
+margin_top = 5.0
+margin_right = -5.0
+margin_bottom = -5.0
+texture = ExtResource( 66 )
+expand = true
+
+[node name="separator2" type="TextureRect" parent="CraftRules/Container/items"]
+margin_left = 376.0
+margin_right = 408.0
+margin_bottom = 64.0
+texture = ExtResource( 67 )
+stretch_mode = 4
+flip_h = true
+
+[node name="pos_e_3" type="TextureRect" parent="CraftRules/Container/items"]
+margin_left = 412.0
+margin_right = 476.0
+margin_bottom = 64.0
+rect_min_size = Vector2( 64, 64 )
+texture = ExtResource( 64 )
+expand = true
+stretch_mode = 6
+script = ExtResource( 65 )
+
+[node name="icon" type="TextureRect" parent="CraftRules/Container/items/pos_e_3"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+margin_left = 5.0
+margin_top = 5.0
+margin_right = -5.0
+margin_bottom = -5.0
+texture = ExtResource( 66 )
+expand = true
+
+[node name="separator3" type="TextureRect" parent="CraftRules/Container/items"]
+margin_left = 480.0
+margin_right = 512.0
+margin_bottom = 64.0
+texture = ExtResource( 67 )
+stretch_mode = 4
+flip_h = true
+
+[node name="pos_e_4" type="TextureRect" parent="CraftRules/Container/items"]
+margin_left = 516.0
+margin_right = 580.0
+margin_bottom = 64.0
+rect_min_size = Vector2( 64, 64 )
+texture = ExtResource( 64 )
+expand = true
+stretch_mode = 6
+script = ExtResource( 65 )
+
+[node name="icon" type="TextureRect" parent="CraftRules/Container/items/pos_e_4"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+margin_left = 5.0
+margin_top = 5.0
+margin_right = -5.0
+margin_bottom = -5.0
+texture = ExtResource( 66 )
+expand = true
+
+[node name="separator7" type="TextureRect" parent="CraftRules/Container/items"]
+margin_left = 584.0
+margin_right = 616.0
+margin_bottom = 64.0
+texture = ExtResource( 67 )
+stretch_mode = 4
+flip_h = true
+
+[node name="pos_e_5" type="TextureRect" parent="CraftRules/Container/items"]
+margin_left = 620.0
+margin_right = 684.0
+margin_bottom = 64.0
+rect_min_size = Vector2( 64, 64 )
+texture = ExtResource( 64 )
+expand = true
+stretch_mode = 6
+script = ExtResource( 65 )
+
+[node name="icon" type="TextureRect" parent="CraftRules/Container/items/pos_e_5"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+margin_left = 5.0
+margin_top = 5.0
+margin_right = -5.0
+margin_bottom = -5.0
+texture = ExtResource( 66 )
+expand = true
+
+[node name="Label2" type="Label" parent="CraftRules/Container/items"]
+margin_top = 82.0
+margin_right = 200.0
+margin_bottom = 117.0
+custom_fonts/font = ExtResource( 44 )
+text = "Jobs Disabled"
+
+[node name="pos_d_1" type="TextureRect" parent="CraftRules/Container/items"]
+margin_left = 204.0
+margin_top = 68.0
+margin_right = 268.0
+margin_bottom = 132.0
+rect_min_size = Vector2( 64, 64 )
+texture = ExtResource( 64 )
+expand = true
+stretch_mode = 6
+script = ExtResource( 65 )
+
+[node name="icon" type="TextureRect" parent="CraftRules/Container/items/pos_d_1"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+margin_left = 5.0
+margin_top = 5.0
+margin_right = -5.0
+margin_bottom = -5.0
+texture = ExtResource( 66 )
+expand = true
+
+[node name="separator4" type="TextureRect" parent="CraftRules/Container/items"]
+margin_left = 272.0
+margin_top = 68.0
+margin_right = 304.0
+margin_bottom = 132.0
+stretch_mode = 4
+flip_h = true
+
+[node name="pos_d_2" type="TextureRect" parent="CraftRules/Container/items"]
+margin_left = 308.0
+margin_top = 68.0
+margin_right = 372.0
+margin_bottom = 132.0
+rect_min_size = Vector2( 64, 64 )
+texture = ExtResource( 64 )
+expand = true
+stretch_mode = 6
+script = ExtResource( 65 )
+
+[node name="icon" type="TextureRect" parent="CraftRules/Container/items/pos_d_2"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+margin_left = 5.0
+margin_top = 5.0
+margin_right = -5.0
+margin_bottom = -5.0
+texture = ExtResource( 66 )
+expand = true
+
+[node name="separator5" type="TextureRect" parent="CraftRules/Container/items"]
+margin_left = 376.0
+margin_top = 68.0
+margin_right = 408.0
+margin_bottom = 132.0
+stretch_mode = 4
+flip_h = true
+
+[node name="pos_d_3" type="TextureRect" parent="CraftRules/Container/items"]
+margin_left = 412.0
+margin_top = 68.0
+margin_right = 476.0
+margin_bottom = 132.0
+rect_min_size = Vector2( 64, 64 )
+texture = ExtResource( 64 )
+expand = true
+stretch_mode = 6
+script = ExtResource( 65 )
+
+[node name="icon" type="TextureRect" parent="CraftRules/Container/items/pos_d_3"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+margin_left = 5.0
+margin_top = 5.0
+margin_right = -5.0
+margin_bottom = -5.0
+texture = ExtResource( 66 )
+expand = true
+
+[node name="separator6" type="TextureRect" parent="CraftRules/Container/items"]
+margin_left = 480.0
+margin_top = 68.0
+margin_right = 512.0
+margin_bottom = 132.0
+stretch_mode = 4
+flip_h = true
+
+[node name="pos_d_4" type="TextureRect" parent="CraftRules/Container/items"]
+margin_left = 516.0
+margin_top = 68.0
+margin_right = 580.0
+margin_bottom = 132.0
+rect_min_size = Vector2( 64, 64 )
+texture = ExtResource( 64 )
+expand = true
+stretch_mode = 6
+script = ExtResource( 65 )
+
+[node name="icon" type="TextureRect" parent="CraftRules/Container/items/pos_d_4"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+margin_left = 5.0
+margin_top = 5.0
+margin_right = -5.0
+margin_bottom = -5.0
+texture = ExtResource( 66 )
+expand = true
+
+[node name="separator8" type="TextureRect" parent="CraftRules/Container/items"]
+margin_left = 584.0
+margin_top = 68.0
+margin_right = 616.0
+margin_bottom = 132.0
+stretch_mode = 4
+flip_h = true
+
+[node name="pos_d_5" type="TextureRect" parent="CraftRules/Container/items"]
+margin_left = 620.0
+margin_top = 68.0
+margin_right = 684.0
+margin_bottom = 132.0
+rect_min_size = Vector2( 64, 64 )
+texture = ExtResource( 64 )
+expand = true
+stretch_mode = 6
+script = ExtResource( 65 )
+
+[node name="icon" type="TextureRect" parent="CraftRules/Container/items/pos_d_5"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+margin_left = 5.0
+margin_top = 5.0
+margin_right = -5.0
+margin_bottom = -5.0
+texture = ExtResource( 66 )
+expand = true
+
+[node name="CraftRules2" type="Panel" parent="."]
+self_modulate = Color( 1, 1, 1, 0.823529 )
+margin_left = 78.0
+margin_top = 274.0
+margin_right = 860.0
+margin_bottom = 714.0
+
+[node name="crafttooltip2" type="TextureRect" parent="CraftRules2"]
+margin_left = 0.330963
+margin_top = 6.06903
+margin_right = 48.331
+margin_bottom = 51.069
+texture = ExtResource( 43 )
+expand = true
+stretch_mode = 6
+
+[node name="Label" type="Label" parent="CraftRules2"]
+margin_left = 209.944
+margin_top = 16.0
+margin_right = 582.944
+margin_bottom = 51.0
+custom_fonts/font = ExtResource( 44 )
+text = "Craft Rules"
+align = 1
+
+[node name="Label2" type="Label" parent="CraftRules2"]
+margin_left = 433.546
+margin_top = 378.891
+margin_right = 659.546
+margin_bottom = 413.891
+custom_fonts/font = ExtResource( 44 )
+text = "Predicted task:"
+align = 1
+
+[node name="icon" type="TextureRect" parent="CraftRules2"]
+margin_left = 685.546
+margin_top = 363.687
+margin_right = 749.546
+margin_bottom = 427.687
+texture = ExtResource( 43 )
+expand = true
+stretch_mode = 6
+
+[node name="filters" type="HBoxContainer" parent="CraftRules2"]
+margin_left = 18.0
+margin_top = 81.0
+margin_right = 762.0
+margin_bottom = 368.0
+custom_constants/separation = 30
+alignment = 1
+
+[node name="checks1" type="VBoxContainer" parent="CraftRules2/filters"]
+margin_left = 84.0
+margin_right = 192.0
+margin_bottom = 287.0
+
+[node name="Label" type="Label" parent="CraftRules2/filters/checks1"]
+margin_right = 108.0
+margin_bottom = 35.0
+custom_fonts/font = ExtResource( 44 )
+text = "Materials"
+align = 1
+
+[node name="Button" type="CheckBox" parent="CraftRules2/filters/checks1"]
+visible = false
+margin_top = 39.0
+margin_right = 121.0
+margin_bottom = 87.0
+theme = ExtResource( 42 )
+text = "button"
+
+[node name="checks2" type="VBoxContainer" parent="CraftRules2/filters"]
+margin_left = 222.0
+margin_right = 288.0
+margin_bottom = 287.0
+
+[node name="Label" type="Label" parent="CraftRules2/filters/checks2"]
+margin_right = 66.0
+margin_bottom = 35.0
+custom_fonts/font = ExtResource( 44 )
+text = "Items"
+align = 1
+
+[node name="Button" type="CheckBox" parent="CraftRules2/filters/checks2"]
+visible = false
+margin_top = 39.0
+margin_right = 121.0
+margin_bottom = 87.0
+theme = ExtResource( 42 )
+text = "button"
+
+[node name="order1" type="VBoxContainer" parent="CraftRules2/filters"]
+margin_left = 318.0
+margin_right = 495.0
+margin_bottom = 287.0
+
+[node name="Label" type="Label" parent="CraftRules2/filters/order1"]
+margin_right = 177.0
+margin_bottom = 35.0
+custom_fonts/font = ExtResource( 44 )
+text = "Materials order"
+
+[node name="Button" type="TextureButton" parent="CraftRules2/filters/order1"]
+visible = false
+margin_left = 8.0
+margin_top = 39.0
+margin_right = 168.0
+margin_bottom = 79.0
+size_flags_horizontal = 4
+texture_normal = ExtResource( 63 )
+texture_pressed = ExtResource( 60 )
+texture_hover = ExtResource( 61 )
+script = ExtResource( 62 )
+
+[node name="Label" type="Label" parent="CraftRules2/filters/order1/Button"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+custom_colors/font_color = Color( 0.878431, 0.878431, 0.878431, 1 )
+custom_fonts/font = ExtResource( 9 )
+text = "Name"
+align = 1
+valign = 1
+
+[node name="order2" type="VBoxContainer" parent="CraftRules2/filters"]
+margin_left = 525.0
+margin_right = 660.0
+margin_bottom = 287.0
+
+[node name="Label" type="Label" parent="CraftRules2/filters/order2"]
+margin_right = 135.0
+margin_bottom = 35.0
+custom_fonts/font = ExtResource( 44 )
+text = "Items order"
+align = 1
+
+[node name="Button" type="TextureButton" parent="CraftRules2/filters/order2"]
+visible = false
+margin_top = 39.0
+margin_right = 160.0
+margin_bottom = 79.0
+mouse_default_cursor_shape = 2
+size_flags_horizontal = 4
+texture_normal = ExtResource( 63 )
+texture_pressed = ExtResource( 60 )
+texture_hover = ExtResource( 61 )
+script = ExtResource( 62 )
+
+[node name="Label" type="Label" parent="CraftRules2/filters/order2/Button"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+custom_colors/font_color = Color( 0.878431, 0.878431, 0.878431, 1 )
+custom_fonts/font = ExtResource( 9 )
+text = "Name"
+align = 1
+valign = 1
+
+[node name="mod_select" type="HBoxContainer" parent="."]
+margin_left = 427.446
+margin_top = 44.2182
+margin_right = 1047.45
+margin_bottom = 103.218
+
+[node name="occupation" type="Button" parent="mod_select"]
+margin_right = 308.0
+margin_bottom = 59.0
+size_flags_horizontal = 3
+custom_colors/font_color_disabled = Color( 0.976471, 0.882353, 0.505882, 1 )
+custom_colors/font_color_focus = Color( 0.976471, 0.882353, 0.505882, 1 )
+custom_colors/font_color = Color( 0.772549, 0.772549, 0.772549, 1 )
+custom_colors/font_color_hover = Color( 0.976471, 0.882353, 0.505882, 1 )
+custom_colors/font_color_pressed = Color( 0.976471, 0.882353, 0.505882, 1 )
+custom_fonts/font = SubResource( 5 )
+custom_styles/hover = SubResource( 8 )
+custom_styles/pressed = SubResource( 9 )
+custom_styles/focus = SubResource( 10 )
+custom_styles/disabled = SubResource( 11 )
+custom_styles/normal = SubResource( 12 )
+toggle_mode = true
+pressed = true
+text = "MSLMOCCU"
+clip_text = true
+
+[node name="farm" type="Button" parent="mod_select"]
+margin_left = 312.0
+margin_right = 620.0
+margin_bottom = 59.0
+size_flags_horizontal = 3
+custom_colors/font_color_disabled = Color( 0.976471, 0.882353, 0.505882, 1 )
+custom_colors/font_color_focus = Color( 0.976471, 0.882353, 0.505882, 1 )
+custom_colors/font_color = Color( 0.772549, 0.772549, 0.772549, 1 )
+custom_colors/font_color_hover = Color( 0.976471, 0.882353, 0.505882, 1 )
+custom_colors/font_color_pressed = Color( 0.976471, 0.882353, 0.505882, 1 )
+custom_fonts/font = SubResource( 5 )
+custom_styles/hover = SubResource( 8 )
+custom_styles/pressed = SubResource( 9 )
+custom_styles/focus = SubResource( 10 )
+custom_styles/disabled = SubResource( 11 )
+custom_styles/normal = SubResource( 12 )
+toggle_mode = true
+text = "FARM_LABEL"
+clip_text = true

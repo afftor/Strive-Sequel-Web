@@ -1,0 +1,241 @@
+extends Reference
+
+var skills = {
+	darkness = {
+		code = 'darkness',
+		descript = '',
+		icon = "res://assets/images/iconsskills/icon_dark.png",
+		type = 'combat', 
+		ability_type = 'spell',
+		tags = ['damage','ads','dark'],
+		reqs = [],
+		targetreqs = [],
+		keep_target = variables.TARGET_KEEP, #for using with spellsword
+		next_target = variables.NT_MELEE,
+		effects = [Effectdata.rebuild_template({effect = 'blind', duration = 1})], 
+		cost = {mp = 3},
+		charges = 0,
+		combatcooldown = 0,
+		cooldown = 0,
+		catalysts = {},
+		target = 'enemy',
+		target_number = 'single',
+		target_range = 'any',
+		damage_type = 'dark',
+		sfx = [
+			{code = 'darkness', target = 'target', period = 'predamage'},
+			{code = 'cast_dark', target = 'caster', period = 'windup', is_cast = true}], 
+		sounddata = {initiate = null, strike = 'spell_dark', hit = null},
+		value = 0.75,
+		variations = [
+			{
+				reqs = [{code = 'stat', stat = 'mastery_dark', value = 3, operant = 'gte'}],
+				set = {effects = [Effectdata.rebuild_template({effect = 'blind', duration = 2})]},
+				add = {descript = '_1'}
+			},
+		]
+	},
+	black_tendrils = {
+		code = 'black_tendrils',
+		descript = '',
+		icon = load("res://assets/images/iconsskills/Shackle.png"),
+		type = 'combat', 
+		ability_type = 'spell',
+		tags = ['damage', 'aoe', 'debuff', 'ads', 'dark'],
+		reqs = [],
+		targetreqs = [],
+		effects = [Effectdata.rebuild_template({effect = 'e_s_ensnare', duration = 1})], 
+		cost = {mp = 4},
+		charges = 0,
+		combatcooldown = 1,
+		cooldown = 0,
+		catalysts = {},
+		target = 'enemy',
+		target_number = 'all',
+		target_range = 'any',
+		damage_type = 'dark',
+		aipatterns = ['attack'],
+		allowedtargets = ['enemy'],
+		value = 0.3,
+		random_factor_p = 0.1,
+		sfx = [
+			{code = 'black_tendrils', target = 'target_group', period = 'windup'},
+			{code = 'cast_dark', target = 'caster', period = 'windup', is_cast = true}], 
+		sounddata = {initiate = null, strike = 'spell_break', hit = null},
+		variations = [
+			{
+				reqs = [{code = 'stat', stat = 'combatgroup', value = 'enemy', operant = 'eq'}],
+				set = {combatcooldown = 2} #to prevent spaming
+			}
+		]
+	},
+	malediction = {
+		code = 'malediction',
+		descript = '',
+		icon = "res://assets/images/iconsskills/icon_elementa_weakness.png",
+		type = 'combat', 
+		ability_type = 'spell',
+		tags = ['damage','ads','dark'],
+		reqs = [],
+		targetreqs = [],
+		effects = [Effectdata.rebuild_template({effect = 'cursed', duration = 5})], 
+		cost = {mp = 8},
+		charges = 0,
+		combatcooldown = 5,
+		cooldown = 0,
+		catalysts = {},
+		target = 'enemy',
+		target_number = 'single',
+		target_range = 'any',
+		damage_type = 'dark',
+		sfx = [
+			{code = 'malediction', target = 'target', period = 'predamage'},
+			{code = 'cast_dark', target = 'caster', period = 'windup', is_cast = true}], 
+		sounddata = {initiate = null, strike = 'spell_explosion', hit = null},
+		value = 0.6,
+		variations = [
+			{
+				reqs = [{code = 'stat', stat = 'combatgroup', value = 'enemy', operant = 'eq'}],
+				set = {targetreqs = [{code = 'has_status', status = 'cursed', check = false}],} #to prevent overuse of low-damage long-duration ads
+			}
+		]
+	},
+	devour_magic = {
+		code = 'devour_magic',
+		descript = '',
+		icon = "res://assets/images/iconsskills/ManaDrain.png",
+		type = 'combat', 
+		ability_type = 'spell',
+		tags = ['support','ads','dark','devour_magic'],
+		reqs = [],
+		targetreqs = [],
+		effects = ['e_s_devourmagic'], 
+		cost = {mp = 5},
+		charges = 0,
+		combatcooldown = 1,
+		cooldown = 0,
+		catalysts = {},
+		target = 'enemy',
+		target_number = 'single',
+		target_range = 'any',
+		damage_type = 'dark',
+		sfx = [
+			{code = 'devour_magic', target = 'target', period = 'predamage'},
+			{code = 'cast_dark', target = 'caster', period = 'windup', is_cast = true}], 
+		sounddata = {initiate = null, strike = 'spell2', hit = null},
+		value = [['0']],
+		damagestat = ['no_stat'],
+		variations = [
+			{
+				reqs = [{code = 'stat', stat = 'combatgroup', value = 'enemy', operant = 'eq'}],
+				set = {targetreqs = [{code = 'has_status', status = 'silence', check = false}],} #to prevent overuse of low-damage long-duration ads
+			}
+		]
+	},
+	veil = {
+		code = 'veil',
+		descript = '',
+		icon = "res://assets/images/iconsskills/skill_veil.png",
+		type = 'combat', 
+		ability_type = 'spell',
+		tags = ['support', 'buff'],
+		reqs = [],
+		targetreqs = [{code = 'has_status', status = 'veil', check = false}],
+		effects = [
+			Effectdata.rebuild_template({effect = 'e_s_veil', duration = 5, push_value = true}),
+			Effectdata.rebuild_template({effect = 'e_t_hide2', duration = 5})
+			],
+		cost = {mp = 6},
+		charges = 0,
+		combatcooldown = 0,
+		cooldown = 0,
+		catalysts = {},
+		target = 'ally',
+		target_number = 'line',
+		target_range = 'any',
+		damage_type = 'dark',#not sure but not matters
+		sfx = [
+			{code = 'shadow_veil', target = 'target', period = 'predamage'},
+			{code = 'cast_dark', target = 'caster', period = 'windup', is_cast = true}],
+		sounddata = {initiate = null, strike = 'skill_scene', hit = null},
+		value = [['caster.matk', '*0.5']],
+		damagestat = ['no_stat'],
+	},
+	skill_void = {
+		code = 'skill_void',
+		descript = '',
+		eff_descript = ['disarm', 'silence', 'blind'],
+		icon = "res://assets/images/iconsskills/skill_void.png",
+		type = 'combat', 
+		ability_type = 'spell',
+		tags = ['damage', 'aoe', 'debuff', 'ads', 'dark', 'ultimate'],
+		reqs = [],
+		targetreqs = [],
+		effects = ['e_s_void'], 
+		cost = {mp = 16},
+		charges = 0,
+		combatcooldown = 6,
+		cooldown = 0,
+		catalysts = {},
+		target = 'enemy',
+		target_number = 'all',
+		target_range = 'any',
+		damage_type = 'dark',
+		aipatterns = ['attack'],
+		allowedtargets = ['enemy'],
+		value = 1.5,
+		random_factor_p = 0.1,
+		sfx = [
+			{code = 'skill_void', target = 'target_group', period = 'windup'},
+			{code = 'cast_dark', target = 'caster', period = 'windup', is_cast = true}], 
+		sounddata = {initiate = 'spell_void', strike = null, hit = null},
+	},
+}
+var effects = {
+	e_s_devourmagic = {
+		type = 'trigger',
+		trigger = [variables.TR_POSTDAMAGE],
+		conditions = [],
+		req_skill = true,
+		args = {duration = {obj = 'self', func = 'dr', dr = 3},},
+		sub_effects = [
+			Effectdata.rebuild_remove_effect('buff'), #fill proper tags
+			Effectdata.rebuild_remove_effect('positive'),
+			'silence'
+			],
+		buffs = []
+	},
+	e_s_veil = {
+		type = 'temp_s',
+		target = 'target',
+		stack = 'veil',
+		tick_event = variables.TR_TURN_S,
+		rem_event = [variables.TR_COMBAT_F, variables.TR_DEATH],
+		duration = 'arg',
+		tags = ['buff', 'veil', 'shield'],
+		args = {value = {obj = 'skill', func = 'get', arg = 'process_value'}},
+		statchanges = {mdef = ['arg', 'value'], resist_light = 30, resist_dark = 30},
+		buffs = [
+			{
+				icon = "res://assets/images/iconsskills/skill_veil.png",
+				description = "TRAITEFFECTVEIL",
+			}
+		],
+	},
+	e_s_void = {
+		type = 'trigger',
+		conditions = [
+			{type = 'skill', value = ['hit_res', 'mask', variables.RES_HITCRIT]},
+		],
+		trigger = [variables.TR_POSTDAMAGE],
+		req_skill = true,
+		args = {duration = {obj = 'self', func = 'dr', dr = 1},},
+		modal_sub_effects = ['blind', 'disarm', 'silence'],
+	},
+}
+var atomic_effects = {}
+var buffs = {}
+
+var stacks = {
+	veil = {} #st 1
+}

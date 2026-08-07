@@ -1,0 +1,804 @@
+[gd_scene load_steps=39 format=2]
+
+[ext_resource path="res://assets/recolor shader.shader" type="Shader" id=1]
+[ext_resource path="res://assets/RecolorShaderMasks.tres" type="Material" id=2]
+[ext_resource path="res://assets/images/iconsgear/item_leather_chest_adv.png" type="Texture" id=3]
+[ext_resource path="res://assets/images/iconsgear/ArmorBasicCloth.png" type="Texture" id=4]
+[ext_resource path="res://assets/images/sprites/Erlen.png" type="Texture" id=5]
+[ext_resource path="res://assets/book_shader.tres" type="Material" id=6]
+[ext_resource path="res://assets/Textures_v2/craft/enchant/button_item_default.png" type="Texture" id=7]
+
+[sub_resource type="Shader" id=1]
+code = "shader_type canvas_item;
+render_mode blend_mix;
+
+uniform vec4 target1color : hint_color;
+uniform vec4 target2color : hint_color;
+uniform vec4 target3color : hint_color;
+
+
+uniform float dist = 0.1;
+uniform float lmod = 0.6;
+
+vec3 rgb2hsl(vec3 c )
+{
+    float epsilon = 0.00000001;
+    float cmin = min( c.r, min( c.g, c.b ) );
+    float cmax = max( c.r, max( c.g, c.b ) );
+    float cd   = cmax - cmin;
+    vec3 hsl = vec3(0.0);
+    hsl.z = (cmax + cmin) / 2.0;
+    hsl.y = mix(cd / (cmax + cmin + epsilon), cd / (epsilon + 2.0 - (cmax + cmin)), step(0.5, hsl.z));
+
+    vec3 a = vec3(1.0 - step(epsilon, abs(cmax - c)));
+    a = mix(vec3(a.x, 0.0, a.z), a, step(0.5, 2.0 - a.x - a.y));
+    a = mix(vec3(a.x, a.y, 0.0), a, step(0.5, 2.0 - a.x - a.z));
+    a = mix(vec3(a.x, a.y, 0.0), a, step(0.5, 2.0 - a.y - a.z));
+    
+    hsl.x = dot( vec3(0.0, 2.0, 4.0) + ((c.gbr - c.brg) / (epsilon + cd)), a );
+    hsl.x = (hsl.x + (1.0 - step(0.0, hsl.x) ) * 6.0 ) / 6.0;
+	hsl.y = clamp (hsl.y, 0.0, 1.0);
+    return hsl;
+}
+
+vec3 hsl2rgb(vec3 HSL)
+{
+  float R = abs(HSL.x * 6.0 - 3.0) - 1.0;
+  float G = 2.0 - abs(HSL.x * 6.0 - 2.0);
+  float B = 2.0 - abs(HSL.x * 6.0 - 4.0);
+  vec3 RGB = clamp(vec3(R,G,B), 0.0, 1.0);
+  float C = (1.0 - abs(2.0 * HSL.z - 1.0)) * HSL.y;
+  return (RGB - 0.5) * C + HSL.z;
+}
+
+void fragment(){
+    vec4 color = texture(TEXTURE, UV);
+	float a = color.a;
+	vec3 t1 = rgb2hsl(target1color.rgb);
+	vec3 t2 = rgb2hsl(target2color.rgb);
+	vec3 t3 = rgb2hsl(target3color.rgb);
+	vec3 k = rgb2hsl(color.rgb);
+	k = pow (k, vec3(1.0, 1.0, lmod));
+	if (abs(k.x - t1.x) < dist){
+		vec3 dcolor = t1;
+		float rot = dcolor.x - t1.x;
+		k.x = k.x + rot;
+		k.x = (k.x > 0.5) ? k.x - 0.5 : k.x + 0.5;
+		k.y = dcolor.y * 0.2;
+		k.z *= dcolor.z;
+		k = hsl2rgb(k);
+		color = vec4(k.xyz, a);
+		}
+	else if (abs(k.x - t2.x) < dist){
+		vec3 dcolor = t2;
+		float rot = dcolor.x - t2.x;
+		k.x = k.x + rot;
+		k.x = (k.x > 0.5) ? k.x - 0.5 : k.x + 0.5;
+		k.y = dcolor.y * 0.2;
+		k.z *= dcolor.z;
+		k = hsl2rgb(k);
+		color = vec4(k.xyz, a);
+		}
+	else if (abs(k.x - t3.x) < dist){
+		vec3 dcolor = t3;
+		float rot = dcolor.x - t3.x;
+		k.x = k.x + rot;
+		k.x = (k.x > 0.5) ? k.x - 0.5 : k.x + 0.5;
+		k.y = dcolor.y * 0.2;
+		k.z *= dcolor.z;
+		k = hsl2rgb(k);
+		color = vec4(k.xyz, a);
+		}
+	else {
+		k.x = (k.x > 0.5) ? k.x - 0.5 : k.x + 0.5;
+		k.y = 1.0;
+		//k.z = 0.4 + k.z * 0.6;
+		k = hsl2rgb(k);
+		color = vec4(k.xyz, a);
+	}
+	COLOR = color;
+}"
+
+[sub_resource type="ShaderMaterial" id=2]
+shader = SubResource( 1 )
+shader_param/target1color = Color( 0.980392, 0, 1, 1 )
+shader_param/target2color = Color( 0.498039, 1, 0, 1 )
+shader_param/target3color = Color( 0, 1, 0.6, 1 )
+shader_param/dist = 0.1
+shader_param/lmod = 0.6
+
+[sub_resource type="ShaderMaterial" id=3]
+shader = ExtResource( 1 )
+shader_param/target1color = Color( 0.980392, 0, 1, 1 )
+shader_param/target2color = Color( 0.498039, 1, 0, 1 )
+shader_param/target3color = Color( 0, 1, 0.6, 1 )
+shader_param/part1color = Color( 0.376471, 0.698039, 0.301961, 1 )
+shader_param/part2color = Color( 0.435294, 0.266667, 0.027451, 1 )
+shader_param/part3color = Color( 0.427451, 0.290196, 0.290196, 1 )
+shader_param/dist = 0.1
+shader_param/lmod = 0.6
+
+[sub_resource type="Shader" id=4]
+code = "shader_type canvas_item;
+
+uniform float outline_width = 2.0;
+uniform vec4 outline_color : hint_color;
+uniform float opacity = 1.0;
+uniform float speed = 0.1;
+uniform float speed_2 = 0.1;
+uniform float speed_3 = 0.1;
+
+const vec2 dir1 = vec2(0.3, 1.0);
+const vec2 dir2 = vec2(-0.3, 1.0);
+const vec2 dir3 = vec2(-0.1, -0.8);
+
+const float PI = 3.14;
+const float EPS = 1.0/512.0;
+
+uniform sampler2D tex_main;
+uniform sampler2D tex_mask_1;
+uniform sampler2D tex_mask_2;
+
+
+float border(float val) {
+	float res = (val + 0.9) / 3.0 - 0.5;
+	res = res * 20.0;
+	return clamp(res, 0.0, 1.0);
+}
+
+
+void fragment() {
+	vec4 col = texture(TEXTURE, UV);
+	vec2 ps = TEXTURE_PIXEL_SIZE;
+	vec4 shadow = vec4(1.0);
+	float time_mod = TIME * speed;
+	float time_mod_2 = TIME * speed_2;
+	float time_mod_3 = TIME * speed_3;
+	
+	vec2 pos1 = UV + time_mod * dir1;
+	vec4 col1 = texture(tex_main, pos1);
+	vec2 pos2 = UV + time_mod * dir2;
+	vec4 col2 = texture(tex_main, pos2);
+	vec2 pos3 = UV + time_mod * dir3;
+	vec4 col3 = texture(tex_main, pos3);
+	
+	vec2 pos1_1 = (UV - vec2(0.5)) * 0.7 * mat2(vec2(cos(time_mod_2), sin(time_mod_2)), vec2(-sin(time_mod_2), cos(time_mod_2))) + vec2(0.5);
+	vec2 pos1_2 = (UV - vec2(0.5)) * 0.7 * mat2(vec2(cos(time_mod_2), -sin(time_mod_2)), vec2(sin(time_mod_2), cos(time_mod_2))) + vec2(0.5);
+	shadow.a = texture(tex_mask_1, pos1_1).x * abs(sin(time_mod_3)) + texture(tex_mask_2, pos1_2).x * abs(cos(time_mod_3));
+//	shadow.a = texture(tex_mask_1, pos1_1).x * abs(sin(TIME)) + texture(tex_mask_2, pos1_2).x * abs(cos(TIME));
+	
+//	shadow = vec4(outline_color.r, outline_color.g, outline_color.b, border(shadow.a));
+	shadow = vec4(sqrt(col1.r) * outline_color.r, sqrt(col2.g) * outline_color.g, sqrt(col3.b) * outline_color.b, border(shadow.a) * opacity);
+	//col.a = min(col.a, sqrt(sqrt(1.0 - opacity)));
+	COLOR = mix(shadow, col, col.a);
+	//COLOR = mix(col, outline_color, (maxa - mina)*opacity);
+}"
+
+[sub_resource type="OpenSimplexNoise" id=6]
+octaves = 4
+period = 100.0
+
+[sub_resource type="NoiseTexture" id=7]
+seamless = true
+noise = SubResource( 6 )
+
+[sub_resource type="OpenSimplexNoise" id=14]
+seed = 15
+octaves = 2
+period = 100.0
+persistence = 0.8
+lacunarity = 2.5
+
+[sub_resource type="NoiseTexture" id=9]
+seamless = true
+noise = SubResource( 14 )
+
+[sub_resource type="OpenSimplexNoise" id=10]
+seed = 100
+
+[sub_resource type="NoiseTexture" id=11]
+seamless = true
+noise = SubResource( 10 )
+
+[sub_resource type="ShaderMaterial" id=5]
+shader = SubResource( 4 )
+shader_param/outline_width = 30.0
+shader_param/outline_color = Color( 0.929412, 0.956863, 0.0392157, 1 )
+shader_param/opacity = 0.6
+shader_param/speed = 0.3
+shader_param/speed_2 = 0.5
+shader_param/speed_3 = 0.2
+shader_param/tex_main = SubResource( 7 )
+shader_param/tex_mask_1 = SubResource( 9 )
+shader_param/tex_mask_2 = SubResource( 11 )
+
+[sub_resource type="Shader" id=12]
+code = "shader_type canvas_item;
+
+uniform float outline_width = 2.0;
+uniform vec4 outline_color : hint_color;
+uniform float opacity = 1.0;
+uniform float speed = 0.1;
+uniform float speed_2 = 0.1;
+uniform float speed_3 = 0.1;
+
+const vec2 dir1 = vec2(0.3, 1.0);
+const vec2 dir2 = vec2(-0.3, 1.0);
+const vec2 dir3 = vec2(-0.1, -0.8);
+
+const float PI = 3.14;
+const float EPS = 1.0/512.0;
+
+uniform sampler2D tex_main;
+uniform sampler2D tex_main_2;
+uniform sampler2D tex_mask_1;
+uniform sampler2D tex_mask_2;
+
+
+float border(float val) {
+	float res = (val + 0.9) / 3.0 - 0.5;
+	res = res * 20.0;
+	return clamp(res, 0.0, 1.0);
+}
+
+
+void fragment() {
+	vec4 col = texture(TEXTURE, UV);
+	vec2 ps = TEXTURE_PIXEL_SIZE;
+	vec4 shadow = vec4(1.0);
+	float time_mod = TIME * speed;
+	float time_mod_2 = TIME * speed_2;
+	float time_mod_3 = TIME * speed_3;
+	
+	vec2 pos1 = UV + time_mod * dir1;
+	vec4 col1 = 1.0 - sqrt(abs(texture(tex_main, pos1) - texture(tex_main_2, pos1)));
+	vec2 pos2 = UV + time_mod * dir2;
+	vec4 col2 = 1.0 - sqrt(abs(texture(tex_main, pos2) - texture(tex_main_2, pos2)));
+	vec2 pos3 = UV + time_mod * dir3;
+	vec4 col3 = 1.0 - sqrt(abs(texture(tex_main, pos3) - texture(tex_main_2, pos3)));
+	
+	vec2 pos1_1 = (UV - vec2(0.5)) * 0.7 * mat2(vec2(cos(time_mod_2), sin(time_mod_2)), vec2(-sin(time_mod_2), cos(time_mod_2))) + vec2(0.5);
+	vec2 pos1_2 = (UV - vec2(0.5)) * 0.7 * mat2(vec2(cos(time_mod_2), -sin(time_mod_2)), vec2(sin(time_mod_2), cos(time_mod_2))) + vec2(0.5);
+	shadow.a = texture(tex_mask_1, pos1_1).x * abs(sin(time_mod_3)) + texture(tex_mask_2, pos1_2).x * abs(cos(time_mod_3));
+	
+	shadow = vec4(col1.r * outline_color.r, col2.g * outline_color.g, col3.b * outline_color.b, border(shadow.a) * opacity);
+	COLOR = mix(shadow, col, col.a);
+}"
+
+[sub_resource type="OpenSimplexNoise" id=15]
+seed = 50
+octaves = 5
+period = 100.0
+
+[sub_resource type="NoiseTexture" id=16]
+seamless = true
+noise = SubResource( 15 )
+
+[sub_resource type="ShaderMaterial" id=13]
+shader = SubResource( 12 )
+shader_param/outline_width = 30.0
+shader_param/outline_color = Color( 1, 0.921569, 0.231373, 1 )
+shader_param/opacity = 0.7
+shader_param/speed = 0.1
+shader_param/speed_2 = 0.5
+shader_param/speed_3 = 0.2
+shader_param/tex_main = SubResource( 7 )
+shader_param/tex_main_2 = SubResource( 16 )
+shader_param/tex_mask_1 = SubResource( 9 )
+shader_param/tex_mask_2 = SubResource( 11 )
+
+[sub_resource type="Shader" id=29]
+code = "shader_type canvas_item;
+
+uniform float outline_width = 2.0;
+uniform vec4 outline_color : hint_color;
+uniform float opacity = 1.0;
+uniform float speed = 0.1;
+uniform float speed_2 = 0.1;
+uniform float speed_3 = 0.1;
+
+const vec2 dir1 = vec2(0.3, 1.0);
+const vec2 dir2 = vec2(-0.3, 1.0);
+const vec2 dir3 = vec2(-0.1, -0.8);
+
+const float PI = 3.14;
+const float EPS = 1.0/512.0;
+
+uniform sampler2D tex_main;
+uniform sampler2D tex_main_2;
+uniform sampler2D tex_mask_1;
+uniform sampler2D tex_mask_2;
+
+
+float border(float val) {
+	float res = sqrt(val) / 3.5 - 0.17;
+	res = res * 12.0;
+	return clamp(res, 0.0, 1.0);
+}
+
+
+void fragment() {
+	vec4 col = texture(TEXTURE, UV);
+	vec2 ps = TEXTURE_PIXEL_SIZE;
+	vec4 shadow = vec4(1.0);
+	float time_mod = TIME * speed;
+	float time_mod_2 = TIME * speed_2;
+	float time_mod_3 = TIME * speed_3;
+	
+	vec2 pos1 = UV + time_mod * dir1;
+	vec4 col1 = 1.0 - sqrt(abs(texture(tex_main, pos1) - texture(tex_main_2, pos1)));
+	vec2 pos2 = UV + time_mod * dir1;
+	vec4 col2 = 1.0 - sqrt(abs(texture(tex_main, pos2) - texture(tex_main_2, pos2)));
+	vec2 pos3 = UV + time_mod * dir1;
+	vec4 col3 = 1.0 - sqrt(abs(texture(tex_main, pos3) - texture(tex_main_2, pos3)));
+	
+	vec2 pos1_1 = (UV - vec2(0.5)) * 0.7 * mat2(vec2(cos(time_mod_2), sin(time_mod_2)), vec2(-sin(time_mod_2), cos(time_mod_2))) + vec2(0.5);
+	vec2 pos1_2 = (UV - vec2(0.5)) * 0.7 * mat2(vec2(cos(time_mod_2), -sin(time_mod_2)), vec2(sin(time_mod_2), cos(time_mod_2))) + vec2(0.5);
+	shadow.a = texture(tex_mask_1, pos1_1).x * (abs(sin(time_mod_3))) + texture(tex_mask_2, pos1_2).x * (abs(cos(time_mod_3)));
+	
+	shadow = vec4(col1.r * outline_color.r, col2.g * outline_color.g, col3.b * outline_color.b, border(shadow.a) * opacity);
+	COLOR = mix(shadow, col, col.a);
+}"
+
+[sub_resource type="ShaderMaterial" id=30]
+shader = SubResource( 29 )
+shader_param/outline_width = 30.0
+shader_param/outline_color = Color( 0.27451, 1, 0.862745, 1 )
+shader_param/opacity = 0.4
+shader_param/speed = 0.1
+shader_param/speed_2 = 0.5
+shader_param/speed_3 = 0.2
+shader_param/tex_main = SubResource( 7 )
+shader_param/tex_main_2 = SubResource( 16 )
+shader_param/tex_mask_1 = SubResource( 9 )
+shader_param/tex_mask_2 = SubResource( 11 )
+
+[sub_resource type="Shader" id=17]
+code = "shader_type canvas_item;
+
+uniform float outline_width = 2.0;
+uniform vec4 outline_color : hint_color;
+uniform float opacity = 1.0;
+uniform float speed = 0.1;
+uniform float speed_2 = 0.1;
+uniform float speed_3 = 0.1;
+
+const vec2 dir1 = vec2(0.3, 1.0);
+const vec2 dir2 = vec2(-0.3, 1.0);
+const vec2 dir3 = vec2(-0.1, -0.8);
+
+const float PI = 3.14;
+const float EPS = 1.0/512.0;
+
+uniform sampler2D tex_main;
+uniform sampler2D tex_main_2;
+uniform sampler2D tex_mask_1;
+uniform sampler2D tex_mask_2;
+uniform sampler2D tex_mask_3;
+uniform sampler2D tex_mask_4;
+uniform sampler2D tex_mask_5;
+uniform sampler2D tex_mask_6;
+
+
+vec3 border(vec3 val) {
+	vec3 res = (val + 1.0) / 3.0 - 0.5;
+	res = res * 10.0;
+	return clamp(res, 0.0, 1.0);
+}
+
+
+void fragment() {
+	vec4 col = texture(TEXTURE, UV);
+	vec2 ps = TEXTURE_PIXEL_SIZE;
+	vec3 shadow = vec3(1.0);
+	float time_mod = TIME * speed;
+	float time_mod_2 = TIME * speed_2;
+	float time_mod_3 = TIME * speed_3;
+	
+	vec2 pos1 = UV + time_mod * dir1;
+	vec4 col1 = 1.0 - sqrt(abs(texture(tex_main, pos1) - texture(tex_main_2, pos1)));
+	vec2 pos2 = UV + time_mod * dir2;
+	vec4 col2 = 1.0 - sqrt(abs(texture(tex_main, pos2) - texture(tex_main_2, pos2)));
+	vec2 pos3 = UV + time_mod * dir3;
+	vec4 col3 = 1.0 - sqrt(abs(texture(tex_main, pos3) - texture(tex_main_2, pos3)));
+	
+	vec2 pos1_1 = (UV - vec2(0.5)) * 0.7 * mat2(vec2(cos(time_mod_2), sin(time_mod_2)), vec2(-sin(time_mod_2), cos(time_mod_2))) + vec2(0.5);
+	vec2 pos1_2 = (UV - vec2(0.5)) * 0.7 * mat2(vec2(cos(time_mod_2), -sin(time_mod_2)), vec2(sin(time_mod_2), cos(time_mod_2))) + vec2(0.5);
+	shadow.x = texture(tex_mask_1, pos1_1).x * abs(sin(time_mod_3)) + texture(tex_mask_2, pos1_2).x * abs(cos(time_mod_3));
+	shadow.y = texture(tex_mask_3, pos1_1).x * abs(sin(time_mod_3)) + texture(tex_mask_4, pos1_2).x * abs(cos(time_mod_3));
+	shadow.z = texture(tex_mask_5, pos1_1).x * abs(sin(time_mod_3)) + texture(tex_mask_6, pos1_2).x * abs(cos(time_mod_3));
+	shadow = border(shadow);
+	shadow = shadow * outline_color.rgb;
+
+	vec4 shadow1 = vec4(vec3(col1.r, col2.r, col3.r) * shadow, 1.0 - (1.0 - shadow.x) * (1.0 - shadow.y) * (1.0 - shadow.z));
+	shadow1.a *= opacity;
+
+	COLOR = mix(shadow1, col, col.a);
+}"
+
+[sub_resource type="OpenSimplexNoise" id=18]
+seed = 25
+octaves = 2
+period = 100.0
+persistence = 0.8
+lacunarity = 2.5
+
+[sub_resource type="NoiseTexture" id=19]
+seamless = true
+noise = SubResource( 18 )
+
+[sub_resource type="OpenSimplexNoise" id=20]
+seed = 150
+
+[sub_resource type="NoiseTexture" id=21]
+seamless = true
+noise = SubResource( 20 )
+
+[sub_resource type="OpenSimplexNoise" id=22]
+seed = 5
+octaves = 2
+period = 100.0
+persistence = 0.8
+lacunarity = 2.5
+
+[sub_resource type="NoiseTexture" id=23]
+seamless = true
+noise = SubResource( 22 )
+
+[sub_resource type="OpenSimplexNoise" id=24]
+seed = 120
+
+[sub_resource type="NoiseTexture" id=25]
+seamless = true
+noise = SubResource( 24 )
+
+[sub_resource type="ShaderMaterial" id=33]
+shader = SubResource( 17 )
+shader_param/outline_width = 30.0
+shader_param/outline_color = Color( 0.941176, 0, 0.996078, 1 )
+shader_param/opacity = 0.5
+shader_param/speed = 0.1
+shader_param/speed_2 = 0.5
+shader_param/speed_3 = 0.2
+shader_param/tex_main = SubResource( 7 )
+shader_param/tex_main_2 = SubResource( 16 )
+shader_param/tex_mask_1 = SubResource( 9 )
+shader_param/tex_mask_2 = SubResource( 11 )
+shader_param/tex_mask_3 = SubResource( 19 )
+shader_param/tex_mask_4 = SubResource( 21 )
+shader_param/tex_mask_5 = SubResource( 23 )
+shader_param/tex_mask_6 = SubResource( 25 )
+
+[sub_resource type="Shader" id=27]
+code = "shader_type canvas_item;
+
+uniform float outline_width = 2.0;
+uniform vec4 outline_color : hint_color;
+uniform float opacity = 1.0;
+uniform float speed = 0.1;
+uniform float speed_2 = 0.1;
+uniform float speed_3 = 0.1;
+
+const vec2 dir1 = vec2(0.3, 1.0);
+const vec2 dir2 = vec2(-0.3, 1.0);
+const vec2 dir3 = vec2(-0.1, -0.8);
+
+const float PI = 3.14;
+const float EPS = 1.0/512.0;
+
+uniform sampler2D tex_main;
+uniform sampler2D tex_main_2;
+uniform sampler2D tex_mask_1;
+uniform sampler2D tex_mask_2;
+//uniform sampler2D tex_mask_3;
+uniform sampler2D tex_mask_4;
+//uniform sampler2D tex_mask_5;
+uniform sampler2D tex_mask_6;
+
+
+vec3 border(vec3 val) {
+	vec3 res = (val + 0.9) / 3.0 - 0.5;
+	res = res * 15.0;
+	return clamp(res, 0.0, 1.0);
+}
+
+
+void fragment() {
+	vec4 col = texture(TEXTURE, UV);
+	vec2 ps = TEXTURE_PIXEL_SIZE;
+	vec3 shadow = vec3(1.0);
+	float time_mod = TIME * speed;
+	float time_mod_2 = TIME * speed_2;
+	float time_mod_3 = TIME * speed_3;
+	
+	vec2 pos1 = UV + time_mod * dir1;
+	vec4 col1 = 1.0 - sqrt(abs(texture(tex_main, pos1) - texture(tex_main_2, pos1)));
+	vec2 pos2 = UV + time_mod * dir2;
+	vec4 col2 = 1.0 - sqrt(abs(texture(tex_main, pos2) - texture(tex_main_2, pos2)));
+	vec2 pos3 = UV + time_mod * dir3;
+	vec4 col3 = 1.0 - sqrt(abs(texture(tex_main, pos3) - texture(tex_main_2, pos3)));
+	
+	vec2 pos1_1 = (UV - vec2(0.5)) * 0.7 * mat2(vec2(cos(time_mod_2), sin(time_mod_2)), vec2(-sin(time_mod_2), cos(time_mod_2))) + vec2(0.5);
+	vec2 pos1_2 = (UV - vec2(0.5)) * 0.7 * mat2(vec2(cos(time_mod_2), -sin(time_mod_2)), vec2(sin(time_mod_2), cos(time_mod_2))) + vec2(0.5);
+	shadow.x = texture(tex_mask_1, pos1_1).x * abs(sin(time_mod_3)) + texture(tex_mask_2, pos1_2).x * abs(cos(time_mod_3));
+	shadow.y = texture(tex_mask_1, pos1_1).x * abs(sin(time_mod_3)) + texture(tex_mask_4, pos1_2).x * abs(cos(time_mod_3));
+	shadow.z = texture(tex_mask_1, pos1_1).x * abs(sin(time_mod_3)) + texture(tex_mask_6, pos1_2).x * abs(cos(time_mod_3));
+	shadow = border(shadow);
+	shadow = shadow * outline_color.rgb;
+
+	vec4 shadow1 = vec4(vec3(col1.r, col2.r, col3.r) * shadow, 1.0 - (1.0 - shadow.x) * (1.0 - shadow.y) * (1.0 - shadow.z));
+	shadow1.a *= opacity;
+
+	COLOR = mix(shadow1, col, col.a);
+}"
+
+[sub_resource type="ShaderMaterial" id=28]
+shader = SubResource( 27 )
+shader_param/outline_width = 30.0
+shader_param/outline_color = Color( 0.921569, 1, 0, 1 )
+shader_param/opacity = 0.7
+shader_param/speed = 0.1
+shader_param/speed_2 = 0.5
+shader_param/speed_3 = 0.2
+shader_param/tex_main = SubResource( 7 )
+shader_param/tex_main_2 = SubResource( 16 )
+shader_param/tex_mask_1 = SubResource( 9 )
+shader_param/tex_mask_2 = SubResource( 11 )
+shader_param/tex_mask_4 = SubResource( 21 )
+shader_param/tex_mask_6 = SubResource( 25 )
+
+[sub_resource type="Shader" id=31]
+code = "shader_type canvas_item;
+
+uniform vec4 outline_color1 : hint_color;
+uniform vec4 outline_color2 : hint_color;
+uniform vec4 outline_color3 : hint_color;
+uniform float opacity = 1.0;
+uniform float speed = 0.1;
+uniform float speed_2 = 0.1;
+uniform float speed_3 = 0.1;
+
+const vec2 dir1 = vec2(0.3, 1.0);
+const vec2 dir2 = vec2(-0.3, 1.0);
+const vec2 dir3 = vec2(-0.1, -0.8);
+
+const float PI = 3.14;
+const float EPS = 1.0/512.0;
+
+uniform sampler2D tex_main;
+uniform sampler2D tex_main_2;
+uniform sampler2D tex_mask_1;
+uniform sampler2D tex_mask_2;
+uniform sampler2D tex_mask_3;
+uniform sampler2D tex_mask_4;
+uniform sampler2D tex_mask_5;
+uniform sampler2D tex_mask_6;
+
+
+vec3 border(vec3 val) {
+	vec3 res = (val - 0.55);
+	res = res * 5.0;
+	return clamp(res, 0.001, 1.0);
+}
+
+
+void fragment() {
+	vec4 col = texture(TEXTURE, UV);
+	vec2 ps = TEXTURE_PIXEL_SIZE;
+	vec3 shadow = vec3(1.0);
+	float time_mod = TIME * speed;
+	float time_mod_2 = TIME * speed_2;
+	float time_mod_3 = TIME * speed_3;
+	
+	vec2 pos1 = UV + time_mod * dir1;
+	vec4 col1 = 1.0 - sqrt(sqrt(sqrt(abs(texture(tex_main, pos1) - texture(tex_main_2, pos1)))));
+	vec2 pos2 = UV + time_mod * dir2;
+	vec4 col2 = 1.0 - sqrt(sqrt(sqrt(abs(texture(tex_main, pos2) - texture(tex_main_2, pos2)))));
+	vec2 pos3 = UV + time_mod * dir3;
+	vec4 col3 = 1.0 - sqrt(sqrt(sqrt(abs(texture(tex_main, pos3) - texture(tex_main_2, pos3)))));
+	
+	vec2 pos1_1 = (UV - vec2(0.5)) * 0.7 * mat2(vec2(cos(time_mod_2), sin(time_mod_2)), vec2(-sin(time_mod_2), cos(time_mod_2))) + vec2(0.5);
+	vec2 pos1_2 = (UV - vec2(0.5)) * 0.7 * mat2(vec2(cos(time_mod_2), -sin(time_mod_2)), vec2(sin(time_mod_2), cos(time_mod_2))) + vec2(0.5);
+	float mod1 = sqrt(sqrt(sin(time_mod_3) + 1.1));
+	float mod2 = sqrt(sqrt(-sin(time_mod_3) + 1.1));
+	shadow.x = max(texture(tex_mask_1, pos1_1).x * mod1, texture(tex_mask_2, pos1_2).x * mod2);
+	shadow.y = max(texture(tex_mask_3, pos1_1).x * mod1, texture(tex_mask_4, pos1_2).x * mod2);
+	shadow.z = max(texture(tex_mask_4, pos1_1).x * mod1, texture(tex_mask_6, pos1_2).x * mod2);
+	shadow = border(shadow);
+	shadow = shadow * vec3(col1.r, col2.r, col3.r);
+	float m = shadow.x + shadow.y + shadow.z;
+	
+//	vec4 shadow1 = vec4(outline_color1.rgb, shadow.x);
+	vec4 shadow1 = vec4((outline_color1.rgb * shadow.x + outline_color2.rgb * shadow.y + outline_color3.rgb * shadow.z) / m, 1.0 - (1.0 - shadow.x) * (1.0 - shadow.y) * (1.0 - shadow.z));
+	shadow1.a *= opacity;
+
+	COLOR = mix(shadow1, col, col.a);
+}"
+
+[sub_resource type="ShaderMaterial" id=32]
+shader = SubResource( 31 )
+shader_param/outline_color1 = Color( 1, 0.176471, 0.176471, 1 )
+shader_param/outline_color2 = Color( 0.992157, 0.952941, 0, 1 )
+shader_param/outline_color3 = Color( 0.0392157, 0.819608, 0.0705882, 1 )
+shader_param/opacity = 1.2
+shader_param/speed = 0.1
+shader_param/speed_2 = 0.5
+shader_param/speed_3 = 0.2
+shader_param/tex_main = SubResource( 7 )
+shader_param/tex_main_2 = SubResource( 16 )
+shader_param/tex_mask_1 = SubResource( 9 )
+shader_param/tex_mask_2 = SubResource( 11 )
+shader_param/tex_mask_3 = SubResource( 19 )
+shader_param/tex_mask_4 = SubResource( 21 )
+shader_param/tex_mask_5 = SubResource( 23 )
+shader_param/tex_mask_6 = SubResource( 25 )
+
+[node name="Panel" type="Panel"]
+margin_right = 1012.0
+margin_bottom = 883.0
+
+[node name="ColorRect" type="ColorRect" parent="."]
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color( 0.145098, 0.486275, 0.32549, 1 )
+
+[node name="main_artefact_detector" type="TextureRect" parent="."]
+visible = false
+material = SubResource( 2 )
+margin_left = 12.0
+margin_top = 15.0
+margin_right = 250.0
+margin_bottom = 234.0
+texture = ExtResource( 3 )
+expand = true
+
+[node name="color_shift_detector" type="TextureRect" parent="."]
+visible = false
+material = SubResource( 3 )
+margin_left = 340.371
+margin_top = 15.004
+margin_right = 572.371
+margin_bottom = 246.004
+texture = ExtResource( 3 )
+expand = true
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="masked_recolor_test" type="TextureRect" parent="."]
+visible = false
+material = ExtResource( 2 )
+margin_left = 560.0
+margin_top = 13.0
+margin_right = 764.0
+margin_bottom = 194.0
+texture = ExtResource( 4 )
+expand = true
+
+[node name="sprite_book_shader" type="TextureRect" parent="."]
+visible = false
+material = ExtResource( 6 )
+margin_left = 686.0
+margin_top = -9.0
+margin_right = 1030.0
+margin_bottom = 396.0
+texture = ExtResource( 5 )
+expand = true
+stretch_mode = 6
+
+[node name="flame_test" type="TextureRect" parent="."]
+material = SubResource( 5 )
+margin_left = 6.0
+margin_top = 256.0
+margin_right = 210.0
+margin_bottom = 437.0
+texture = ExtResource( 7 )
+expand = true
+
+[node name="flame_test" type="TextureRect" parent="flame_test"]
+show_behind_parent = true
+anchor_right = 1.0
+anchor_bottom = 1.0
+texture = ExtResource( 4 )
+expand = true
+
+[node name="flame_test2" type="TextureRect" parent="."]
+material = SubResource( 13 )
+margin_left = 239.0
+margin_top = 258.0
+margin_right = 443.0
+margin_bottom = 439.0
+texture = ExtResource( 7 )
+expand = true
+
+[node name="flame_test" type="TextureRect" parent="flame_test2"]
+show_behind_parent = true
+anchor_right = 1.0
+anchor_bottom = 1.0
+texture = ExtResource( 4 )
+expand = true
+
+[node name="flame_test6" type="TextureRect" parent="."]
+material = SubResource( 30 )
+margin_left = 271.0
+margin_top = 513.0
+margin_right = 475.0
+margin_bottom = 694.0
+texture = ExtResource( 7 )
+expand = true
+
+[node name="flame_test" type="TextureRect" parent="flame_test6"]
+show_behind_parent = true
+anchor_right = 1.0
+anchor_bottom = 1.0
+texture = ExtResource( 4 )
+expand = true
+
+[node name="flame_test3" type="TextureRect" parent="."]
+material = SubResource( 33 )
+margin_left = 476.0
+margin_top = 259.0
+margin_right = 680.0
+margin_bottom = 440.0
+texture = ExtResource( 7 )
+expand = true
+
+[node name="flame_test" type="TextureRect" parent="flame_test3"]
+show_behind_parent = true
+anchor_right = 1.0
+anchor_bottom = 1.0
+texture = ExtResource( 4 )
+expand = true
+
+[node name="flame_test4" type="TextureRect" parent="."]
+material = SubResource( 28 )
+margin_left = 695.0
+margin_top = 387.0
+margin_right = 899.0
+margin_bottom = 568.0
+texture = ExtResource( 7 )
+expand = true
+
+[node name="flame_test" type="TextureRect" parent="flame_test4"]
+show_behind_parent = true
+anchor_right = 1.0
+anchor_bottom = 1.0
+texture = ExtResource( 4 )
+expand = true
+
+[node name="flame_test5" type="TextureRect" parent="."]
+margin_left = 12.0
+margin_top = 512.0
+margin_right = 216.0
+margin_bottom = 693.0
+texture = ExtResource( 7 )
+expand = true
+
+[node name="flame_test" type="TextureRect" parent="flame_test5"]
+show_behind_parent = true
+anchor_right = 1.0
+anchor_bottom = 1.0
+texture = ExtResource( 4 )
+expand = true
+
+[node name="ColorRect" type="ColorRect" parent="flame_test5"]
+modulate = Color( 1, 1, 1, 0.462745 )
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color( 1, 0, 0, 1 )
+
+[node name="flame_test7" type="TextureRect" parent="."]
+material = SubResource( 32 )
+margin_left = 526.0
+margin_top = 601.0
+margin_right = 730.0
+margin_bottom = 782.0
+texture = ExtResource( 7 )
+expand = true
+
+[node name="flame_test" type="TextureRect" parent="flame_test7"]
+show_behind_parent = true
+anchor_right = 1.0
+anchor_bottom = 1.0
+texture = ExtResource( 4 )
+expand = true

@@ -1,0 +1,192 @@
+[gd_scene load_steps=13 format=2]
+
+[ext_resource path="res://assets/Fonts_v2/FontThemes/MainMiddle.tres" type="DynamicFont" id=1]
+[ext_resource path="res://gui_modules/Mansion/Scripts/MansionTaskInfoModule.gd" type="Script" id=2]
+[ext_resource path="res://assets/Textures_v2/MANSION/panel_resourses.png" type="Texture" id=3]
+[ext_resource path="res://assets/Themes_v2/MANSION/M_Prog_Small_FG.tres" type="StyleBox" id=4]
+[ext_resource path="res://assets/Themes_v2/MANSION/M_Prog_Small_BG.tres" type="StyleBox" id=5]
+[ext_resource path="res://assets/Textures_v2/MANSION/TaskInfo/button_taskinfo_hover.png" type="Texture" id=6]
+[ext_resource path="res://assets/Textures_v2/MANSION/TaskInfo/taskinfo_header.png" type="Texture" id=7]
+[ext_resource path="res://assets/Textures_v2/MANSION/TaskInfo/button_taskinfo.png" type="Texture" id=8]
+[ext_resource path="res://assets/Textures_v2/MANSION/TaskInfo/button_taskinfo_pressed.png" type="Texture" id=9]
+[ext_resource path="res://MainFont_Small.tres" type="DynamicFont" id=10]
+[ext_resource path="res://assets/Themes_v2/UNIVERSAL/VScrollBar.tres" type="Theme" id=11]
+[ext_resource path="res://assets/images/iconsitems/Wood.png" type="Texture" id=12]
+
+[node name="MansionTaskInfoModule" type="Control"]
+margin_right = 290.0
+margin_bottom = 365.0
+rect_min_size = Vector2( 0, 365 )
+script = ExtResource( 2 )
+
+[node name="TextureRect" type="TextureRect" parent="."]
+show_behind_parent = true
+margin_top = 26.3158
+margin_right = 292.0
+margin_bottom = 78.3158
+texture = ExtResource( 7 )
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Button" type="TextureButton" parent="."]
+margin_left = 56.0
+margin_top = 26.3158
+margin_right = 236.0
+margin_bottom = 78.3158
+texture_normal = ExtResource( 8 )
+texture_pressed = ExtResource( 9 )
+texture_hover = ExtResource( 6 )
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Label" type="Label" parent="Button"]
+margin_right = 180.0
+margin_bottom = 52.0
+custom_colors/font_color = Color( 0.976471, 0.882353, 0.505882, 1 )
+custom_fonts/font = ExtResource( 1 )
+text = "TASKINFORESOURCES"
+align = 1
+valign = 1
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="TextureRect" type="TextureRect" parent="Button"]
+margin_left = 134.0
+margin_top = 6.0
+margin_right = 174.0
+margin_bottom = 46.0
+
+[node name="TaskList" type="TextureRect" parent="."]
+margin_top = 81.0
+margin_right = 290.0
+margin_bottom = 364.0
+texture = ExtResource( 3 )
+
+[node name="TaskListBG" type="Panel" parent="TaskList"]
+self_modulate = Color( 0, 0, 0, 0.705882 )
+show_behind_parent = true
+anchor_right = 1.0
+anchor_bottom = 1.0
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="ScrollContainer" type="ScrollContainer" parent="TaskList"]
+margin_left = 14.0
+margin_top = 6.0
+margin_right = 276.0
+margin_bottom = 271.0
+theme = ExtResource( 11 )
+scroll_horizontal_enabled = false
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="VBoxContainer" type="VBoxContainer" parent="TaskList/ScrollContainer"]
+margin_right = 262.0
+rect_min_size = Vector2( 262, 0 )
+
+[node name="Button" type="TextureButton" parent="TaskList/ScrollContainer/VBoxContainer"]
+visible = false
+margin_right = 262.0
+margin_bottom = 50.0
+rect_min_size = Vector2( 0, 50 )
+
+[node name="Task" type="Label" parent="TaskList/ScrollContainer/VBoxContainer/Button"]
+margin_right = 262.0
+margin_bottom = 32.0
+custom_colors/font_color = Color( 0.976471, 0.882353, 0.505882, 1 )
+custom_fonts/font = ExtResource( 1 )
+text = "Active Task"
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="TaskIcon" type="TextureRect" parent="TaskList/ScrollContainer/VBoxContainer/Button/Task"]
+margin_left = 228.0
+margin_right = 263.0
+margin_bottom = 35.0
+texture = ExtResource( 12 )
+expand = true
+stretch_mode = 6
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Label" type="Label" parent="TaskList/ScrollContainer/VBoxContainer/Button/Task/TaskIcon"]
+visible = false
+margin_left = 1.0
+margin_top = 19.0
+margin_right = 33.0
+margin_bottom = 33.0
+custom_colors/font_color_shadow = Color( 0, 0, 0, 1 )
+text = "5"
+align = 1
+
+[node name="progress" type="Label" parent="TaskList/ScrollContainer/VBoxContainer/Button"]
+margin_left = 1.41422
+margin_top = 32.0
+margin_right = 245.414
+margin_bottom = 48.0
+custom_colors/font_color = Color( 0.976471, 0.882353, 0.505882, 1 )
+custom_fonts/font = ExtResource( 10 )
+text = "+10(20)/100"
+align = 1
+
+[node name="ProgressBar" type="ProgressBar" parent="TaskList/ScrollContainer/VBoxContainer/Button"]
+margin_left = 1.41422
+margin_top = 32.0
+margin_right = 245.414
+margin_bottom = 48.0
+custom_styles/fg = ExtResource( 4 )
+custom_styles/bg = ExtResource( 5 )
+value = 50.0
+
+[node name="NoResources" type="Label" parent="TaskList/ScrollContainer/VBoxContainer/Button"]
+visible = false
+margin_left = 1.41422
+margin_top = 55.8615
+margin_right = 245.414
+margin_bottom = 71.8615
+custom_colors/font_color = Color( 0.768627, 0.0588235, 0.0588235, 1 )
+custom_fonts/font = ExtResource( 10 )
+text = "TASKINFONORESOURCES"
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Tooltip" type="Panel" parent="."]
+visible = false
+margin_right = 290.0
+margin_bottom = 363.0
+rect_min_size = Vector2( 290, 0 )
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Workers" type="Label" parent="Tooltip"]
+margin_right = 276.0
+margin_bottom = 24.0
+custom_fonts/font = ExtResource( 1 )
+text = "Workers"
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Tooltip"]
+margin_top = 24.0
+margin_right = 290.0
+margin_bottom = 48.0
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Button" type="Label" parent="Tooltip/VBoxContainer"]
+visible = false
+margin_right = 290.0
+margin_bottom = 27.0
+custom_fonts/font = ExtResource( 1 )
+text = "Worker Name"

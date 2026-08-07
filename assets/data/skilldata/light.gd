@@ -1,0 +1,367 @@
+extends Reference
+
+var skills = {
+	healing = {
+		code = 'healing',
+		descript = '',
+		icon = "res://assets/images/iconsskills/light_spell.png",
+		type = 'combat', 
+		ability_type = 'spell',
+		tags = ['heal', 'noreduce', 'noevade','support', 'exploration'],
+		reqs = [],
+		targetreqs = [
+			{code = 'stat', stat = 'combatgroup', operant = 'eq', value = 'enemy'},
+			{code = 'stat', stat = 'racegroup', operant = 'eq', value = 'undead'},
+			{orflag = true, code = 'stat', stat = 'combatgroup', operant = 'eq', value = 'ally'},
+		],
+		effects = [
+			'e_s_heal_setup',
+			Effectdata.rebuild_template({effect = Effectdata.rebuild_remove_effect('bleed')})
+		], 
+		cost = {mp = 6},
+		charges = 0,
+		combatcooldown = 2,
+		cooldown = 0,
+		catalysts = {},
+		target = 'all',
+		target_number = 'single',
+		target_range = 'any',
+		damage_type = 'light',
+		sfx = [
+			{code = 'healing_light', target = 'target', period = 'predamage'},
+			{code = 'cast_light', target = 'caster', period = 'windup', is_cast = true}],
+		sounddata = {initiate = null, strike = 'skill_scene', hit = null},
+		value = [1.3, 1.3],
+		damagestat = ['-damage_hp', 'damage_hp'],
+		value_target_reqs = {
+			0:[{code = 'stat', stat = 'racegroup', value = 'undead', operant = 'neq'}],
+			1:[{code = 'stat', stat = 'racegroup', value = 'undead', operant = 'eq'}],
+			},
+		variations = [
+			{
+				reqs = [{code = 'stat', stat = 'combatgroup', value = 'enemy', operant = 'eq'}],
+				set = {targetreqs = [
+					{code = 'stat', stat = 'combatgroup', operant = 'eq', value = 'ally'},
+					{code = 'stat', stat = 'racegroup', operant = 'eq', value = 'undead'},
+					{orflag = true, code = 'stat', stat = 'combatgroup', operant = 'eq', value = 'enemy'},
+				],}  
+			}
+		]
+	},
+	blessing = {
+		code = 'blessing',
+		descript = '',
+		icon = "res://assets/images/iconsskills/icon_light.png",
+		type = 'combat', 
+		ability_type = 'spell',
+		tags = ['support', 'buff'],
+		reqs = [],
+		targetreqs = [],
+		effects = ['e_s_blessing'], 
+		cost = {mp = 6},
+		charges = 0,
+		combatcooldown = 0,
+		cooldown = 0,
+		catalysts = {},
+		target = 'ally',
+		target_number = 'single',
+		target_range = 'any',
+		damage_type = 'light',#not sure but not matters
+		sfx = [
+			{code = 'blessing', target = 'target', period = 'predamage'},
+			{code = 'cast_light', target = 'caster', period = 'windup', is_cast = true}],
+		sounddata = {initiate = null, strike = 'skill_scene', hit = null},
+		value = [['0']],
+		damagestat = ['no_stat'],
+		variations = [
+			{
+				reqs = [{code = 'stat', stat = 'combatgroup', value = 'enemy', operant = 'eq'}],
+				set = {
+				targetreqs = [
+					{code = 'has_status', status = 'fear', check = true},
+					{orflag = true, code = 'has_status', status = 'blind', check = true},
+					{orflag = true, code = 'has_status', status = 'ensnared', check = true},
+					{orflag = true, code = 'has_status', status = 'cursed', check = true},
+				],
+				effects = [],
+				}  
+			}
+		]
+	},
+	resurrect = {
+		code = 'resurrect',
+		descript = '',
+		icon = "res://assets/images/iconsskills/icon_reincarnation.png",
+		type = 'combat', 
+		ability_type = 'spell',
+		tags = ['resurrect', 'noevade','noreduce','support'],
+		reqs = [],
+		targetreqs = [],
+		effects = [Effectdata.rebuild_template({effect = 'e_res', push_value = true})], 
+		cost = {mp = 10},
+		charges = 0,
+		combatcooldown = 0,
+		cooldown = 2,
+		catalysts = {},
+		target = 'ally',
+		target_number = 'single',
+		target_range = 'dead',
+		damage_type = 'light',
+		sfx = [
+			{code = 'resurrect', target = 'target', period = 'predamage'},
+			{code = 'cast_light', target = 'caster', period = 'windup', is_cast = true}],
+		sounddata = {initiate = null, strike = null, hit = null},
+		value = [['40']],
+		damagestat = 'no_stat'
+	},
+	elemental_protection = { 
+		code = 'elemental_protection',
+		descript = '',
+		icon = "res://assets/images/iconsskills/icon_elemental_protection.png",
+		type = 'combat', 
+		ability_type = 'spell',
+		tags = ['buff', 'support'],
+		reqs = [],
+		targetreqs = [],
+		effects = [Effectdata.rebuild_template({effect = 'e_s_elprotect', duration = 3})], 
+		cost = {mp = 7},
+		charges = 0,
+		combatcooldown = 0,
+		cooldown = 0,
+		catalysts = {},
+		target = 'ally',
+		target_number = 'single',#'line'
+		target_range = 'any',
+		damage_type = 'light',
+		sfx = [
+			{code = 'elemental_protection', target = 'target', period = 'predamage'},
+			{code = 'cast_light', target = 'caster', period = 'windup', is_cast = true}], 
+		sounddata = {initiate = null, strike = 'blade', hit = null},
+		value = [['0']],
+		damagestat = 'no_stat',
+		variations = [
+			{
+				reqs = [{code = 'stat', stat = 'combatgroup', value = 'enemy', operant = 'eq'}],
+				set = {targetreqs = [{code = 'has_status', status = 'shield', check = false}],} #to prevent overuse of long-duration buffs
+			}
+		]
+	},
+	pacify = {
+		code = 'pacify',
+		descript = '',
+		icon = "res://assets/images/iconsskills/Serve2.png",
+		type = 'combat', 
+		ability_type = 'spell',
+		tags = ['damage', 'ads', 'light', 'damage_spot'],
+		reqs = [],
+		targetreqs = [],
+		effects = [Effectdata.rebuild_template({effect = 'disarm', duration = 2})], 
+		cost = {mp = 7},
+		charges = 0,
+		combatcooldown = 2,
+		cooldown = 0,
+		catalysts = {},
+		target = 'enemy',
+		target_number = 'single',
+		target_range = 'any',
+		damage_type = 'light',
+		sfx = [
+			{code = 'pacify', target = 'target', period = 'predamage'},
+			{code = 'cast_light', target = 'caster', period = 'windup', is_cast = true}],#? 
+		sounddata = {initiate = null, strike = 'blade', hit = null},
+		value = 1.3
+	},
+	sanctuary = {
+		code = 'sanctuary',
+		descript = '',
+		icon = "res://assets/images/iconsskills/sanctuary.png",
+		type = 'combat', 
+		ability_type = 'spell',
+		tags = ['heal', 'noreduce', 'noevade','support', 'exploration'],
+		reqs = [],
+		targetreqs = [],
+		effects = [Effectdata.rebuild_template({effect = 'e_s_regen', push_value = true, duration = 3})], 
+		cost = {mp = 15}, 
+		charges = 0,
+		combatcooldown = 3,
+		cooldown = 0,
+		catalysts = {},
+		target = 'ally',
+		target_number = 'all',
+		target_range = 'any',
+		damage_type = 'light',#not sure but not matters
+		sfx = [
+			{code = 'heal', target = 'target', period = 'predamage'},
+			{code = 'cast_light', target = 'caster', period = 'windup', is_cast = true}],
+		sounddata = {initiate = null, strike = 'skill_scene', hit = null},
+		value = [['caster.matk', '*1.2'], ['caster.matk', '*0.8']],
+		damagestat = ['no_stat','-damage_hp']
+	},
+	radiance = {
+		code = 'radiance',
+		descript = '',
+		icon ="res://assets/images/iconsskills/light_spell_aoe.png" ,
+		type = 'combat', 
+		ability_type = 'spell',
+		tags = ['damage', 'aoe', 'light', 'ads'],
+		reqs = [],
+		targetreqs = [],
+		effects = [
+			Effectdata.rebuild_template({effect = 'shatter', duration = 3}),
+			Effectdata.rebuild_template({trigger = variables.TR_PREHIT, effect = Effectdata.rebuild_remove_effect('hide')})
+		], 
+		cost = {mp = 9},
+		charges = 0,
+		combatcooldown = 2,
+		cooldown = 0,
+		catalysts = {},
+		target = 'enemy',
+		target_number = 'all',
+		target_range = 'any',
+		damage_type = 'light',
+		aipatterns = ['attack'],
+		allowedtargets = ['enemy'],
+		value = 0.8,
+		random_factor_p = 0.1,
+		sfx = [
+			{code = 'radiance', target = 'target_group', period = 'windup'},
+			{code = 'cast_light', target = 'caster', period = 'windup', is_cast = true}], 
+		sounddata = {initiate = null, strike = 'blade', hit = null},
+		variations = [
+			{
+				reqs = [{code = 'stat', stat = 'combatgroup', value = 'enemy', operant = 'eq'}],
+				set = {combatcooldown = 3} #to prevent spaming
+			}
+		]
+	},
+	mass_resurrect = {
+		code = 'mass_resurrect',
+		descript = '',
+		icon = "res://assets/images/iconsskills/mass_ressurection.png",
+		type = 'combat', 
+		ability_type = 'spell',
+		tags = ['heal', 'noreduce', 'noevade','support', 'no_caster_bonuses', 'resurrect'],
+#		new_syntax = true,
+		reqs = [],
+		targetreqs = [],
+		effects = [], 
+		cost = {mp = 25},
+		charges = 0,
+		combatcooldown = 6,
+		cooldown = 0,
+		catalysts = {},
+		target = 'ally',
+		target_number = 'all',
+		target_range = 'any',
+		damage_type = 'light',
+		sfx = [
+			{code = 'mass_resurrection', target = 'target_group', period = 'windup'},
+			{code = 'cast_light', target = 'caster', period = 'windup', is_cast = true}],
+		sounddata = {initiate = null, strike = 'skill_scene', hit = null},
+		value = [['target.hpmax','*0.80']],
+		damagestat = ['-damage_hp'],
+		follow_up = 'mass_resurrect_1',
+		variations = [
+			{
+				reqs = [{code = 'stat', stat = 'combatgroup', value = 'enemy', operant = 'eq'}],
+				set = {targetreqs = [{code = 'false'}],} #needs complete rework for ai, currently disabled - used targetreqs for reqs are ignored by ai
+			}
+		]
+	},
+	mass_resurrect_1 = {
+		code = 'mass_resurrect_1',
+		name = '',
+		descript = '',
+		icon = "res://assets/images/iconsskills/light_spell_aoe.png",
+		type = 'combat', 
+		ability_type = 'spell',
+		tags = ['resurrect', 'noevade','noreduce','support', 'aoe', 'not_final'],
+		reqs = [],
+		targetreqs = [{code = 'trait', trait = 'undead', check = false}],
+		effects = [Effectdata.rebuild_template({effect = 'e_res', push_value = true})],
+		cost = {},
+		charges = 0,
+		combatcooldown = 0,
+		cooldown = 0,
+		catalysts = {},
+		target = 'ally',
+		target_number = 'all_allowed',
+		target_range = 'dead',
+		damage_type = 'light',
+		sfx = [], 
+		sounddata = {initiate = null, strike = null, hit = null},
+		value = [['80']],
+		damagestat = 'no_stat',
+		not_final = true
+	},
+}
+var effects = {
+	e_s_heal_setup = {
+		type = 'trigger',
+		trigger = [variables.TR_HIT],
+		conditions = [
+			{type = 'target', value = [{code = 'stat', stat = 'racegroup', operant = 'eq', value = 'undead'}]}
+		],
+		req_skill = true,
+		sub_effects = [
+			{
+				type = 'oneshot',
+				target = 'skill',
+				atomic = [{type = 'add_tag', value = 'damage'}],
+			}
+		]
+	},
+	e_s_blessing = {
+		type = 'trigger',
+		trigger = [variables.TR_POSTDAMAGE],
+		conditions = [],
+		req_skill = true,
+		sub_effects = [
+			Effectdata.rebuild_remove_effect('fear'),
+			Effectdata.rebuild_remove_effect('ensnared'),
+			Effectdata.rebuild_remove_effect('blind'),
+			Effectdata.rebuild_remove_effect('cursed'),
+			'e_t_blessing'
+			],
+		buffs = []
+	},
+	e_t_blessing = {
+		type = 'temp_s',
+		target = 'target',
+		stack = 'blessing',
+		tick_event = variables.TR_TURN_S,
+		rem_event = [variables.TR_COMBAT_F, variables.TR_DEATH],
+		duration = 5,
+		tags = ['buff','blessed'],
+		statchanges = {hitrate = 35, evasion = 35},
+		buffs = [
+			{
+				icon = "res://assets/images/iconsskills/icon_light.png",
+				description = "TRAITEFFECTBLESSING",
+			}
+		],
+	},
+	e_s_elprotect = {
+		type = 'temp_s',
+		target = 'target',
+		stack = 'elprotect',
+		tick_event = variables.TR_TURN_F,
+		rem_event = [variables.TR_COMBAT_F, variables.TR_DEATH],
+		duration = 'arg',
+		tags = ['buff', 'shield'],
+		statchanges = {resist_fire = 20, resist_earth = 35, resist_water = 20, resist_air = 20},
+		buffs = [
+			{
+				icon = "res://assets/images/iconsskills/icon_elemental_protection.png",
+				description = "TRAITEFFECTELEMENTALPROTECT",
+			}
+		],
+	},
+}
+var atomic_effects = {}
+var buffs = {}
+
+var stacks = {
+	blessing = {}, #st 1
+	elprotect = {}, #st 1
+}

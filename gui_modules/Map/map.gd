@@ -1,0 +1,1418 @@
+extends CanvasItem
+
+#map inputs
+var map_zoom_max = 1.5
+var map_zoom_min = 0.9
+var map_zoom_step = 0.1
+
+var drag_mode = false
+var drag_offset = Vector2(0.0, 0.0)
+var click_position
+
+var hovered_area = null
+var hovered_location = null
+#_hovered_area and loc_locked are seems obsolete. Delete with time (12.02.26)
+#var _hovered_area = null
+#var loc_locked = false
+
+var area_zoom_data = {
+	null:{
+		position = Vector2(920, 1090),
+		zoom = 1.0
+	},
+	plains = {
+		position = Vector2(640, 1352),
+		zoom = 1.0
+#		zoom = 1.5
+	},
+	forests = {
+		position = Vector2(1221, 1429),
+		zoom = 1.0
+#		zoom = 1.5
+	},
+	mountains = {
+		position = Vector2(817, 825),
+		zoom = 1.0
+#		zoom = 1.5
+	},
+	empire = {
+		position = Vector2(1026, 227),
+		zoom = 1.0
+#		zoom = 1.2
+	},
+}
+
+#in most cases char_groups and travel_groups_ref are hadled automatically in build_from_locations()
+var char_groups = {
+#	group_name = {chars = [], priority = 1}
+}
+var char_groups_by_loc = {
+#	loc_name = []
+}
+var selected_groups = []
+var group_to_rename
+var group_move_chars = []
+var mass_select_press_effect = false
+var can_teleport = false
+
+onready var info_btn_teleport = $InfoPanel/buttons/Teleport
+onready var info_btn_separator = $InfoPanel/buttons/separator
+onready var info_btn_send = $InfoPanel/buttons/Sendbutton
+onready var info_btn_forget = $InfoPanel/buttons/Forget
+onready var info_btns = $InfoPanel/buttons
+onready var info_teleport_menu = $InfoPanel/teleport_menu
+
+func map_input(event):
+#func _input(event):
+#	if event.is_action_pressed('MouseUp'):
+#		set_map_zoom($map.scale.x + map_zoom_step)
+#	if event.is_action_pressed('MouseDown'):
+#		set_map_zoom($map.scale.x - map_zoom_step)
+	for area in $map.get_children():
+		if area.has_method('custom_input'):
+			area.custom_input(event)
+	
+	if event.is_action_pressed("LMB") and !drag_mode:
+		click_position = get_global_mouse_position()
+		drag_offset = $map.global_position - click_position
+		drag_mode = true
+	if event.is_action_released("LMB") and drag_mode:
+		drag_mode = false
+		if (get_global_mouse_position() - click_position).length() < 5:
+			if hovered_location != null:
+				map_location_press(hovered_location)
+			elif hovered_area != null:
+				map_area_press(hovered_area)
+	if drag_mode:
+		set_map_position()
+	#2add part with selecting areas with click on map
+
+func map_all_mouse_exited():
+	for area in $map.get_children():
+		if area.has_method('set_mouse_in_me'):
+			area.set_mouse_in_me(false)
+
+func animate_map_moves(zoom, pos, time = 0.5):
+	var tween = input_handler.GetTweenNode(self)
+	tween.interpolate_property($map, 'scale', $map.scale, Vector2(zoom, zoom), time)
+	tween.interpolate_property($map, 'global_position', $map.global_position, pos, time)
+	tween.interpolate_property($zoom, 'value', $zoom.value, zoom, time)
+	tween.start()
+
+
+func zoom_change(value):
+	var tween = input_handler.GetTweenNode(self)
+	if tween.is_active():
+		return
+	set_map_zoom(value, true)
+
+
+func zoom_change_step(delta = 0):
+	var value = $zoom.value
+	value += delta * map_zoom_step
+	set_map_zoom(value, true)
+
+
+func set_map_zoom(value, centered = false):
+	value = clamp(value, map_zoom_min, map_zoom_max)
+	var current_zoom = $map.scale.x
+	var k = value / current_zoom
+	if k == 1.0:
+		return
+	
+	var point
+	if !centered:
+		point = get_global_mouse_position()
+	else:
+		point = get_viewport().get_visible_rect().size * 0.5
+	var map_pos = $map.global_position
+	var point_offset = map_pos - point
+	
+	var new_point_offset = point_offset * k
+	var new_map_pos = new_point_offset + point
+	animate_map_moves(value, trim_map_pos(new_map_pos, value), 0.1)
+#	$map.scale.x = value
+#	$map.scale.y = value
+#	$map.global_position = new_map_pos
+
+
+func set_map_position():
+	var new_map_pos = get_global_mouse_position() + drag_offset
+	$map.global_position = trim_map_pos(new_map_pos)
+
+
+func trim_map_pos(pos, scale = null):
+	if scale == null:
+		scale = $map.scale.x
+	var screen = get_viewport().get_visible_rect().size
+	var msize = $map.get_rect().size * scale
+	var max_x = msize.x * 0.5
+	var max_y = msize.y * 0.5
+	var min_x =  screen.x - msize.x * 0.5
+	var min_y =  screen.y - msize.y * 0.5
+	var res = pos
+	if screen.x < msize.x:
+		res.x = clamp(res.x, min_x, max_x)
+	else:
+		res.x = screen.x * 0.5
+	if screen.y < msize.y:
+		res.y = clamp(res.y, min_y, max_y)
+	else:
+		res.y = screen.y * 0.5
+	return res
+
+
+func set_focus_area():
+	var data = area_zoom_data[selected_area]
+	animate_map_moves(data.zoom, trim_map_pos(data.position, data.zoom))
+#	$map.scale.x = data.zoom
+#	$map.scale.y = data.zoom
+#	$map.global_position = data.position
+	
+	for area in $map.get_children():
+		if area.name == selected_area:
+			area.highlight(area.HighlightColor)
+		else:
+			area.highlight(Color(0,0,0,0))
+
+
+func set_focus_location(loc):
+#	loc_locked = true
+	for area in $map.get_children():
+		if area.name == loc or area.name == selected_area:
+			area.highlight(area.HighlightColor)
+		else:
+			area.highlight(Color(0,0,0,0))
+
+
+func unselect_location():
+#	loc_locked = false
+	hovered_location = null
+	if selected_area == null:
+		unselect_area()
+		return
+	for area in $map.get_children():
+		if area.name == selected_area:
+			area.highlight(area.HighlightColor)
+		else:
+			area.highlight(Color(0,0,0,0))
+
+#seems obsolete. Delete with time (12.02.26)
+#func area_locked():
+#	if hovered_area != null and hovered_area != _hovered_area:
+#		return true
+#	return false
+
+
+#map gui
+var locs_chosen = []
+var selected_loc
+var from_loc
+var to_loc
+var selected_chars = []
+var selected_area
+
+var sorted_locations = []
+var lands_order = ['plains', 'forests', 'mountains', 'empire', 'steppe', 'seas']
+var lands_count = {}
+var locs_order = ['capital', 'settlement', 'quest_location', 'dungeon', 'encounter']
+var locs_count = {}
+
+var return_screen = null
+var return_nav_module = null
+var return_location = null
+
+
+func _input(event):
+	if !visible:
+		return
+	if input_handler.hard_tutorial_active:#TEMPORAL!!! Fix _input order bug for hard-tutorial!
+		return
+	if (event.is_action_pressed("ESC") || event.is_action_released("RMB")):
+		if to_loc != null:
+			reset_to()
+		elif selected_area != null:
+			unselect_area()
+			update_selected_area()
+			build_info(null)
+		elif from_loc != null:
+			reset_from()
+		elif selected_loc != null:
+			selected_loc = null
+			selected_chars.clear()
+			selected_groups.clear()
+			unselect_location()
+			build_info()
+			update_location_chars()
+			match_state()
+		else:
+			close()
+		get_tree().set_input_as_handled()
+
+
+func _ready():#2add button connections
+	$InfoPanel/Label.text = tr("INFORMATION_LABEL")
+	$InfoPanel/buttons/Sendbutton/Label.text = tr("CONFIRM")
+	$InfoPanel/buttons/Teleport/Label.text = tr("SKILLTELEPORT")
+	$InfoPanel/buttons/Forget/Label.text = tr("FORGET_LABEL")
+	$InfoPanel/VBoxContainer/Label2.text = tr("GALLERYCHAR")
+	$InfoPanel/VBoxContainer/Label3.text = tr("UPGRADERES")
+	$FromLocList/Label.text = tr("SELECT_CHAR_LABEL")
+	$ToLocList/Label.text = tr("LOCATION_LIST_LABEL")
+	$Back/Label.text = tr("BACK")
+	$Back.connect('pressed', self, 'close')
+	$mode.connect('pressed', self, 'from_loc_set')
+#	$FromLocList/Sendbutton.connect('pressed', self, 'from_loc_set')
+	info_btn_send.connect('pressed', self, 'confirm_travel')
+	info_btn_teleport.connect('pressed', self, 'switch_teleport_menu')
+	$zoom.min_value = map_zoom_min
+	$zoom.max_value = map_zoom_max
+#	$zoom.connect("value_changed", self, 'zoom_change')
+#	$zoom/minus.connect("pressed", self, 'zoom_change_step', [ -1])
+#	$zoom/plus.connect("pressed", self, 'zoom_change_step', [ 1])
+	info_btn_forget.connect("pressed", self, "forget_location")
+#	match_state()
+	input_handler.connect("mass_select_in_act", self, "off_mass_select_effect")
+	input_handler.register_btn_source('travel_master', self, 'tut_get_master')
+	input_handler.register_btn_source('travel_servant', self, 'tut_get_servant')
+	input_handler.register_btn_source('travel_chars_highlight', self, null, self, 'tut_get_chars_highlight')
+#	input_handler.register_btn_source('travel_send', self, 'tut_get_send')
+	input_handler.register_btn_source('travel_to_loc', self, 'tut_get_location')
+	input_handler.register_btn_source('travel_confirm', self, 'tut_get_send_confirm')
+	input_handler.register_btn_source('travel_back', self, 'tut_get_back_btn')
+	$map_control.connect("mouse_exited", self, "map_all_mouse_exited")
+
+func tut_get_master():
+	return tut_get_chara(ResourceScripts.game_party.get_unique_slave('tutorial_master'))
+func tut_get_chars_highlight():
+	var btn = tut_get_master()
+	var rect = btn.get_global_rect()
+	rect.end.x = btn.get_node('group').rect_global_position.x
+	var btn2 = tut_get_servant()
+	rect.end.y = tut_get_servant().get_global_rect().end.y
+	return rect
+func tut_get_servant():
+	return tut_get_chara(ResourceScripts.game_party.get_unique_slave('tutorial_servant'))
+func tut_get_chara(character):
+	for loc_cat in $FromLocList/LocScroll/LocCatList.get_children():
+		for loc_group in loc_cat.get_node('offset/LocGroupList').get_children():
+			for btn in loc_group.get_node('offset/LocList').get_children():
+				if btn.get_meta('character', "") == character.id:
+					return btn
+#func tut_get_send():
+#	return $FromLocList/Sendbutton
+func tut_get_location():
+	var loc_id
+	for id in ResourceScripts.game_world.areas['plains'].questlocations:
+		if ResourceScripts.game_world.areas['plains'].questlocations[id].code == 'tutorial_threat_wolves':
+			loc_id = id
+			break
+	for loc_cat in $ToLocList/LocScroll/LocCatList.get_children():
+		for btn in loc_cat.get_node('offset/LocList').get_children():
+			if btn.get_meta('location', "") == loc_id:
+				return btn
+func tut_get_send_confirm():
+	return info_btn_send
+func tut_get_back_btn():
+	return $Back
+
+func forget_location():
+	input_handler.get_spec_node(
+		input_handler.NODE_YESNOPANEL,
+		[
+			self,
+			'clear_dungeon_confirm',
+			tr("FORGETLOCATIONQUESTION")
+		]
+	)
+
+
+func clear_dungeon_confirm():
+	if to_loc == null:
+		return
+	globals.remove_location(to_loc)
+	input_handler.SystemMessage(tr("LOC_BEEN_REMOVED_LABEL"))
+	selected_loc = null
+	selected_chars.clear()
+	selected_groups.clear()
+	build_locations_list()
+	reset_from()
+	reset_to()
+	unselect_location()
+	build_from_locations()
+	update_location_chars()
+	build_to_locations()
+	match_state()
+	build_info()
+
+
+func set_return_context(screen, nav_module, location):
+	return_screen = screen
+	return_nav_module = nav_module
+	return_location = location
+
+
+func close():
+#	get_parent().set_process_input(true)
+#	set_process_input(true)
+	if !visible: return
+	var nav_to_restore = return_nav_module
+	var location_to_restore = return_location if return_location != null else input_handler.selected_location
+	var screen_to_restore = return_screen
+	return_nav_module = null
+	return_location = null
+	return_screen = null
+	if screen_to_restore == null:
+		gui_controller.current_screen = gui_controller.mansion
+		input_handler.node_children_visible(get_parent(), null, true)
+		gui_controller.current_screen.mansion_state = 'default'
+		if gui_controller.clock != null:
+			gui_controller.clock.visible = true
+	else:
+		gui_controller.current_screen = screen_to_restore
+		input_handler.node_children_visible(get_parent(), null, true)
+	
+#	get_parent().match_state()
+	ResourceScripts.core_animations.FadeAnimation(self, 0.2)
+	hide()
+	if screen_to_restore != null:
+		get_parent().hide()
+		if nav_to_restore != null:
+			nav_to_restore.select_location(location_to_restore)
+		return
+#	if get_parent().mansion_state == 'travels':
+#		get_parent().mansion_state = 'default'
+#
+#	else:
+#		.hide()
+
+func open():
+	hovered_area = null
+#	get_parent().set_process_input(false)
+#	set_process_input(true)
+	gui_controller.current_screen = self
+	if !gui_controller.windows_opened.has(self):
+		gui_controller.windows_opened.append(self)
+	if gui_controller.clock != null:
+		gui_controller.clock.visible = false
+#	get_parent().SlaveListModule.hide()
+	
+	selected_chars.clear()
+	selected_groups.clear()
+	from_loc = null
+	to_loc = null
+	selected_loc = null
+	selected_area = null
+	build_locations_list()
+	build_from_locations()
+	update_location_chars()
+	build_to_locations()
+#	selected_area = 'plains'
+	update_selected_area()
+	match_state()
+	build_info(null)
+	show()
+	input_handler.node_children_visible(get_parent(), self, false)
+	ResourceScripts.core_animations.UnfadeAnimation(self, 0.2)
+	set_focus_area()
+	for area in $map.get_children():
+		if area.has_method('check_gray'):
+			area.check_gray()#strictly after build_locations_list()
+	input_handler.ActivateTutorial("TUTORIALLIST3")
+
+
+func build_locations_list():
+	locs_chosen.clear()
+	sorted_locations.clear()
+	locs_count.clear()
+	lands_count.clear()
+	var temp_locations = {}
+	for id in ResourceScripts.game_world.location_links:
+		var tdata = ResourceScripts.game_world.location_links[id]
+		var adata = ResourceScripts.game_world.areas[tdata.area]
+		if !adata.unlocked: continue
+		var cdata = adata[tdata.category]
+		if !cdata.has(id): 
+			continue #should add here currently nonexisted marking location link to delete
+		
+		var temp = {id = id, area = tdata.area, type = cdata[id].type, heroes = [], quest = false}
+		if temp.type == "capital":
+			if adata.has("capital_code"):
+				if globals.is_capital_closed(adata.capital_code):
+					continue
+		if cdata[id].has("tags") and cdata[id].tags.has('quest'):
+			temp.quest = true
+		if tdata.category == "questlocations":
+			if cdata[id].has("questid") and ResourceScripts.game_progress.if_quest_active(cdata[id].questid):
+				temp.quest = true
+			if adata.questlocations.has(id):
+				if adata.questlocations[id].has("quest"):
+					temp.quest = adata.questlocations[id].quest
+		if cdata[id].has('background'):
+			temp.icon = cdata[id].background
+		elif temp.type == 'capital' and adata.has('capital_background'):
+			temp.icon = adata.capital_background
+		else:
+			temp.icon = null
+		if cdata[id].has('captured'): temp.captured = cdata[id].captured
+		if cdata[id].has('locked'): temp.locked = cdata[id].locked
+		if temp.area == 'beastkin_tribe':
+			temp.area = 'forests'
+		if lands_count.has(temp.area): lands_count[temp.area] += 1
+		else:  lands_count[temp.area] = 1
+		if locs_count.has(temp.type): locs_count[temp.type] += 1
+		else:  locs_count[temp.type] = 1
+		temp_locations[id] = temp
+	
+	var temp = {id = 'travel', heroes = []}
+	for ch_id in ResourceScripts.game_party.character_order:
+		var character = characters_pool.get_char_by_id(ch_id)
+		if !character.is_active: 
+			continue
+		var loc = character.get_location()
+		if loc == "mansion":
+			character.travel.location = ResourceScripts.game_world.mansion_location
+		if loc == 'travel':
+			temp.heroes.push_back(ch_id)
+		elif character.is_on_quest(): 
+			continue
+		elif !temp_locations.has(loc):
+			print("warning - populated location %s not found or not avail" % loc)
+			continue
+		else:
+			temp_locations[loc].heroes.push_back(character.id)
+			if !locs_chosen.has(loc):
+				locs_chosen.push_back(loc)
+	
+	sorted_locations = temp_locations.values().duplicate()
+	sorted_locations.sort_custom(self, 'sort_locations')
+	sorted_locations.push_back(temp)
+
+
+func sort_locations(first, second):
+	if lands_order.has(first.area):
+		if lands_order.has(second.area):
+			if lands_order.find(first.area) == lands_order.find(second.area):
+				if locs_order.has(first.type):
+					if locs_order.has(second.type):
+						if locs_order.find(first.type) != locs_order.find(second.type):
+							return locs_order.find(first.type) < locs_order.find(second.type)
+						else:
+							return first.id > second.id
+			else:
+				return lands_order.find(first.area) < lands_order.find(second.area)
+		return false
+	return true
+
+
+func if_location_in_list(loc):
+	for loc_d in sorted_locations:
+		if loc_d.id == loc:
+			return true
+	return false
+
+
+func get_location_data(loc):
+	for loc_d in sorted_locations:
+		if loc_d.id == loc:
+			return loc_d
+	return false
+
+
+func build_info(loc = null):
+	if loc == null:
+		loc = to_loc
+#	if loc == null:
+#		loc = from_loc
+#	if loc == null:
+#		loc = selected_loc
+	if loc == null:
+		$InfoPanel.visible = false
+		return
+	
+	var location = ResourceScripts.world_gen.get_location_from_code(loc)
+	var tdata = ResourceScripts.game_world.location_links[loc]
+	var adata = ResourceScripts.game_world.areas[tdata.area]
+	
+	var location_selected = get_location_data(loc)
+	info_btn_forget.visible = (!location.tags.has('quest') and location_selected.type in ['dungeon', 'encounter'])
+#	if to_loc != null:
+#		info_btn_forget.visible = false
+	
+	#build info
+	$InfoPanel/Label.text = tr(location.name)
+	var icon = null
+	if location.type == 'capital' and adata.has('capital_background'):
+		icon = adata.capital_background
+	elif location.has('background'):
+		icon = location.background
+	if icon != null:
+		icon = images.get_background(icon)
+	$InfoPanel/InfoFrame/icon.texture = icon
+	$InfoPanel/InfoFrame/name.text = tr(location.name)
+	#build res
+	var dungeon = false
+	var hidden = false
+	var info_res_node = $InfoPanel/VBoxContainer/ResScroll/Resources
+	input_handler.ClearContainer(info_res_node)
+	info_res_node.show()
+	$InfoPanel/VBoxContainer/Label3.show()
+	$InfoPanel/InfoFrame/enemies.visible = false
+	for r_task in ['recruit_easy', 'recruit_hard']:
+		if location.has('tags') and location.tags.has(r_task):
+			var newbutton = input_handler.DuplicateContainerTemplate(info_res_node)
+			var jobdata = tasks.tasklist[r_task]
+			newbutton.get_node("Icon").texture = load(jobdata.production_icon)
+			var max_workers_count = jobdata.base_workers
+			var current_workers_count = 0
+			for task_id in ResourceScripts.game_res.active_tasks.recruiting:
+				var task = ResourceScripts.game_res.tasks_progresses[task_id]
+				if (task.location == loc) and (task.job == r_task):
+					current_workers_count = task.workers.size()
+			newbutton.get_node("amount").text = str(max_workers_count - current_workers_count) + "/" + str(max_workers_count)
+			globals.connecttexttooltip(newbutton, jobdata.descript)
+	var gatherable_resources
+	if (location.type in ["capital", "quest_location"]) or (location.has('locked') and location.locked):
+		info_res_node.hide()
+		$InfoPanel/VBoxContainer/Label3.hide()
+	elif location.type == "dungeon":
+		$InfoPanel/InfoFrame/enemies.visible = true
+		if location.tags.has('quest'):
+			$InfoPanel/InfoFrame/enemies.text = tr("QUESTLOCATION")
+			
+		else:
+			$InfoPanel/InfoFrame/enemies.text = tr(location.classname)
+		dungeon = true
+#		if !location.completed:
+#			hidden = true
+		gatherable_resources = location.gather_limit_resources
+	else:
+		if location.has('gather_resources'):
+			gatherable_resources = location.gather_resources
+	
+	if gatherable_resources != null:
+		if gatherable_resources.empty():
+			info_res_node.hide()
+			$InfoPanel/VBoxContainer/Label3.hide()
+		for i in gatherable_resources:
+			var item = Items.materiallist[i]
+			if ResourceScripts.game_progress.can_gather_item(i) or dungeon:
+				var newbutton = input_handler.DuplicateContainerTemplate(info_res_node)
+				newbutton.get_node("Icon").texture = Items.materiallist[i].icon
+				newbutton.set_meta("exploration", true)
+				if dungeon:
+					if !hidden:
+						newbutton.get_node("amount").text = str(gatherable_resources[i])
+						var gather_mod = Items.get_loot().get_gather_mod_from_loc(location, i)
+						newbutton.set_meta("gather_mod", round(gather_mod * 100))
+						globals.connectmaterialtooltip(newbutton, item)
+					else:
+						newbutton.get_node("Icon").texture = load("res://assets/Textures_v2/Travel/placer_travel_question.png")
+				else:
+					var max_workers_count = gatherable_resources[i]
+					var current_workers_count = 0
+					for task_id in ResourceScripts.game_res.active_tasks.gathering:
+						var task = ResourceScripts.game_res.tasks_progresses[task_id]
+						if (task.job == i) && (task.location == loc):
+							current_workers_count = task.workers.size()
+					newbutton.get_node("amount").text = str(max_workers_count - current_workers_count) + "/" + str(max_workers_count)
+					newbutton.set_meta("max_workers", max_workers_count)
+					newbutton.set_meta("current_workers", current_workers_count)
+					globals.connectmaterialtooltip(newbutton, item)
+			else:
+				continue
+		for i in gatherable_resources:
+			var item = Items.materiallist[i]
+			if ResourceScripts.game_progress.can_gather_item(i) or dungeon:
+				continue
+			else:
+				var newbutton = input_handler.DuplicateContainerTemplate(info_res_node)
+				newbutton.get_node("Icon").texture = load("res://assets/Textures_v2/Travel/placer_travel_question.png")
+				newbutton.set_meta("exploration", true)
+				newbutton.get_node("amount").text = ""
+				globals.connecttexttooltip(newbutton, tr('TOOLTIPHIDDENRESOURCE'))
+	#build chars
+	input_handler.ClearContainer($InfoPanel/VBoxContainer/CharScroll/Characters)
+	var f = false
+	for ch_id in ResourceScripts.game_party.character_order:
+		var ch = characters_pool.get_char_by_id(ch_id)
+		if ch.get_location() != loc:
+			continue
+		f = true
+		var panel = input_handler.DuplicateContainerTemplate($InfoPanel/VBoxContainer/CharScroll/Characters)
+		panel.get_node('Icon').texture = ch.get_icon_small()
+		globals.connectslavetooltip(panel, ch)
+	$InfoPanel/VBoxContainer/CharScroll.visible = f
+	$InfoPanel/VBoxContainer/Label2.visible = f
+	
+	info_teleport_menu.hide()
+	
+	$InfoPanel.visible = true
+	var not_temporal_info = (to_loc != null and loc == to_loc)
+	info_btns.visible = not_temporal_info
+	if from_loc != 'adv_mode' and not_temporal_info and !selected_chars.empty() and from_loc != to_loc:
+		info_btn_send.visible = true
+		$InfoPanel/time.visible = true
+		$InfoPanel/time.text = tr("TRAVEL_TIME_LABEL") + " - %d t" % globals.calculate_travel_time(from_loc, to_loc).time
+		
+		can_teleport = false
+		for sort_loc in sorted_locations:
+			if sort_loc.id == selected_loc:
+				can_teleport = info_teleport_menu.make_list(sort_loc.heroes, self, "cast_teleport")
+				break
+		info_btn_teleport.visible = can_teleport
+		info_btn_separator.visible = !can_teleport
+	else:
+		info_btn_send.visible = false
+		info_btn_teleport.visible = false
+		info_btn_separator.visible = false
+		$InfoPanel/time.visible = false
+
+
+func make_panel_for_location(panel, loc):
+	if loc.id == 'travel':
+		set_loc_text(panel, tr("CHARS_ON_ROAD_LABEL"))
+	else:
+		var data = ResourceScripts.world_gen.get_location_from_code(loc.id)
+		var text = data.name
+#		if ResourceScripts.game_world.areas[loc.area].questlocations.has(loc.id):
+		if loc.quest:
+			text = "Q:" + text
+			panel.get_node("Label").set("custom_colors/font_color", variables.hexcolordict.yellow)
+		if  data.has('active') and data.active == false:
+			text += "(!)"
+		set_loc_text(panel, text)
+#		panel.get_node("Label").text = text
+		if loc.has('captured'):
+			if loc.captured:
+				panel.get_node("Label").set("custom_colors/font_color", variables.hexcolordict.red)
+				panel.disabled = true
+#				globals.connecttexttooltip(panel, "Location Unavailable")
+#				globals.return_characters_from_location(loc.id)
+		if loc.has('locked'):
+			if loc.locked:
+				panel.get_node("Label").set("custom_colors/font_color", variables.hexcolordict.yellow)
+#				globals.connecttexttooltip(panel, "Location Unavailable")
+#				globals.return_characters_from_location(loc.id)
+		var icon
+		match loc.type:
+			'settlement':
+				icon = images.get_icon('travel_village')
+			'dungeon':
+				icon = images.get_icon('travel_dungeon')
+			'capital':
+				icon = images.get_icon('travel_city')
+			'quest_location', 'encounter':
+				icon = images.get_icon('travel_event')
+		if panel.has_node('icon'):
+			panel.get_node("icon").texture = icon
+
+
+func make_panel_for_character(panel, ch_id):
+	var tchar = characters_pool.get_char_by_id(ch_id)
+	set_loc_text(panel, tchar.get_full_name())
+	panel.get_node("icon").texture = tchar.get_icon_small()
+#	if !tchar.is_controllable(): 
+#		panel.disabled = true
+#	if tchar.get_location() == 'travel':
+#		panel.disabled = true
+
+func make_panel_for_group(panel, group_name):
+	set_loc_text(panel, group_name)
+
+
+func build_from_locations():
+	#filter locations
+	var areas = {}
+	var travel_data
+	for loc_data in sorted_locations:
+		if loc_data.heroes.empty():
+			continue
+		if loc_data.id == 'travel':
+			travel_data = loc_data
+			continue
+#		if loc_data.id == to_loc:
+#			continue
+		if areas.has(loc_data.area):
+			areas[loc_data.area].push_back(loc_data)
+		else:
+			areas[loc_data.area] = [loc_data]
+	#update list
+	input_handler.ClearContainer($FromLocList/LocScroll/LocCatList, ['LocCat'])
+	char_groups.clear()
+	char_groups_by_loc.clear()
+	var sorted_keys = areas.keys()
+	if travel_data != null:
+		areas.travel_data = [travel_data]
+		sorted_keys.append('travel_data')
+	var mass_select = []
+	for area in sorted_keys:
+		#no need to clear container
+		for loc_data in areas[area]:
+			var category = input_handler.DuplicateContainerTemplate($FromLocList/LocScroll/LocCatList, 'LocCat')
+			category.set_meta('location', loc_data.id)
+			category.get_node('Button').connect('pressed', self, 'toggle_from_location', [loc_data.id])
+			if loc_data.id != 'travel':
+				category.get_node('Button').connect('mouse_entered', $map.get_node(area), 'Light')
+				category.get_node('Button').connect('mouse_exited', $map.get_node(area), 'UnLight')
+#			category.get_node('Button').connect('mouse_entered', self, 'build_info', [loc_data.id])
+#			category.get_node('Button').connect('mouse_exited', self, 'build_info')
+			make_panel_for_location(category.get_node('Button'), loc_data)
+			var loc_char_groups = {}
+			char_groups_by_loc[loc_data.id] = []
+			for ch_id in loc_data.heroes:
+				var person = characters_pool.get_char_by_id(ch_id)
+				var group_name = person.get_loc_group()
+				if !loc_char_groups.has(group_name):
+					loc_char_groups[group_name] = []
+				loc_char_groups[group_name].append(ch_id)
+			for group_name in loc_char_groups.keys():
+				var true_name = group_name
+				if char_groups.has(group_name):#bad sit, means there is a double
+					true_name = make_new_group_name()
+					loc_char_groups[true_name] = loc_char_groups[group_name]
+					loc_char_groups.erase(group_name)
+					for ch_id in loc_char_groups[true_name]:
+						var person = characters_pool.get_char_by_id(ch_id)
+						person.set_loc_group(true_name)
+				append_char_group(true_name, loc_char_groups[true_name])
+				char_groups_by_loc[loc_data.id].append(true_name)
+			var sorted_groups = sort_groups(loc_char_groups.keys())
+			for group_name in sorted_groups:
+				var group_cont = input_handler.DuplicateContainerTemplate(category.get_node('offset/LocGroupList'), 'LocGroup')
+				group_cont.set_meta('location', loc_data.id)
+				group_cont.set_meta('group', group_name)
+				group_cont.get_node('Button').connect('pressed', self, 'group_press', [group_name, loc_data.id])
+				group_cont.get_node('Button/menu').connect("pressed", self, "open_group_menu", [group_name, loc_data.id])
+				globals.connecttexttooltip(group_cont.get_node('Button/menu'), tr("TRAVEL_GROUP_RENAME"))
+				group_cont.visible = true
+				make_panel_for_group(group_cont.get_node('Button'), group_name)
+				for ch_id in loc_char_groups[group_name]:
+					var loc_button = input_handler.DuplicateContainerTemplate(group_cont.get_node('offset/LocList'), 'Button')
+					loc_button.set_meta('location', loc_data.id)
+					loc_button.set_meta('character', ch_id)
+					loc_button.connect('pressed', self, 'char_loc_press', [ch_id, loc_data.id])
+					loc_button.get_node('group').connect('pressed', self, 'open_char_menu', [ch_id, loc_data.id])
+					globals.connecttexttooltip(loc_button.get_node('group'), tr("TRAVEL_RENAME"))
+	#				loc_button.connect('pressed', self, 'location_press', [loc_data.id, 'from'])
+	#				loc_button.connect('mouse_entered', self, 'build_info', [loc_data.id])
+	#				loc_button.connect('mouse_exited', self, 'build_info')
+					loc_button.visible = true
+					make_panel_for_character(loc_button, ch_id)
+					mass_select.append({
+						btn_node = loc_button,
+						act_func = 'char_loc_press_mass',
+						act_args = [weakref(loc_button)]
+					})
+	update_groups_ref()
+	input_handler.start_mass_select(self, mass_select)
+
+
+
+func build_to_locations():
+	#filter locations
+	var areas = {}
+	for loc_data in sorted_locations:
+		if loc_data.id == 'travel':
+			continue
+#		if loc_data.captured:
+#			continue
+#		if loc_data.id == from_loc:
+#			continue
+		if areas.has(loc_data.area):
+			areas[loc_data.area].push_back(loc_data)
+		else:
+			areas[loc_data.area] = [loc_data]
+	#update list
+	input_handler.ClearContainer($ToLocList/LocScroll/LocCatList, ['LocCat'])
+	for area in areas:
+		var category = input_handler.DuplicateContainerTemplate($ToLocList/LocScroll/LocCatList, 'LocCat')
+		category.set_meta('area', area)
+		category.get_node('Button/Label').text = tr('AREA' + area.to_upper()) #currently works, but not granted
+		category.get_node('Button').connect('pressed', self, 'area_press', [area, 'to'])
+		category.get_node('Button').connect('mouse_entered', $map.get_node(area), 'Light')
+		category.get_node('Button').connect('mouse_exited', $map.get_node(area), 'UnLight')
+		#no need to clear container
+		for loc_data in areas[area]:
+			var loc_button = input_handler.DuplicateContainerTemplate(category.get_node('offset/LocList'), 'Button')
+			loc_button.set_meta('location', loc_data.id)
+			loc_button.connect('pressed', self, 'location_press', [loc_data.id, 'to'])
+			loc_button.connect('mouse_entered', self, 'build_info', [loc_data.id])
+			loc_button.connect('mouse_exited', self, 'build_info')
+			make_panel_for_location(loc_button, loc_data)
+			if !loc_data.heroes.empty():
+				loc_button.get_node('amount').text = str(loc_data.heroes.size())
+			else:
+				loc_button.get_node('amount').text = ""
+	
+	update_selected_area()
+	update_selected_to_location()
+
+
+func update_selected_area():
+	for cat in $ToLocList/LocScroll/LocCatList.get_children():
+		if !cat.has_meta('area'):
+			continue
+		var tarea = cat.get_meta('area')
+		if tarea == selected_area:
+			cat.get_node('Button').pressed = true
+			cat.get_node('offset/LocList').visible = true
+		else:
+			cat.get_node('Button').pressed = false
+			cat.get_node('offset/LocList').visible = false
+
+
+func toggle_from_location(loc_toggled):
+	if locs_chosen.has(loc_toggled):
+		locs_chosen.erase(loc_toggled)
+	else:
+		locs_chosen.push_back(loc_toggled)
+	update_location_chars()
+
+
+func update_selected_to_location():
+	for cat in $ToLocList/LocScroll/LocCatList.get_children():
+		for loc in cat.get_node('offset/LocList').get_children():
+			if !loc.has_meta('location'):
+				continue
+			loc.pressed = (loc.get_meta('location') == to_loc)
+
+
+func update_confirm():
+	if !$InfoPanel.visible: return
+	if selected_chars.empty():#selected_groups.empty()
+		info_btn_send.visible = false
+		info_btn_teleport.visible = false
+		info_btn_separator.visible = false
+	elif !info_btn_send.visible:
+		build_info()
+
+
+func map_area_press(area):
+	if !ResourceScripts.game_world.is_area_unlocked(area):
+		return
+	if selected_area == area:
+		return
+	if from_loc == null:
+		return
+	else:
+		selected_area = area
+	if selected_area == null:
+		unselect_area()
+	
+	update_selected_area()
+	set_focus_area()
+	match_state()
+#	build_info()
+
+
+func map_location_press(loc):
+	if !if_location_in_list(loc):
+		return
+	var locs_area
+	for zone in $map.get_children():
+		if zone.name == loc:
+			locs_area = zone.get_area()#should have get_area() func
+			break
+	if selected_area != locs_area:
+		map_area_press(locs_area)
+	if selected_area == null:
+		return
+	
+#	var mode = 'from'
+#	if from_loc != null:
+#		mode = 'to'
+	
+	location_press(loc, 'to')
+
+
+func area_press(area, mode):
+	if selected_area == area:
+		unselect_area()
+	else:
+		selected_area = area
+	
+#	selected_loc = null
+	update_selected_area()
+	set_focus_area()
+	match_state()
+	build_info()
+
+
+func unselect_area():
+	selected_area = null
+#	hovered_area = _hovered_area
+	set_focus_area()
+
+
+func char_loc_press(ch_id, loc_id):
+	var selected
+	if !selected_chars.has(ch_id):
+		try_switch_selected_loc(loc_id)
+		selected_chars.push_back(ch_id)
+		selected = true
+		var group_name = characters_pool.get_char_by_id(ch_id).get_loc_group()
+		var all_selected = true
+		for ch_id_i in char_groups[group_name].chars:
+			if !selected_chars.has(ch_id_i):
+				all_selected = false
+				break
+		if all_selected:
+			try_append_selected_group(group_name)
+	else:
+		selected_chars.erase(ch_id)
+		selected = false
+		var person = characters_pool.get_char_by_id(ch_id)
+		try_erase_selected_group(person.get_loc_group())
+		try_switch_selected_loc(null)
+#	build_info()
+	update_confirm()
+	update_location_chars()
+	return selected
+
+func char_loc_press_mass(ch_btn_ref):
+	var ch_btn = ch_btn_ref.get_ref()
+	if (ch_btn.disabled
+			or (mass_select_press_effect != null and ch_btn.pressed == mass_select_press_effect)
+		):
+		return
+	var selected = char_loc_press(ch_btn.get_meta('character'), ch_btn.get_meta('location'))
+	if mass_select_press_effect == null:
+		mass_select_press_effect = selected
+
+func off_mass_select_effect():
+	mass_select_press_effect = null
+
+func group_press(group_name, loc_id):
+	try_switch_selected_loc(loc_id)
+	var appended = try_append_selected_group(group_name)
+	if appended:
+		for ch_id in char_groups[group_name].chars:
+			if !selected_chars.has(ch_id):
+				selected_chars.append(ch_id)
+	else:
+		try_erase_selected_group(group_name)
+		for ch_id in char_groups[group_name].chars:
+			selected_chars.erase(ch_id)
+	try_switch_selected_loc(null)
+	update_confirm()
+	update_location_chars()
+
+
+func try_switch_selected_loc(loc_id):
+	if selected_chars.empty() and selected_groups.empty():
+		selected_loc = loc_id
+		if selected_loc == null:
+			reset_from()
+		else:
+			from_loc_set()
+			match_state()
+
+func try_append_selected_group(group_name):
+	if !selected_groups.has(group_name):
+		selected_groups.append(group_name)
+		return true
+	return false
+
+func try_erase_selected_group(group_name):
+	if !selected_groups.has(group_name):
+		return false
+	selected_groups.erase(group_name)
+	return true
+
+func update_location_chars():
+	for loc in $FromLocList/LocScroll/LocCatList.get_children():
+#		for loc in cat.get_node('offset/LocList').get_children():
+		if loc.is_queued_for_deletion() or !loc.has_meta('location'):
+			continue
+		var cloc = loc.get_meta('location')
+		var show_chars = true
+		if locs_chosen.has(cloc):
+			loc.get_node('Button').pressed = true
+		else:
+			loc.get_node('Button').pressed = false
+			show_chars = false
+		for group in loc.get_node('offset/LocGroupList').get_children():
+			if !group.has_meta('group'):
+				continue
+			group.visible = show_chars
+			var loc_id = group.get_meta('location')
+			var group_btn = group.get_node('Button')
+			group_btn.pressed = selected_groups.has(group.get_meta('group'))
+			if group.get_meta('location') == 'travel':
+				group_btn.disabled = true
+			else:
+				group_btn.disabled = (selected_loc != null and loc_id != selected_loc)
+			for ch in group.get_node('offset/LocList').get_children():
+				if !ch.has_meta('character'):
+					continue
+				var person_id = ch.get_meta('character')
+				var person = characters_pool.get_char_by_id(person_id)
+				ch.pressed = selected_chars.has(person_id)
+				ch.disabled = false
+				if person.get_location() == 'travel':
+					ch.disabled = true
+				elif selected_loc != null and ch.get_meta('location') != selected_loc:
+					ch.disabled = true
+#				ch.get_node('group').disabled = ch.disabled
+#				if !person.is_controllable(): 
+#					ch.disabled = true
+
+
+func location_press(location, mode):
+	#location_press()'s ability to set selected_loc seems obsolete. Delete with time (12.02.26)
+#	match mode:
+#		'from':
+#			if selected_loc == location and selected_chars.empty():
+#				selected_loc = null
+#				unselect_location()
+#			else:
+#				selected_loc = location
+#				set_focus_location(location)
+#			build_info(selected_loc)#should it be here?
+#			match_state()
+#		'to':
+	if to_loc == location:
+		to_loc = null
+		unselect_location()
+	else:
+		to_loc = location
+		set_focus_location(location)
+	build_info(to_loc)
+#	selected_chars.clear()
+	update_selected_to_location()
+	match_state()
+
+
+func match_state():
+	if from_loc == null:
+		$FromLocList.visible = true
+		$ToLocList.visible = false
+		if selected_loc == null:
+#			$FromLocList/Sendbutton/Label.text = 'Adv.Mode'
+#			$FromLocList/Sendbutton.visible = false
+			$mode/Label.text = tr("ADV_MODE_LABEL")
+			$mode.visible = true
+		else:
+#			$FromLocList/Sendbutton.visible = true
+			$mode.visible = false
+#			$FromLocList/Sendbutton/Label.text = 'Send'
+#		$FromLocList/Sendbutton.visible = true
+		info_btn_send.visible = false
+		info_btn_teleport.visible = false
+	else:
+		$ToLocList.visible = true
+		if from_loc == 'adv_mode':
+			$FromLocList.visible = false
+			$mode/Label.text = tr("SMPL_MODE_LABEL")
+			$mode.visible = true
+		else:
+			$FromLocList.visible = true
+#			$FromLocList/Sendbutton.visible = false
+			$mode.visible = false
+
+
+func from_loc_set():
+	if from_loc == 'adv_mode':
+		selected_loc = null
+		reset_from()
+		return
+	if selected_loc == null:
+		selected_loc = 'adv_mode'
+		update_location_chars()
+	else:
+		for loc_data in sorted_locations:
+			if loc_data.id == selected_loc:
+				selected_area = loc_data.area
+				break
+	from_loc = selected_loc
+#	loc_locked = false
+	build_to_locations()
+	set_focus_area()
+	build_info()
+	match_state()
+
+
+#func to_loc_set():#is in use?
+#	if selected_loc == null: 
+#		return
+#	to_loc = selected_loc
+##	loc_locked = false
+##	build_from_locations()
+#	build_info()
+#	match_state()
+
+
+func reset_to():
+#	from_loc = null
+	to_loc = null
+#	unselect_area()
+	unselect_location()
+	match_state()
+	build_to_locations()
+	build_info(null)
+
+
+func reset_from():
+	from_loc = null
+	to_loc = null
+	selected_loc = null
+	selected_chars.clear()
+	selected_groups.clear()
+	unselect_area()
+	unselect_location()
+	build_from_locations()
+	update_location_chars()
+	match_state()
+	build_info(null)
+
+
+func confirm_travel(by_teleport = false):
+	if from_loc == to_loc:
+		return
+	var flocdata = ResourceScripts.world_gen.get_location_from_code(from_loc)
+	for chid in selected_chars:
+		var person = characters_pool.get_char_by_id(chid)
+		person.remove_from_task()
+		person.process_event(variables.TR_MOVE)
+		if ResourceScripts.game_globals.instant_travel == false and !by_teleport :
+			person.set_travel_to(from_loc, to_loc)
+		else:
+#			person.set_work('') #not needed after remove from task
+			person.instant_travel(to_loc)
+	input_handler.PlaySound("ding")
+	globals.emit_signal("slave_departed")
+	selected_chars.clear()
+	selected_groups.clear()
+	reset_from()
+	reset_to()
+	selected_loc = null
+	build_locations_list()
+	build_from_locations()
+	update_location_chars()
+	match_state()
+	build_info(selected_loc)
+
+
+func set_loc_text (btn, text):
+	btn.get_node("Label").text = text
+	var font = input_handler.font_size_calculator(btn.get_node("Label"))
+	btn.get_node("Label").set("custom_fonts/font", font)
+
+#groups
+func add_one_char_to_group(ch_id, group_name):
+	group_move_chars = [ch_id]
+	change_group_for_chars(group_name)
+
+func add_sel_char_to_group(group_name):
+	if selected_chars.empty():
+		push_error("add_selected_char_to_group: at least 1 char should be selected!")
+		return
+	group_move_chars = selected_chars
+	change_group_for_chars(group_name)
+
+func rename_group(group_name, loc_id):
+	group_to_rename = group_name
+	var node = input_handler.get_spec_node(input_handler.NODE_TEXTEDIT)
+	node.open(self, 'set_new_group_name', group_name, '', 'check_group_new_name')
+
+func check_group_new_name(new_name):
+	if !has_group(new_name.strip_edges()):
+		return true
+#	input_handler.SystemMessage(tr('TRAVEL_HAS_GROUP'))
+	input_handler.get_spec_node(input_handler.NODE_POPUP, [tr('TRAVEL_HAS_GROUP')])
+	return false
+
+func set_new_group_name(new_name):
+	new_name = new_name.strip_edges()
+	if group_to_rename == null:
+		push_error("set_new_group_name: no group_to_rename was set!")
+		return
+	for ch_id in char_groups[group_to_rename].chars:
+		var person = characters_pool.get_char_by_id(ch_id)
+		person.set_loc_group(new_name)
+	var groups_ref = ResourceScripts.game_party.travel_groups_ref
+	groups_ref[new_name] = groups_ref[group_to_rename]
+	group_to_rename = null
+	reset_from()
+
+func prepare_new_group_one(ch_id):
+	group_move_chars = [ch_id]
+	ask_group_name()
+
+func prepare_new_group_sel():
+	if selected_chars.empty():
+		push_error("prepare_new_group_sel: at least 1 char should be selected!")
+		return
+	group_move_chars = selected_chars
+	ask_group_name()
+
+func ask_group_name():
+	var node = input_handler.get_spec_node(input_handler.NODE_TEXTEDIT)
+	node.open(self, 'make_new_group', make_new_group_name(), '', 'check_group_new_name')
+
+func make_new_group(new_group):
+	new_group = new_group.strip_edges()
+	change_group_for_chars(new_group)
+
+func change_group_for_chars(new_group):
+	for ch_id in group_move_chars:
+		var person = characters_pool.get_char_by_id(ch_id)
+		person.set_loc_group(new_group)
+	group_move_chars = []
+	reset_from()
+
+func has_group(group_name):
+	return char_groups.has(group_name)
+
+func make_new_group_name():
+	var i = 1
+	while i < 10000:
+		var new_name = "Group %d" % i
+		if !has_group(new_name):
+			return new_name
+		i += 1
+	return "Error name"
+
+func append_char_group(group_name, char_list):
+	char_groups[group_name] = {chars = char_list, priority = 10}
+	var groups_ref = ResourceScripts.game_party.travel_groups_ref
+	if groups_ref.has(group_name):
+		char_groups[group_name].priority = groups_ref[group_name].priority
+
+func update_groups_ref():
+	var groups_ref = ResourceScripts.game_party.travel_groups_ref
+	for group_name in char_groups:
+		if !groups_ref.has(group_name):
+			groups_ref[group_name] = {}
+		groups_ref[group_name].priority = char_groups[group_name].priority
+	for group_name in groups_ref.keys():
+		if !char_groups.has(group_name):
+			groups_ref.erase(group_name)
+
+func update_single_group_ref(group_name):
+	var groups_ref = ResourceScripts.game_party.travel_groups_ref
+	if !groups_ref.has(group_name):
+		groups_ref[group_name] = {}
+	groups_ref[group_name].priority = char_groups[group_name].priority
+
+func sort_groups(old_list):#REDO: not quite optimized
+	var new_list = []
+	var priority_dict = {}
+	for group_name in old_list:
+		var prior = char_groups[group_name].priority
+		if !priority_dict.has(prior):
+			priority_dict[prior] = []
+		priority_dict[prior].append(group_name)
+	var keys = priority_dict.keys()
+	keys.sort()
+	for i in keys:
+		new_list.append_array(priority_dict[i])
+	for i in range(0, new_list.size()):
+		char_groups[new_list[i]].priority = i
+		update_single_group_ref(new_list[i])
+		#updating travel_groups_ref here is not necessary, while there is update_groups_ref() at
+		#the end of build_from_locations()
+	return new_list
+
+func move_group_prior_up(group_name, loc_id):
+	if char_groups[group_name].priority == 0:
+		return
+	char_groups[group_name].priority -= 1
+	update_single_group_ref(group_name)
+	for rgp in char_groups_by_loc[loc_id]:
+		if rgp != group_name and char_groups[rgp].priority == char_groups[group_name].priority:
+			char_groups[rgp].priority += 1
+			update_single_group_ref(rgp)
+			break
+	reset_from()
+
+func move_group_prior_down(group_name, loc_id):
+	char_groups[group_name].priority += 1
+	update_single_group_ref(group_name)
+	for rgp in char_groups_by_loc[loc_id]:
+		if rgp != group_name and char_groups[rgp].priority == char_groups[group_name].priority:
+			char_groups[rgp].priority -= 1
+			update_single_group_ref(rgp)
+			break
+	reset_from()
+
+func open_char_menu(ch_id, loc_id):
+	var actions = [
+		{
+			"label": tr("TRAVEL_ADD_GROUP"),
+			"callback": funcref(self, "prepare_new_group_one"),
+			"args": [ch_id]
+		}
+	]
+	var person = characters_pool.get_char_by_id(ch_id)
+	var cur_group = person.get_loc_group()
+	for group_name in char_groups_by_loc[loc_id]:
+		if group_name == cur_group:
+			continue
+		actions.append({
+			"label": tr("TRAVEL_MOVE_TO") % group_name,
+			"callback": funcref(self, "add_one_char_to_group"),
+			"args": [ch_id, group_name]
+		})
+	if !selected_chars.empty():
+		actions.append_array([
+			{
+				"separator": tr("TRAVEL_ALL_SELECTED")
+			},
+			{
+				"label": tr("TRAVEL_ADD_GROUP"),
+				"callback": funcref(self, "prepare_new_group_sel")
+			}
+		])
+		var groups_of_selected_chars = {}
+		for ch_id in selected_chars:
+			for group_name in char_groups:
+				if char_groups[group_name].chars.has(ch_id):
+					groups_of_selected_chars[group_name] = true
+		var blocked_group
+		if groups_of_selected_chars.keys().size() == 1:
+			blocked_group = groups_of_selected_chars.keys()[0]
+		for group_name in char_groups_by_loc[selected_loc]:
+			if blocked_group and blocked_group == group_name:
+				continue
+			actions.append({
+				"label": tr("TRAVEL_MOVE_TO") % group_name,
+				"callback": funcref(self, "add_sel_char_to_group"),
+				"args": [group_name]
+			})
+	$FromLocList/ContextMenu.open_with_actions(person.get_short_name(), actions, get_viewport().get_mouse_position())
+
+func open_group_menu(group_name, loc_id):
+	var actions = [
+		{
+			"label": tr("TRAVEL_GROUP_RENAME"),
+			"callback": funcref(self, "rename_group"),
+			"args": [group_name, loc_id]
+		}
+	]
+	if char_groups[group_name].priority > 0:
+		actions.append({
+			"label": tr("TRAVEL_MOVE_UP"),
+			"callback": funcref(self, "move_group_prior_up"),
+			"args": [group_name, loc_id]
+		})
+	actions.append({
+		"label": tr("TRAVEL_MOVE_DOWN"),
+		"callback": funcref(self, "move_group_prior_down"),
+		"args": [group_name, loc_id]
+	})
+	$FromLocList/ContextMenu.open_with_actions(group_name, actions, get_viewport().get_mouse_position())
+
+func switch_teleport_menu():
+	info_teleport_menu.visible = !info_teleport_menu.visible
+
+func cast_teleport(chid):
+	if from_loc == to_loc:
+		return
+	info_teleport_menu.hide()
+	var caster = characters_pool.get_char_by_id(chid)
+	var skill = Skilldata.get_template('teleport', caster)
+	caster.pay_cost(skill.cost)
+	caster.spend_combat_charge(skill.code, skill.cooldown)
+	confirm_travel(true)

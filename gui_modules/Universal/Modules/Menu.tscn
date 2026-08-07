@@ -1,0 +1,1202 @@
+[gd_scene load_steps=93 format=2]
+
+[ext_resource path="res://assets/Themes_v2/UNIVERSAL/NonDecorButton_with_Font.tres" type="Theme" id=1]
+[ext_resource path="res://assets/Themes_v2/UNIVERSAL/PT_24_Label.tres" type="Theme" id=2]
+[ext_resource path="res://assets/Themes_v2/UNIVERSAL/VScrollBar.tres" type="Theme" id=3]
+[ext_resource path="res://assets/Fonts_v2/Noto_Sans_SC/NotoSansSC-Regular.otf" type="DynamicFontData" id=4]
+[ext_resource path="res://assets/Themes_v2/EmptyTexture.tres" type="StyleBox" id=5]
+[ext_resource path="res://assets/Themes_v2/UNIVERSAL/PanelBorders.tres" type="StyleBox" id=6]
+[ext_resource path="res://assets/Textures_v2/MANSION/Craft/Buttons/button_craftchoose.png" type="Texture" id=7]
+[ext_resource path="res://assets/Textures_v2/Universal/Buttons/buttonbig_decor.png" type="Texture" id=8]
+[ext_resource path="res://assets/Textures_v2/Universal/Buttons/buttonbig_decor_pressed.png" type="Texture" id=9]
+[ext_resource path="res://assets/Textures_v2/Universal/Buttons/buttonbig_decor_hover.png" type="Texture" id=10]
+[ext_resource path="res://assets/images/iconsitems/gold.png" type="Texture" id=11]
+[ext_resource path="res://assets/Themes_v2/UNIVERSAL/CheckBox.tres" type="Theme" id=12]
+[ext_resource path="res://assets/Themes_v2/UNIVERSAL/DecorButton.tres" type="Theme" id=13]
+[ext_resource path="res://assets/images/gui/exclamation.png" type="Texture" id=14]
+[ext_resource path="res://assets/Themes_v2/UNIVERSAL/Ledger_30.tres" type="DynamicFont" id=15]
+[ext_resource path="res://assets/Textures_v2/MANSION/Craft/Buttons/button_craftchoose_hover.png" type="Texture" id=16]
+[ext_resource path="res://src/scenes/SaveLoadPanel.tscn" type="PackedScene" id=17]
+[ext_resource path="res://src/scenes/Options.tscn" type="PackedScene" id=18]
+[ext_resource path="res://assets/Textures_v2/MAIN_MENU/Panels/panel_modsoptions.png" type="Texture" id=19]
+[ext_resource path="res://src/scenes/ModPanel.tscn" type="PackedScene" id=20]
+[ext_resource path="res://src/scenes/WarnScreen.tscn" type="PackedScene" id=21]
+[ext_resource path="res://gui_modules/Universal/Modules/Gallery.tscn" type="PackedScene" id=22]
+[ext_resource path="res://assets/Themes_v2/MAIN_MENU/Menu_NewGameOptions.tres" type="Theme" id=23]
+[ext_resource path="res://assets/fonts/BLKCHCRY.TTF" type="DynamicFontData" id=24]
+[ext_resource path="res://gui_modules/Universal/Scripts/Menu.gd" type="Script" id=25]
+[ext_resource path="res://assets/fonts/CursiveFont.tres" type="DynamicFont" id=26]
+[ext_resource path="res://assets/images/backgroundmenu/mountain1.jpg" type="Texture" id=27]
+[ext_resource path="res://assets/Fonts_v2/FontThemes/MainMiddle.tres" type="DynamicFont" id=28]
+[ext_resource path="res://assets/Fonts_v2/Ledger/Ledger-Regular.ttf" type="DynamicFontData" id=29]
+[ext_resource path="res://assets/images/buttons/mainmenu/button_itch2.png" type="Texture" id=30]
+[ext_resource path="res://assets/images/buttons/mainmenu/button_subscribestar.png" type="Texture" id=31]
+[ext_resource path="res://assets/images/buttons/mainmenu/button_subscribestar2.png" type="Texture" id=32]
+[ext_resource path="res://assets/Themes_v2/UNIVERSAL/NS_24.tres" type="DynamicFont" id=33]
+[ext_resource path="res://assets/Themes_v2/UNIVERSAL/DropDown.tres" type="Theme" id=34]
+[ext_resource path="res://assets/Textures_v2/CHAR_CREATION/new/triangles_selection_hover1.png" type="Texture" id=35]
+[ext_resource path="res://assets/Textures_v2/CHAR_CREATION/new/triangles_selection_hover2.png" type="Texture" id=36]
+[ext_resource path="res://assets/Textures_v2/CHAR_CREATION/new/triangles_selection_right.png" type="Texture" id=37]
+[ext_resource path="res://assets/Textures_v2/CHAR_CREATION/new/triangles_selection_active2.png" type="Texture" id=38]
+[ext_resource path="res://assets/Textures_v2/CHAR_CREATION/new/triangles_selection_active1.png" type="Texture" id=39]
+[ext_resource path="res://assets/Textures_v2/CHAR_CREATION/new/triangles_selection_left.png" type="Texture" id=40]
+[ext_resource path="res://assets/images/buttons/mainmenu/button_discord2.png" type="Texture" id=41]
+[ext_resource path="res://assets/Textures_v2/CHAR_CREATION/new/button_choose_basic.png" type="Texture" id=42]
+[ext_resource path="res://assets/Themes_v2/UNIVERSAL/ConfirmWindowTheme.tres" type="Theme" id=43]
+[ext_resource path="res://assets/Textures_v2/Universal/Buttons/buttonbig.png" type="Texture" id=44]
+[ext_resource path="res://assets/Textures_v2/Universal/Icons/tick.png" type="Texture" id=45]
+[ext_resource path="res://assets/images/buttons/mainmenu/button_discord.png" type="Texture" id=46]
+[ext_resource path="res://assets/Textures_v2/Universal/Buttons/buttonbig_disabled.png" type="Texture" id=47]
+[ext_resource path="res://assets/Textures_v2/Universal/Buttons/buttonbig_hover_pressed.png" type="Texture" id=48]
+[ext_resource path="res://assets/Textures_v2/Universal/Icons/tick_hover.png" type="Texture" id=49]
+[ext_resource path="res://assets/Textures_v2/Universal/Icons/tick_chosen.png" type="Texture" id=50]
+[ext_resource path="res://assets/Textures_v2/Universal/Icons/tick_chosen_disabled.png" type="Texture" id=51]
+[ext_resource path="res://assets/Textures_v2/Universal/Panels/panel_simple.png" type="Texture" id=52]
+[ext_resource path="res://assets/Textures_v2/Universal/Panels/panel_square.png" type="Texture" id=53]
+[ext_resource path="res://assets/Themes_v2/MAIN_MENU/Menu_StartGame_panel.tres" type="StyleBox" id=54]
+[ext_resource path="res://assets/images/buttons/mainmenu/button_patreon.png" type="Texture" id=55]
+[ext_resource path="res://assets/Themes_v2/UNIVERSAL/PT_24.tres" type="DynamicFont" id=56]
+[ext_resource path="res://gui_modules/Universal/Modules/game_plus_bonus.gd" type="Script" id=57]
+[ext_resource path="res://assets/images/buttons/mainmenu/button_patreon2.png" type="Texture" id=58]
+[ext_resource path="res://assets/images/buttons/mainmenu/button_fandom2.png" type="Texture" id=59]
+[ext_resource path="res://assets/images/buttons/mainmenu/button_itch.png" type="Texture" id=60]
+[ext_resource path="res://assets/images/buttons/mainmenu/button_fandom.png" type="Texture" id=61]
+[ext_resource path="res://assets/images/portraits/daisy_prt/daisy_default_prt_bold.png" type="Texture" id=62]
+[ext_resource path="res://assets/Themes_v2/CHAR_INFO/CHI_SEX_Skills.tres" type="Theme" id=63]
+[ext_resource path="res://assets/Textures_v2/Universal/Icons/tick_disabled.png" type="Texture" id=64]
+[ext_resource path="res://gui_modules/achievements/bonus_unit.tscn" type="PackedScene" id=65]
+[ext_resource path="res://src/scenes/CloseButton.tscn" type="PackedScene" id=66]
+[ext_resource path="res://assets/Fonts_v2/Noto_Serif/NotoSerif-BoldItalic.ttf" type="DynamicFontData" id=67]
+[ext_resource path="res://assets/Fonts_v2/Noto_Sans_SC/NotoSansSC-Medium.otf" type="DynamicFontData" id=68]
+[ext_resource path="res://assets/images/buttons/mainmenu/X1.png" type="Texture" id=69]
+[ext_resource path="res://assets/images/buttons/mainmenu/X.png" type="Texture" id=70]
+[ext_resource path="res://gui_modules/Universal/Modules/UpdateNotice.tscn" type="PackedScene" id=71]
+
+[sub_resource type="DynamicFont" id=5]
+size = 64
+outline_size = 3
+outline_color = Color( 0.137255, 0.137255, 0.137255, 1 )
+use_mipmaps = true
+use_filter = true
+font_data = ExtResource( 29 )
+fallback/0 = ExtResource( 68 )
+
+[sub_resource type="StyleBoxTexture" id=1]
+
+[sub_resource type="StyleBoxEmpty" id=2]
+
+[sub_resource type="StyleBoxEmpty" id=3]
+
+[sub_resource type="StyleBoxTexture" id=4]
+
+[sub_resource type="DynamicFont" id=6]
+size = 128
+outline_size = 3
+outline_color = Color( 0, 0, 0, 1 )
+use_mipmaps = true
+use_filter = true
+extra_spacing_bottom = -10
+font_data = ExtResource( 24 )
+fallback/0 = ExtResource( 67 )
+
+[sub_resource type="DynamicFont" id=7]
+size = 24
+use_filter = true
+font_data = ExtResource( 4 )
+
+[sub_resource type="StyleBoxTexture" id=8]
+texture = ExtResource( 10 )
+region_rect = Rect2( 0, 0, 210, 58 )
+
+[sub_resource type="StyleBoxTexture" id=9]
+texture = ExtResource( 9 )
+region_rect = Rect2( 0, 0, 210, 58 )
+
+[sub_resource type="StyleBoxTexture" id=10]
+texture = ExtResource( 8 )
+region_rect = Rect2( 0, 0, 210, 58 )
+
+[sub_resource type="DynamicFont" id=11]
+size = 18
+use_filter = true
+font_data = ExtResource( 4 )
+
+[sub_resource type="ImageTexture" id=12]
+
+[sub_resource type="StyleBoxTexture" id=13]
+texture = ExtResource( 49 )
+region_rect = Rect2( 0, 0, 40, 40 )
+
+[sub_resource type="StyleBoxTexture" id=14]
+texture = ExtResource( 50 )
+region_rect = Rect2( 0, 0, 40, 40 )
+
+[sub_resource type="StyleBoxTexture" id=21]
+texture = ExtResource( 64 )
+region_rect = Rect2( 0, 0, 40, 40 )
+
+[sub_resource type="StyleBoxTexture" id=15]
+texture = ExtResource( 51 )
+region_rect = Rect2( 0, 0, 40, 40 )
+
+[sub_resource type="StyleBoxTexture" id=16]
+texture = ExtResource( 45 )
+region_rect = Rect2( 0, 0, 40, 40 )
+
+[sub_resource type="StyleBoxTexture" id=17]
+texture = ExtResource( 48 )
+region_rect = Rect2( 0, 0, 194, 58 )
+margin_left = 9.0
+margin_right = 9.0
+margin_top = 9.0
+margin_bottom = 9.0
+
+[sub_resource type="StyleBoxTexture" id=18]
+texture = ExtResource( 48 )
+region_rect = Rect2( 0, 0, 194, 58 )
+margin_left = 9.0
+margin_right = 9.0
+margin_top = 9.0
+margin_bottom = 9.0
+
+[sub_resource type="StyleBoxTexture" id=20]
+texture = ExtResource( 47 )
+region_rect = Rect2( 0, 0, 194, 58 )
+margin_left = 7.0
+margin_right = 7.0
+margin_top = 7.0
+margin_bottom = 7.0
+
+[sub_resource type="StyleBoxTexture" id=19]
+texture = ExtResource( 44 )
+region_rect = Rect2( 0, 0, 194, 58 )
+margin_left = 7.0
+margin_right = 7.0
+margin_top = 7.0
+margin_bottom = 7.0
+
+[node name="Menu" type="Control"]
+margin_top = -1.0
+margin_bottom = -1.0
+script = ExtResource( 25 )
+
+[node name="background" type="TextureRect" parent="."]
+margin_right = 2160.0
+margin_bottom = 1080.0
+texture = ExtResource( 27 )
+stretch_mode = 1
+
+[node name="TextureRect2" type="TextureRect" parent="."]
+margin_left = -3.0
+margin_top = 1.0
+margin_right = 2157.0
+margin_bottom = 1081.0
+stretch_mode = 1
+
+[node name="TextureRect3" type="TextureRect" parent="."]
+margin_left = -3.0
+margin_top = 1.0
+margin_right = 2157.0
+margin_bottom = 1081.0
+stretch_mode = 1
+
+[node name="TextureRect4" type="TextureRect" parent="."]
+margin_left = -3.0
+margin_top = 1.0
+margin_right = 2157.0
+margin_bottom = 1081.0
+stretch_mode = 1
+
+[node name="char_sprite" type="TextureRect" parent="."]
+visible = false
+margin_left = 1008.17
+margin_top = -0.513306
+margin_right = 1921.17
+margin_bottom = 1079.49
+stretch_mode = 6
+
+[node name="VBoxContainer" type="VBoxContainer" parent="."]
+margin_left = 634.0
+margin_top = 202.0
+margin_right = 1286.0
+margin_bottom = 1076.0
+custom_constants/separation = 8
+
+[node name="continuebutton" type="Button" parent="VBoxContainer"]
+margin_left = 6.0
+margin_right = 645.0
+margin_bottom = 90.0
+size_flags_horizontal = 4
+size_flags_vertical = 4
+custom_colors/font_color = Color( 0.913725, 0.894118, 0.737255, 1 )
+custom_colors/font_color_pressed = Color( 0.733333, 0.74902, 0.545098, 1 )
+custom_fonts/font = SubResource( 5 )
+custom_styles/hover = SubResource( 1 )
+custom_styles/pressed = SubResource( 2 )
+custom_styles/focus = SubResource( 3 )
+custom_styles/normal = SubResource( 4 )
+toggle_mode = true
+text = "MENUCONTINUE"
+
+[node name="newgamebutton" type="Button" parent="VBoxContainer"]
+margin_top = 98.0
+margin_right = 652.0
+margin_bottom = 188.0
+size_flags_horizontal = 4
+size_flags_vertical = 4
+custom_colors/font_color = Color( 0.913725, 0.894118, 0.737255, 1 )
+custom_colors/font_color_pressed = Color( 0.733333, 0.74902, 0.545098, 1 )
+custom_fonts/font = SubResource( 5 )
+custom_styles/hover = SubResource( 1 )
+custom_styles/pressed = SubResource( 2 )
+custom_styles/focus = SubResource( 3 )
+custom_styles/normal = SubResource( 4 )
+toggle_mode = true
+text = "MENUNEWGAME"
+__meta__ = {
+"_editor_description_": ""
+}
+
+[node name="loadbutton" type="Button" parent="VBoxContainer"]
+margin_left = 102.0
+margin_top = 196.0
+margin_right = 550.0
+margin_bottom = 286.0
+size_flags_horizontal = 4
+size_flags_vertical = 4
+custom_colors/font_color = Color( 0.913725, 0.894118, 0.737255, 1 )
+custom_colors/font_color_pressed = Color( 0.733333, 0.74902, 0.545098, 1 )
+custom_fonts/font = SubResource( 5 )
+custom_styles/hover = SubResource( 1 )
+custom_styles/pressed = SubResource( 2 )
+custom_styles/focus = SubResource( 3 )
+custom_styles/normal = SubResource( 4 )
+toggle_mode = true
+text = "MENULOAD"
+__meta__ = {
+"_editor_description_": ""
+}
+
+[node name="optionsbutton" type="Button" parent="VBoxContainer"]
+margin_left = 43.0
+margin_top = 294.0
+margin_right = 608.0
+margin_bottom = 384.0
+size_flags_horizontal = 4
+size_flags_vertical = 4
+custom_colors/font_color = Color( 0.913725, 0.894118, 0.737255, 1 )
+custom_colors/font_color_pressed = Color( 0.733333, 0.74902, 0.545098, 1 )
+custom_fonts/font = SubResource( 5 )
+custom_styles/hover = SubResource( 1 )
+custom_styles/pressed = SubResource( 2 )
+custom_styles/focus = SubResource( 3 )
+custom_styles/normal = SubResource( 4 )
+toggle_mode = true
+text = "MENUOPTIONS"
+__meta__ = {
+"_editor_description_": ""
+}
+
+[node name="creditsbutton" type="Button" parent="VBoxContainer"]
+margin_left = 48.0
+margin_top = 392.0
+margin_right = 603.0
+margin_bottom = 482.0
+size_flags_horizontal = 4
+size_flags_vertical = 4
+custom_colors/font_color = Color( 0.913725, 0.894118, 0.737255, 1 )
+custom_colors/font_color_pressed = Color( 0.733333, 0.74902, 0.545098, 1 )
+custom_fonts/font = SubResource( 5 )
+custom_styles/hover = SubResource( 1 )
+custom_styles/pressed = SubResource( 2 )
+custom_styles/focus = SubResource( 3 )
+custom_styles/normal = SubResource( 4 )
+toggle_mode = true
+text = "MENUCREDITS"
+__meta__ = {
+"_editor_description_": ""
+}
+
+[node name="modsbutton" type="Button" parent="VBoxContainer"]
+margin_left = 98.0
+margin_top = 490.0
+margin_right = 554.0
+margin_bottom = 580.0
+size_flags_horizontal = 4
+size_flags_vertical = 4
+custom_colors/font_color = Color( 0.913725, 0.894118, 0.737255, 1 )
+custom_colors/font_color_pressed = Color( 0.733333, 0.74902, 0.545098, 1 )
+custom_fonts/font = SubResource( 5 )
+custom_styles/hover = SubResource( 1 )
+custom_styles/pressed = SubResource( 2 )
+custom_styles/focus = SubResource( 3 )
+custom_styles/normal = SubResource( 4 )
+toggle_mode = true
+text = "MENUMODS"
+__meta__ = {
+"_editor_description_": ""
+}
+
+[node name="gallery" type="Button" parent="VBoxContainer"]
+margin_left = 33.0
+margin_top = 588.0
+margin_right = 619.0
+margin_bottom = 678.0
+size_flags_horizontal = 4
+size_flags_vertical = 4
+custom_colors/font_color = Color( 0.913725, 0.894118, 0.737255, 1 )
+custom_colors/font_color_pressed = Color( 0.733333, 0.74902, 0.545098, 1 )
+custom_fonts/font = SubResource( 5 )
+custom_styles/hover = SubResource( 1 )
+custom_styles/pressed = SubResource( 2 )
+custom_styles/focus = SubResource( 3 )
+custom_styles/normal = SubResource( 4 )
+toggle_mode = true
+text = "MENUGALLERY"
+__meta__ = {
+"_editor_description_": ""
+}
+
+[node name="quitbutton" type="Button" parent="VBoxContainer"]
+margin_left = 115.0
+margin_top = 686.0
+margin_right = 537.0
+margin_bottom = 776.0
+size_flags_horizontal = 4
+size_flags_vertical = 4
+custom_colors/font_color = Color( 0.913725, 0.894118, 0.737255, 1 )
+custom_colors/font_color_pressed = Color( 0.733333, 0.74902, 0.545098, 1 )
+custom_fonts/font = SubResource( 5 )
+custom_styles/hover = SubResource( 1 )
+custom_styles/pressed = SubResource( 2 )
+custom_styles/focus = SubResource( 3 )
+custom_styles/normal = SubResource( 4 )
+toggle_mode = true
+text = "MENUQUIT"
+__meta__ = {
+"_editor_description_": ""
+}
+
+[node name="Panel" type="Panel" parent="."]
+self_modulate = Color( 1, 1, 1, 0 )
+margin_left = 97.0
+margin_top = 603.0
+margin_right = 436.0
+margin_bottom = 696.0
+rect_scale = Vector2( 0.8, 0.8 )
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Panel"]
+margin_left = -116.0
+margin_top = 6.75
+margin_right = 76.0
+margin_bottom = 956.75
+rect_scale = Vector2( 0.5, 0.5 )
+custom_constants/separation = 10
+
+[node name="Subscribestar" type="TextureButton" parent="Panel/VBoxContainer"]
+margin_right = 192.0
+margin_bottom = 150.0
+rect_min_size = Vector2( 150, 150 )
+texture_normal = ExtResource( 31 )
+texture_hover = ExtResource( 32 )
+texture_focused = ExtResource( 32 )
+expand = true
+stretch_mode = 5
+
+[node name="Patreon" type="TextureButton" parent="Panel/VBoxContainer"]
+margin_top = 160.0
+margin_right = 192.0
+margin_bottom = 310.0
+rect_min_size = Vector2( 150, 150 )
+texture_normal = ExtResource( 55 )
+texture_hover = ExtResource( 58 )
+texture_focused = ExtResource( 58 )
+expand = true
+stretch_mode = 5
+
+[node name="Discord" type="TextureButton" parent="Panel/VBoxContainer"]
+margin_top = 320.0
+margin_right = 192.0
+margin_bottom = 470.0
+rect_min_size = Vector2( 150, 150 )
+texture_normal = ExtResource( 46 )
+texture_hover = ExtResource( 41 )
+texture_focused = ExtResource( 41 )
+expand = true
+stretch_mode = 5
+
+[node name="Itch" type="TextureButton" parent="Panel/VBoxContainer"]
+margin_top = 480.0
+margin_right = 192.0
+margin_bottom = 630.0
+rect_min_size = Vector2( 150, 150 )
+texture_normal = ExtResource( 60 )
+texture_hover = ExtResource( 30 )
+texture_focused = ExtResource( 30 )
+expand = true
+stretch_mode = 5
+
+[node name="Wiki" type="TextureButton" parent="Panel/VBoxContainer"]
+margin_top = 640.0
+margin_right = 192.0
+margin_bottom = 790.0
+rect_min_size = Vector2( 150, 150 )
+texture_normal = ExtResource( 61 )
+texture_hover = ExtResource( 59 )
+texture_focused = ExtResource( 59 )
+expand = true
+stretch_mode = 5
+
+[node name="X" type="TextureButton" parent="Panel/VBoxContainer"]
+margin_top = 800.0
+margin_right = 192.0
+margin_bottom = 950.0
+rect_min_size = Vector2( 150, 150 )
+texture_normal = ExtResource( 69 )
+texture_hover = ExtResource( 70 )
+texture_focused = ExtResource( 70 )
+expand = true
+stretch_mode = 5
+
+[node name="MainLabel" type="Label" parent="."]
+margin_left = 563.0
+margin_top = 59.0
+margin_right = 1413.0
+margin_bottom = 210.0
+custom_colors/font_color = Color( 0.980392, 0.960784, 0.772549, 1 )
+custom_fonts/font = SubResource( 6 )
+text = "Strive: Conquest"
+align = 1
+
+[node name="Options" parent="." instance=ExtResource( 18 )]
+visible = false
+margin_left = 635.0
+margin_right = 1384.0
+margin_bottom = 920.0
+
+[node name="saveloadpanel" parent="." instance=ExtResource( 17 )]
+visible = false
+margin_left = 635.0
+margin_top = 138.0
+margin_right = 1285.0
+margin_bottom = 912.0
+
+[node name="version" type="Label" parent="."]
+margin_left = 12.0
+margin_top = 1037.0
+margin_right = 115.0
+margin_bottom = 1072.0
+theme = ExtResource( 2 )
+custom_colors/font_color = Color( 0.909804, 0.898039, 0.756863, 1 )
+custom_fonts/font = ExtResource( 26 )
+text = "ver. 0.1.0"
+__meta__ = {
+"_editor_description_": ""
+}
+
+[node name="DemoPanel" type="Panel" parent="."]
+visible = false
+margin_left = 716.0
+margin_top = 347.0
+margin_right = 1336.0
+margin_bottom = 712.0
+
+[node name="RichTextLabel" type="RichTextLabel" parent="DemoPanel"]
+margin_left = 47.0
+margin_top = 47.0
+margin_right = 574.0
+margin_bottom = 215.0
+bbcode_enabled = true
+bbcode_text = "This is an early demo version. Everything you see is a subject to change and should be treated as a representation of general idea and quality level of the future product. Thank you for trying out this game."
+text = "This is an early demo version. Everything you see is a subject to change and should be treated as a representation of general idea and quality level of the future product. Thank you for trying out this game."
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Button" type="Button" parent="DemoPanel"]
+visible = false
+margin_left = 170.0
+margin_top = 289.0
+margin_right = 431.0
+margin_bottom = 340.0
+text = "Confirm"
+
+[node name="WarnScreen" parent="." instance=ExtResource( 21 )]
+visible = false
+margin_left = 0.01477
+margin_top = 0.0440397
+margin_bottom = 1080.04
+
+[node name="mod_panel" parent="." instance=ExtResource( 20 )]
+visible = false
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+margin_left = 340.811
+margin_top = 140.276
+margin_right = 1601.81
+margin_bottom = 943.276
+
+[node name="ModListSafetyPopup" type="PanelContainer" parent="."]
+visible = false
+margin_left = 560.0
+margin_top = 250.0
+margin_right = 1360.0
+margin_bottom = 756.0
+
+[node name="VBoxContainer" type="VBoxContainer" parent="ModListSafetyPopup"]
+margin_left = 7.0
+margin_top = 7.0
+margin_right = 793.0
+margin_bottom = 499.0
+
+[node name="Title" type="Label" parent="ModListSafetyPopup/VBoxContainer"]
+margin_right = 786.0
+margin_bottom = 42.0
+size_flags_vertical = 0
+custom_colors/font_color = Color( 0.976471, 0.882353, 0.505882, 1 )
+custom_fonts/font = ExtResource( 15 )
+text = "MENUMODLISTSAFETY"
+align = 1
+
+[node name="RichTextLabel" type="RichTextLabel" parent="ModListSafetyPopup/VBoxContainer"]
+margin_top = 46.0
+margin_right = 786.0
+margin_bottom = 82.0
+theme = ExtResource( 3 )
+custom_fonts/normal_font = ExtResource( 33 )
+bbcode_enabled = true
+fit_content_height = true
+
+[node name="CloseButton" parent="ModListSafetyPopup" instance=ExtResource( 66 )]
+margin_left = 7.0
+margin_top = 7.0
+margin_right = 37.0
+margin_bottom = 37.0
+size_flags_horizontal = 0
+size_flags_vertical = 0
+
+[node name="NewGameCont" type="HBoxContainer" parent="."]
+visible = false
+margin_left = 30.0
+margin_top = 143.0
+margin_right = 1893.0
+margin_bottom = 913.0
+alignment = 1
+
+[node name="NewGamePanel" type="Panel" parent="NewGameCont"]
+margin_left = 576.0
+margin_right = 1286.0
+margin_bottom = 770.0
+rect_min_size = Vector2( 710, 0 )
+custom_styles/panel = ExtResource( 54 )
+
+[node name="NewGameLabel" type="Label" parent="NewGameCont/NewGamePanel"]
+margin_right = 709.0
+margin_bottom = 85.0
+custom_colors/font_color = Color( 0.976471, 0.882353, 0.505882, 1 )
+custom_fonts/font = ExtResource( 15 )
+text = "NEWGAMENAME"
+align = 1
+valign = 1
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="SettingsLabel" type="Label" parent="NewGameCont/NewGamePanel"]
+margin_left = 6.0
+margin_top = 187.0
+margin_right = 294.0
+margin_bottom = 234.0
+custom_colors/font_color = Color( 0.976471, 0.882353, 0.505882, 1 )
+custom_fonts/font = SubResource( 7 )
+text = "NEWGAMESETTING"
+align = 1
+valign = 1
+
+[node name="PresetContainer" type="ScrollContainer" parent="NewGameCont/NewGamePanel"]
+margin_left = 40.0
+margin_top = 111.0
+margin_right = 266.0
+margin_bottom = 422.0
+theme = ExtResource( 23 )
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="VBoxContainer" type="VBoxContainer" parent="NewGameCont/NewGamePanel/PresetContainer"]
+margin_right = 226.0
+size_flags_horizontal = 3
+
+[node name="Button" type="Button" parent="NewGameCont/NewGamePanel/PresetContainer/VBoxContainer"]
+visible = false
+margin_right = 226.0
+margin_bottom = 55.0
+rect_min_size = Vector2( 0, 40 )
+theme = ExtResource( 1 )
+toggle_mode = true
+
+[node name="Settings" type="VBoxContainer" parent="NewGameCont/NewGamePanel"]
+margin_left = 24.0
+margin_top = 545.0
+margin_right = 280.0
+margin_bottom = 721.0
+theme = ExtResource( 12 )
+
+[node name="Button" type="CheckBox" parent="NewGameCont/NewGamePanel/Settings"]
+visible = false
+margin_right = 256.0
+margin_bottom = 48.0
+
+[node name="Label" type="Label" parent="NewGameCont/NewGamePanel/Settings/Button"]
+margin_left = 72.0
+margin_top = 9.0
+margin_right = 264.0
+margin_bottom = 41.0
+custom_colors/font_color = Color( 0.976471, 0.882353, 0.505882, 1 )
+custom_fonts/font = SubResource( 7 )
+
+[node name="ScrollContainer" type="ScrollContainer" parent="NewGameCont/NewGamePanel"]
+margin_left = 328.0
+margin_top = 115.0
+margin_right = 672.0
+margin_bottom = 451.0
+size_flags_vertical = 3
+theme = ExtResource( 3 )
+scroll_horizontal_enabled = false
+
+[node name="Settings2" type="VBoxContainer" parent="NewGameCont/NewGamePanel/ScrollContainer"]
+margin_right = 344.0
+size_flags_horizontal = 3
+theme = ExtResource( 12 )
+
+[node name="Button" type="CheckBox" parent="NewGameCont/NewGamePanel/ScrollContainer/Settings2"]
+visible = false
+margin_right = 344.0
+margin_bottom = 48.0
+
+[node name="Label" type="Label" parent="NewGameCont/NewGamePanel/ScrollContainer/Settings2/Button"]
+margin_left = 72.0
+margin_top = 9.0
+margin_right = 264.0
+margin_bottom = 41.0
+custom_colors/font_color = Color( 0.976471, 0.882353, 0.505882, 1 )
+custom_fonts/font = SubResource( 7 )
+
+[node name="RichTextLabel" type="RichTextLabel" parent="NewGameCont/NewGamePanel"]
+margin_left = 328.0
+margin_top = 115.0
+margin_right = 672.0
+margin_bottom = 451.0
+size_flags_horizontal = 3
+size_flags_vertical = 3
+custom_fonts/normal_font = ExtResource( 33 )
+
+[node name="Settings3" type="VBoxContainer" parent="NewGameCont/NewGamePanel"]
+margin_left = 24.0
+margin_top = 251.0
+margin_right = 280.0
+margin_bottom = 460.0
+theme = ExtResource( 12 )
+
+[node name="label" type="Label" parent="NewGameCont/NewGamePanel/Settings3"]
+visible = false
+margin_right = 256.0
+margin_bottom = 35.0
+custom_colors/font_color = Color( 0.976471, 0.882353, 0.505882, 1 )
+custom_fonts/font = SubResource( 7 )
+text = "NEWGAMESETTING"
+align = 1
+valign = 1
+
+[node name="button" type="TextureButton" parent="NewGameCont/NewGamePanel/Settings3"]
+visible = false
+margin_right = 256.0
+margin_bottom = 50.0
+rect_min_size = Vector2( 200, 50 )
+theme = ExtResource( 34 )
+texture_normal = ExtResource( 42 )
+texture_pressed = ExtResource( 42 )
+texture_hover = ExtResource( 42 )
+texture_disabled = ExtResource( 42 )
+texture_focused = ExtResource( 42 )
+expand = true
+
+[node name="LArr" type="TextureButton" parent="NewGameCont/NewGamePanel/Settings3/button"]
+anchor_top = 0.5
+anchor_bottom = 0.5
+margin_left = 1.0
+margin_top = -25.0
+margin_right = 26.0
+margin_bottom = 25.0
+grow_vertical = 2
+texture_normal = ExtResource( 40 )
+texture_pressed = ExtResource( 38 )
+texture_hover = ExtResource( 36 )
+expand = true
+stretch_mode = 3
+
+[node name="Label" type="Label" parent="NewGameCont/NewGamePanel/Settings3/button"]
+margin_left = 24.0
+margin_top = 8.0
+margin_right = 206.0
+margin_bottom = 43.0
+size_flags_horizontal = 3
+custom_colors/font_color = Color( 0.976471, 0.882353, 0.505882, 1 )
+custom_fonts/font = ExtResource( 28 )
+text = "sex"
+align = 1
+
+[node name="RArr" type="TextureButton" parent="NewGameCont/NewGamePanel/Settings3/button"]
+anchor_left = 1.0
+anchor_top = 0.5
+anchor_right = 1.0
+anchor_bottom = 0.5
+margin_left = -20.0
+margin_top = -7.0
+margin_right = -5.0
+margin_bottom = 7.0
+texture_normal = ExtResource( 37 )
+texture_pressed = ExtResource( 39 )
+texture_hover = ExtResource( 35 )
+
+[node name="tip" type="TextureRect" parent="NewGameCont/NewGamePanel"]
+visible = false
+margin_left = 751.0
+margin_top = 85.0
+margin_right = 814.0
+margin_bottom = 141.0
+texture = ExtResource( 14 )
+expand = true
+stretch_mode = 6
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Label" type="Label" parent="NewGameCont/NewGamePanel"]
+visible = false
+margin_left = 736.036
+margin_top = 42.9593
+margin_right = 831.036
+margin_bottom = 66.9593
+custom_colors/font_color = Color( 0.976471, 0.882353, 0.505882, 1 )
+custom_fonts/font = SubResource( 7 )
+text = "Settings"
+
+[node name="StartButton" type="Button" parent="NewGameCont/NewGamePanel"]
+margin_left = 397.21
+margin_top = 672.097
+margin_right = 598.21
+margin_bottom = 735.097
+theme = ExtResource( 13 )
+custom_colors/font_color = Color( 0.976471, 0.882353, 0.505882, 1 )
+custom_fonts/font = SubResource( 7 )
+custom_styles/hover = SubResource( 8 )
+custom_styles/pressed = SubResource( 9 )
+custom_styles/focus = ExtResource( 5 )
+custom_styles/normal = SubResource( 10 )
+text = "NEWGAMESTART"
+
+[node name="BackButton" type="Button" parent="NewGameCont/NewGamePanel"]
+margin_left = 49.0
+margin_top = 106.097
+margin_right = 250.0
+margin_bottom = 169.097
+theme = ExtResource( 13 )
+custom_colors/font_color = Color( 0.976471, 0.882353, 0.505882, 1 )
+custom_fonts/font = SubResource( 7 )
+custom_styles/hover = SubResource( 8 )
+custom_styles/pressed = SubResource( 9 )
+custom_styles/focus = ExtResource( 5 )
+custom_styles/normal = SubResource( 10 )
+text = "BACKTOPRESETS"
+
+[node name="Gold" type="TextureRect" parent="NewGameCont/NewGamePanel"]
+margin_left = 407.71
+margin_top = 608.097
+margin_right = 463.71
+margin_bottom = 664.097
+texture = ExtResource( 11 )
+expand = true
+stretch_mode = 6
+
+[node name="Label" type="Label" parent="NewGameCont/NewGamePanel/Gold"]
+margin_left = 51.0
+margin_top = 16.0
+margin_right = 176.0
+margin_bottom = 48.0
+custom_colors/font_color = Color( 0.976471, 0.882353, 0.505882, 1 )
+custom_fonts/font = SubResource( 7 )
+align = 1
+valign = 1
+
+[node name="Materials" type="HBoxContainer" parent="NewGameCont/NewGamePanel"]
+margin_left = 310.0
+margin_top = 528.0
+margin_right = 698.0
+margin_bottom = 608.0
+alignment = 1
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Button" type="TextureButton" parent="NewGameCont/NewGamePanel/Materials"]
+visible = false
+margin_left = 154.0
+margin_right = 234.0
+margin_bottom = 80.0
+rect_min_size = Vector2( 80, 80 )
+texture_normal = ExtResource( 7 )
+texture_hover = ExtResource( 16 )
+expand = true
+stretch_mode = 5
+
+[node name="TextureRect" type="TextureRect" parent="NewGameCont/NewGamePanel/Materials/Button"]
+margin_left = 2.0
+margin_top = 3.0
+margin_right = 76.0
+margin_bottom = 77.0
+rect_min_size = Vector2( 74, 74 )
+expand = true
+stretch_mode = 6
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Label" type="Label" parent="NewGameCont/NewGamePanel/Materials/Button"]
+margin_left = 2.0
+margin_top = 43.0
+margin_right = 77.0
+margin_bottom = 78.0
+custom_colors/font_color = Color( 0.976471, 0.882353, 0.505882, 1 )
+custom_fonts/font = SubResource( 7 )
+align = 1
+valign = 1
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="CloseButton" parent="NewGameCont/NewGamePanel" instance=ExtResource( 66 )]
+margin_left = 680.0
+margin_right = 710.0
+
+[node name="NGPButton" type="Button" parent="NewGameCont/NewGamePanel"]
+margin_left = 613.0
+margin_top = 672.0
+margin_right = 686.0
+margin_bottom = 735.0
+theme = ExtResource( 13 )
+custom_colors/font_color = Color( 0.976471, 0.882353, 0.505882, 1 )
+custom_fonts/font = SubResource( 7 )
+custom_styles/hover = SubResource( 8 )
+custom_styles/pressed = SubResource( 9 )
+custom_styles/focus = ExtResource( 5 )
+custom_styles/normal = SubResource( 10 )
+toggle_mode = true
+text = "NGP_BTN"
+clip_text = true
+
+[node name="bonuses" type="TextureRect" parent="NewGameCont"]
+visible = false
+margin_left = 1019.0
+margin_right = 1558.0
+margin_bottom = 770.0
+rect_min_size = Vector2( 539, 0 )
+texture = ExtResource( 19 )
+expand = true
+
+[node name="title" type="Label" parent="NewGameCont/bonuses"]
+margin_left = 9.0
+margin_right = 529.0
+margin_bottom = 85.0
+custom_colors/font_color = Color( 0.976471, 0.882353, 0.505882, 1 )
+custom_fonts/font = ExtResource( 15 )
+text = "NEWGAMEPLUSNAME"
+align = 1
+valign = 1
+
+[node name="points_cont" type="HBoxContainer" parent="NewGameCont/bonuses"]
+margin_left = 16.0
+margin_top = 89.0
+margin_right = 522.0
+margin_bottom = 129.0
+custom_constants/separation = 15
+
+[node name="points_name" type="Label" parent="NewGameCont/bonuses/points_cont"]
+margin_top = 2.0
+margin_right = 274.0
+margin_bottom = 37.0
+custom_colors/font_color = Color( 0.976471, 0.882353, 0.505882, 1 )
+custom_fonts/font = SubResource( 7 )
+text = "NEWGAMEPLUS_POINTS"
+align = 1
+valign = 1
+
+[node name="points" type="Label" parent="NewGameCont/bonuses/points_cont"]
+margin_left = 289.0
+margin_top = 2.0
+margin_right = 350.0
+margin_bottom = 37.0
+custom_colors/font_color = Color( 0.976471, 0.882353, 0.505882, 1 )
+custom_fonts/font = SubResource( 7 )
+text = "00/00"
+align = 1
+valign = 1
+
+[node name="ScrollContainer" type="ScrollContainer" parent="NewGameCont/bonuses"]
+margin_left = 19.0
+margin_top = 136.0
+margin_right = 530.0
+margin_bottom = 752.0
+theme = ExtResource( 63 )
+
+[node name="VBoxContainer" type="VBoxContainer" parent="NewGameCont/bonuses/ScrollContainer"]
+margin_right = 511.0
+size_flags_horizontal = 3
+
+[node name="bonus" type="Control" parent="NewGameCont/bonuses/ScrollContainer/VBoxContainer"]
+visible = false
+margin_right = 500.0
+margin_bottom = 103.0
+rect_min_size = Vector2( 500, 103 )
+size_flags_horizontal = 0
+script = ExtResource( 57 )
+
+[node name="name" type="Label" parent="NewGameCont/bonuses/ScrollContainer/VBoxContainer/bonus"]
+margin_left = 103.0
+margin_right = 415.0
+margin_bottom = 35.0
+custom_colors/font_color = Color( 0.976471, 0.882353, 0.505882, 1 )
+custom_fonts/font = SubResource( 7 )
+text = "name"
+
+[node name="cost" type="Label" parent="NewGameCont/bonuses/ScrollContainer/VBoxContainer/bonus"]
+margin_left = 432.0
+margin_right = 458.0
+margin_bottom = 35.0
+custom_colors/font_color = Color( 0.976471, 0.882353, 0.505882, 1 )
+custom_fonts/font = SubResource( 7 )
+text = "00"
+align = 2
+
+[node name="desc" type="Label" parent="NewGameCont/bonuses/ScrollContainer/VBoxContainer/bonus"]
+margin_left = 104.0
+margin_top = 31.0
+margin_right = 490.0
+margin_bottom = 94.0
+custom_colors/font_color = Color( 0.976471, 0.882353, 0.505882, 1 )
+custom_fonts/font = SubResource( 11 )
+text = "description"
+autowrap = true
+
+[node name="icon" type="TextureRect" parent="NewGameCont/bonuses/ScrollContainer/VBoxContainer/bonus"]
+anchor_bottom = 1.0
+margin_left = 4.0
+margin_top = 4.0
+margin_right = 99.0
+margin_bottom = -4.0
+texture = ExtResource( 62 )
+expand = true
+stretch_mode = 6
+
+[node name="frame" type="TextureRect" parent="NewGameCont/bonuses/ScrollContainer/VBoxContainer/bonus"]
+anchor_bottom = 1.0
+margin_left = 4.0
+margin_top = 4.0
+margin_right = 99.0
+margin_bottom = -4.0
+texture = ExtResource( 52 )
+expand = true
+stretch_mode = 5
+
+[node name="CheckBox" type="CheckBox" parent="NewGameCont/bonuses/ScrollContainer/VBoxContainer/bonus"]
+margin_left = 461.0
+margin_top = 7.0
+margin_right = 491.0
+margin_bottom = 37.0
+custom_icons/checked_disabled = SubResource( 12 )
+custom_icons/checked = SubResource( 12 )
+custom_icons/unchecked_disabled = SubResource( 12 )
+custom_icons/unchecked = SubResource( 12 )
+custom_styles/hover = SubResource( 13 )
+custom_styles/pressed = SubResource( 14 )
+custom_styles/disabled = SubResource( 21 )
+custom_styles/hover_pressed = SubResource( 15 )
+custom_styles/normal = SubResource( 16 )
+expand_icon = true
+
+[node name="frame_full" type="NinePatchRect" parent="NewGameCont/bonuses/ScrollContainer/VBoxContainer/bonus"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+texture = ExtResource( 53 )
+patch_margin_left = 12
+patch_margin_top = 12
+patch_margin_right = 12
+patch_margin_bottom = 12
+
+[node name="btn" type="Button" parent="NewGameCont/bonuses/ScrollContainer/VBoxContainer/bonus"]
+show_behind_parent = true
+anchor_right = 1.0
+anchor_bottom = 1.0
+focus_mode = 0
+custom_styles/hover = SubResource( 17 )
+custom_styles/pressed = SubResource( 18 )
+custom_styles/disabled = SubResource( 20 )
+custom_styles/normal = SubResource( 19 )
+toggle_mode = true
+enabled_focus_mode = 0
+
+[node name="locked" parent="NewGameCont/bonuses/ScrollContainer/VBoxContainer" instance=ExtResource( 65 )]
+visible = false
+
+[node name="NewOrTutorial" type="Panel" parent="."]
+visible = false
+anchor_right = 1.0
+anchor_bottom = 1.0
+margin_left = 823.0
+margin_top = 292.0
+margin_right = 1063.0
+margin_bottom = 498.0
+theme = ExtResource( 43 )
+
+[node name="ButtonL" type="TextureButton" parent="NewOrTutorial"]
+anchor_left = 0.5
+anchor_right = 0.5
+margin_left = -105.0
+margin_top = 123.0
+margin_right = 105.0
+margin_bottom = 181.0
+texture_normal = ExtResource( 8 )
+texture_pressed = ExtResource( 9 )
+texture_hover = ExtResource( 10 )
+
+[node name="Label" type="Label" parent="NewOrTutorial/ButtonL"]
+margin_left = 12.0
+margin_right = 202.0
+margin_bottom = 58.0
+custom_colors/font_color = Color( 0.976471, 0.882353, 0.505882, 1 )
+text = "MENUNEWGAME"
+align = 1
+valign = 1
+
+[node name="ButtonR" type="TextureButton" parent="NewOrTutorial"]
+anchor_left = 0.5
+anchor_right = 0.5
+margin_left = -105.0
+margin_top = 48.0
+margin_right = 105.0
+margin_bottom = 106.0
+texture_normal = ExtResource( 8 )
+texture_pressed = ExtResource( 9 )
+texture_hover = ExtResource( 10 )
+
+[node name="Label" type="Label" parent="NewOrTutorial/ButtonR"]
+margin_left = 10.0
+margin_right = 201.0
+margin_bottom = 58.0
+custom_colors/font_color = Color( 0.976471, 0.882353, 0.505882, 1 )
+text = "MENUTUTORIAL"
+align = 1
+valign = 1
+
+[node name="ChangelogButton" type="Button" parent="."]
+margin_left = 6.0
+margin_top = 990.0
+margin_right = 153.0
+margin_bottom = 1038.0
+theme = ExtResource( 1 )
+custom_colors/font_color = Color( 0.941176, 0.92549, 0.741176, 1 )
+custom_colors/font_color_pressed = Color( 0.655824, 0.660156, 0.521523, 1 )
+custom_fonts/font = ExtResource( 26 )
+text = "MENUCHANGELOG"
+
+[node name="Changelogpanel" type="Panel" parent="."]
+visible = false
+margin_left = 529.445
+margin_top = 97.5106
+margin_right = 1458.44
+margin_bottom = 810.511
+custom_styles/panel = ExtResource( 6 )
+
+[node name="changelogtext" type="RichTextLabel" parent="Changelogpanel"]
+margin_left = 19.0441
+margin_top = 49.6543
+margin_right = 918.044
+margin_bottom = 687.654
+theme = ExtResource( 3 )
+custom_fonts/normal_font = ExtResource( 33 )
+bbcode_enabled = true
+
+[node name="Credits" type="Control" parent="."]
+visible = false
+margin_left = 635.0
+margin_top = 153.0
+margin_right = 1285.0
+margin_bottom = 927.0
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Background" type="TextureRect" parent="Credits"]
+margin_right = 650.0
+margin_bottom = 774.0
+texture = ExtResource( 19 )
+
+[node name="Label" type="Label" parent="Credits/Background"]
+margin_right = 649.0
+margin_bottom = 81.0
+custom_colors/font_color = Color( 0.976471, 0.882353, 0.505882, 1 )
+custom_fonts/font = ExtResource( 15 )
+text = "MENUCREDITSNAME"
+align = 1
+valign = 1
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="ScrollContainer" type="ScrollContainer" parent="Credits/Background"]
+visible = false
+margin_left = 29.0
+margin_top = 110.0
+margin_right = 616.0
+margin_bottom = 735.0
+scroll_horizontal_enabled = false
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Credits/Background/ScrollContainer"]
+margin_right = 587.0
+margin_bottom = 35.0
+
+[node name="Button" type="Label" parent="Credits/Background/ScrollContainer/VBoxContainer"]
+margin_right = 587.0
+margin_bottom = 32.0
+rect_min_size = Vector2( 587, 0 )
+custom_fonts/font = SubResource( 7 )
+text = "Credits"
+align = 1
+valign = 1
+
+[node name="RichTextLabel" type="RichTextLabel" parent="Credits/Background"]
+margin_left = 26.0
+margin_top = 102.0
+margin_right = 632.0
+margin_bottom = 752.0
+theme = ExtResource( 3 )
+custom_fonts/normal_font = ExtResource( 56 )
+bbcode_text = "MENUCREDITSDESC"
+text = "MENUCREDITSDESC"
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Gallery" parent="." instance=ExtResource( 22 )]
+visible = false
+
+[node name="UpdateNotice" parent="." instance=ExtResource( 71 )]
+margin_left = 35.0
+margin_top = 65.0
+margin_right = 371.0
+margin_bottom = 321.0

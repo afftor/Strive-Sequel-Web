@@ -1,0 +1,1081 @@
+extends "res://src/character/ch_jobs.gd"
+
+var base_exp = 0 setget base_exp_set
+
+var sleep = ''
+var work = ''
+var previous_work = ''
+#var workproduct = null
+#var previous_workproduct = null
+var previous_location = ResourceScripts.game_world.mansion_location
+var work_rules = {lock = false, ration = false, shifts = false, constrain = false, luxury = false, contraceptive = false, bindings = false, nudity = false, personality_lock = false, relationship = true, masturbation = false}
+
+var priority_materials = {
+	cooking = 4,
+	smith = 3,
+	tailor = 2,
+	alchemy = 1
+}
+var priority_items = {
+	smith = 5,
+	tailor = 4,
+	alchemy = 3,
+	cooking = 2,
+	building = 1
+}
+
+var brothel_rules = {
+		waitress = true,
+		hostess = false,
+		dancer = false,
+		stripper = false,
+		
+		petting = false,
+		oral = false,
+		anal = false,
+		pussy = false,
+		group = false,
+		sextoy = false,
+		
+		males = true,
+		females = false,
+		futa = false
+	}
+
+var farming_rules = {
+	
+}
+
+var service_boosters = {} 
+
+var messages = []
+
+
+var is_on_quest = false
+var quest_id
+var quest_time_remains = 0
+var quest_time_init = 0
+var unaval_time_remains = -1
+#var selected_work_quest = null
+
+
+func _init():
+	fix_rules()
+
+
+func fix_rules():
+	for rule in variables.work_rules:
+		if !work_rules.has(rule):
+			work_rules[rule] = false
+	for rule in variables.brothel_rules:
+		if !brothel_rules.has(rule):
+			brothel_rules[rule] = false
+	for rule in variables.farming_rules:
+		if !farming_rules.has(rule):
+			farming_rules[rule] = false
+
+#works
+func check_work_rule(rule):
+	if !variables.work_rules.has(rule):
+		return false
+	if !work_rules.has(rule):
+		print("warning - work rule %s removed" % rule)
+		return false
+	return work_rules[rule]
+
+
+func set_work_rule(rule, value):
+	if variables.work_rules.has(rule):
+		work_rules[rule] = value
+		parent.get_ref().reset_rebuild()
+
+
+func get_job_order(materials = true):
+	var res = []
+	var src
+	if materials:
+		src = priority_materials
+	else:
+		src = priority_items
+	var buffer = {}
+	for type in src:
+		if src[type] == 0:
+			continue
+		buffer[src[type]] = type
+	var keys = buffer.keys().duplicate()
+	keys.sort()
+	for val in keys:
+		res.push_back(buffer[val])
+	res.invert()
+	return res
+
+
+func get_job_priority(job, materials = true):
+	var src
+	if materials:
+		src = priority_materials
+	else:
+		src = priority_items
+	return src[job]
+
+
+func get_jobs_enabled(materials = true):
+	var res = []
+	var src
+	if materials:
+		src = priority_materials
+	else:
+		src = priority_items
+	for type in src:
+		if src[type] == 0:
+			continue
+		res.push_back(type)
+	return res
+
+
+func set_job_orders(value, materials = true): 
+	var src
+	if materials:
+		src = priority_materials
+	else:
+		src = priority_items
+	var cur_val = src.size()
+	for job in value:
+		if src[job] != 0:
+			src[job] = cur_val
+			cur_val -= 1
+
+
+func set_job_order(job, value, materials = true): 
+	var src
+	if materials:
+		src = priority_materials
+		if !src.has(job):
+			print("ERROR: no %s in materials priority" % job)
+			return
+	else:
+		src = priority_items
+		if !src.has(job):
+			print("ERROR: no %s in items priority" % job)
+			return
+	
+	var tmp = src[job]
+	if value == tmp:
+		return
+	var border = src.size() - get_jobs_enabled(materials).size()
+	if value == 0:
+		for type in src:
+			if src[type] == 0:
+				continue
+			if src[type] < tmp:
+				src[type] += 1
+		src[job] = 0
+	elif tmp == 0:
+		if value < border:
+			value = border
+		for type in src:
+			if src[type] == 0:
+				continue
+			if src[type] <= value:
+				src[type] -= 1
+		src[job] = value
+	elif tmp > value:
+		if value < border + 1:
+			value = border + 1
+		for type in src:
+			if src[type] == 0:
+				continue
+			if src[type] < tmp and src[type] >= value:
+				src[type] += 1
+		src[job] = value
+	else:
+		for type in src:
+			if src[type] == 0:
+				continue
+			if src[type] > tmp and src[type] <= value:
+				src[type] -= 1
+		src[job] = value
+
+
+func set_job_enabled(job, value, materials = true): #reimplement this to change data structure
+	var src
+	if materials:
+		src = priority_materials
+	else:
+		src = priority_items
+	if value: 
+		if src[job] == 0:
+			var amount = get_jobs_enabled(materials).size()
+			set_job_order(job, src.size() - amount, materials)
+	else:
+		if src[job] > 0:
+			set_job_order(job, 0, materials)
+
+
+func check_brothel_rule(rule):
+	if !variables.brothel_rules.has(rule):
+		return false
+	if !brothel_rules.has(rule):
+		print("warning - brothel rule %s removed" % rule)
+		return false
+	return brothel_rules[rule]
+
+
+func set_brothel_rule(rule, value):
+	if variables.brothel_rules.has(rule):
+		brothel_rules[rule] = value
+
+
+func set_farm_res(res, value):
+	if variables.farming_rules.has(res):
+		farming_rules[res] = value
+
+
+func check_farm_res(res):
+	if !variables.farming_rules.has(res):
+		return false
+	if !farming_rules.has(res):
+		return false
+	return farming_rules[res]
+
+
+func set_service_boost(value = null):
+	var tvalue
+	if value != null:
+		tvalue = value.duplicate()
+	else:
+		tvalue = []
+		for tier_res in variables.booster_tiers.values():
+			tvalue.push_back(input_handler.random_from_array(tier_res))
+	for id in range(1, 4):
+		service_boosters['boost%d' % id] = {res = tvalue[id - 1], value = false}
+
+
+func base_exp_set(value):
+	if value >= get_next_class_exp() && base_exp < get_next_class_exp():
+		input_handler.add_random_chat_message(parent.get_ref(), 'exp_for_level')
+		# input_handler.ActivateTutorial("levelup")
+	base_exp = value
+
+
+func update_exp(value, is_set):
+	if is_set:
+		self.base_exp = value
+		return value
+	else:
+		var tmp = base_exp
+		self.base_exp += value
+		tmp = base_exp - tmp
+		return tmp
+
+
+func fix_serialize():
+	if parent.get_ref().travel.travel_time <= 0 and work == 'travel':
+		work = ''
+	for type in priority_items:
+		priority_items[type] = int(priority_items[type])
+	for type in priority_materials:
+		priority_materials[type] = int(priority_materials[type])
+
+
+func fix_import():
+	is_on_quest = false
+	work = ''
+	previous_work = ''
+
+
+func get_next_class_exp():
+	var currentclassnumber = parent.get_ref().get_prof_number()
+	var exparray = variables.hard_level_reqs
+	var value = 0
+	if exparray.size()-1 < currentclassnumber:
+		value = exparray[exparray.size()-1]
+	else:
+		value = exparray[currentclassnumber]
+	return value
+
+
+#tasks
+func clean_prev_data():
+	previous_work = ''
+	previous_location = ResourceScripts.game_world.mansion_location
+
+
+func save_prev_data():
+	previous_work = work
+	previous_location = parent.get_ref().get_location()
+
+
+func check_prev_data():
+	if previous_location != parent.get_ref().get_location():
+		return false
+	if find_worktask(previous_work) == null:
+		return false
+	return true
+
+
+func find_worktask(task = work):
+	if ResourceScripts.game_res.tasks_progresses.has(task):
+		return ResourceScripts.game_res.tasks_progresses[task]
+	return null
+
+
+func assign_to_task(task):
+	if task == work:
+		return
+	var tdata = find_worktask(task)
+	if tdata.has('max_workers') and tdata.max_workers <= tdata.workers.size():
+		return
+	#remove existing work
+	remove_from_task()
+	save_prev_data()
+	
+	tdata.workers.push_back(parent.get_ref().id)
+	work = task
+
+
+func remove_from_task(travel = false):
+	if work == 'disabled':
+		print("There is a critical error - attempting to enable character a wrong way. Please try to remember and report chain of actions that can be its cause. All saves after this may (or may not) be broken.")
+		return
+	if work == 'travel' and !travel:
+		print("There is a critical error - attempting to stop travelling a wrong way. Please try to remember and report chain of actions that can be its cause. All saves after this may (or may not) be broken.")
+		return
+	var task = find_worktask()
+	if task == null: 
+		work = ''
+		return
+	
+	if task.workers.has(parent.get_ref().id):
+		task.workers.erase(parent.get_ref().id)
+	else:
+		print("error - %s is not in it's worktask's workers" % parent.get_ref().id)
+	work = ''
+
+
+func return_to_task():
+	if check_prev_data():
+		assign_to_task(previous_work)
+	elif previous_location == parent.get_ref().get_location(): 
+		clean_prev_data()
+
+
+func get_work():
+	return work
+
+
+func is_on_quest():
+	return is_on_quest
+
+
+func get_quest_time_init():
+	return int(quest_time_init)
+
+
+func get_selected_quest():
+	return quest_id
+
+
+func make_unavaliable(days = -1):
+	if !is_unavaliable():
+		if is_on_quest:
+			input_handler.SystemMessage(tr(parent.get_ref().get_short_name() + " removed from quest."))
+			var quest_taken = ResourceScripts.game_world.get_quest_by_id(quest_id)
+			quest_taken.taken = false
+		
+		parent.get_ref().remove_from_travel()
+		remove_from_task()
+		parent.get_ref().reset_location()
+		is_on_quest = true
+		work = "disabled"
+		quest_time_remains = -1
+		quest_time_init = -1
+		unaval_time_remains = days
+		parent.get_ref().combat_position = 0
+		gui_controller.mansion.try_rebuild_slave_list()
+
+
+func make_avaliable():
+	if is_unavaliable():
+		is_on_quest = false
+		work = ''
+		quest_time_remains = 0
+		unaval_time_remains = -1
+
+
+func is_unavaliable():
+	return work == "disabled"
+
+
+func assign_to_quest_and_make_unavalible(quest, work_time):
+	parent.get_ref().remove_from_travel()
+	remove_from_task()
+	parent.get_ref().reset_location()
+	is_on_quest = true
+	quest_time_remains = int(work_time)
+	quest_id = quest.id
+	work = quest.name
+	parent.get_ref().combat_position = 0
+	# var quest_taken = ResourceScripts.game_world.get_quest_by_id(quest_id)
+	# for  req in quest_taken.requirements:
+	# 	if req.has("work_time"):
+	quest_time_init = int(work_time)
+	gui_controller.mansion.TaskModule.show()
+	gui_controller.mansion.TaskModule.show_resources_info()
+
+
+func assign_to_learning(learning_type):
+#	remove_from_task(false)
+	is_on_quest = true
+	quest_time_remains = int(variables.tutduration)
+	quest_id = learning_type
+	work = 'learning'
+#	parent.get_ref().set_combat_position(0)
+	quest_time_init = int(variables.tutduration)
+
+
+func get_tutelage_type(): #stub, 2add data etc
+	return tr(quest_id)
+
+
+func get_quest_time_remains():
+	return int(quest_time_remains)
+
+
+func get_unaval_string():
+	if unaval_time_remains <= 0:
+		return tr("CHAR_UNAVALIABLE")
+	
+	if unaval_time_remains == 1:
+		return tr("CHAR_UNAVALIABLE_TURN") % (5 - ResourceScripts.game_globals.hour)
+	else:
+		return tr("CHAR_UNAVALIABLE_DAY") % unaval_time_remains
+
+
+func quest_day_tick():
+	if quest_time_remains > 0:
+#		if work != 'learning':
+#			parent.get_ref().add_stat("base_exp", 12)
+		quest_time_remains -= 1
+		if quest_time_remains <= 0 and work != "disabled" and work != 'learning':
+			remove_from_work_quest()
+		elif quest_time_remains <= 0 and work == 'learning':
+			finish_learning()
+	if unaval_time_remains > 0:
+		unaval_time_remains -= 1
+		if unaval_time_remains <= 0:
+			make_avaliable()
+
+
+func remove_from_work_quest():
+	is_on_quest = false
+	input_handler.SystemMessage(tr(parent.get_ref().get_short_name() + " returned from quest."))
+	globals.text_log_add("char", parent.get_ref().translate("[name] has returned from work"))
+	input_handler.PlaySound("ding")
+	quest_time_init = 0
+	ResourceScripts.game_progress.work_quests_finished.append(quest_id)
+	quest_id = ''
+	return_to_task()
+
+
+func finish_learning():
+	is_on_quest = false
+	globals.text_log_add("char", parent.get_ref().translate("[name] has returned from training"))
+	input_handler.PlaySound("ding")
+	quest_time_init = 0
+	var res_text = "\n\n{color=aqua|" + parent.get_ref().get_short_name() + "} finished training."
+	match quest_id:
+		'nothing':
+			if randf() < 0.5:
+				var tr = parent.get_ref().get_random_trait_tag('negative')
+				parent.get_ref().add_trait(tr)
+				res_text += "\nAcquired %s" % tr(Traitdata.traits[tr].name)
+			else:
+				res_text += "\nNo traits acquired"
+		'slave_training': #obsolete, for compat only
+#			parent.get_ref().add_stat('loyalty', 50) #possibly to remake
+#			res_text += "\n%s + 50" % statdata.statdata.loyalty.name
+			if randf() < 0.5:
+				parent.get_ref().add_stat('tame_factor', 1)
+				res_text += "\n%s + 1" % statdata.statdata.tame_factor.name
+			else:
+				parent.get_ref().add_stat('authority_factor', 1)
+				res_text += "\n%s + 1" % statdata.statdata.authority_factor.name
+			if parent.get_ref().get_stat('slave_class') in ['slave', 'slave_trained']:
+				parent.get_ref().add_trait('training_broke_in')
+				parent.get_ref().add_trait('training_relation')
+				parent.get_ref().add_trait('training_callmaster')
+				parent.get_ref().add_trait('training_sexservice')
+				parent.get_ref().add_trait('training_sexservice_adv')
+				if parent.get_ref().get_stat('slave_class') == 'slave':
+					parent.get_ref().set_slave_category('slave_trained')
+			else:
+				parent.get_ref().add_trait('training_s_relation')
+			parent.get_ref().add_stat('base_exp_direct', 150)
+			res_text += "\n%s + 150" % statdata.statdata.base_exp.name
+		'slave_training_workforce': 
+			if randf() < 0.5:
+				parent.get_ref().add_stat('tame_factor', 1)
+				res_text += "\n%s + 1" % statdata.statdata.tame_factor.name
+			else:
+				parent.get_ref().add_stat('authority_factor', 1)
+				res_text += "\n%s + 1" % statdata.statdata.authority_factor.name
+			
+			parent.get_ref().add_trait('training_broke_in')
+			parent.get_ref().add_trait('training_relation')
+			parent.get_ref().add_trait('training_callmaster')
+			parent.get_ref().add_trait('training_sexservice')
+			parent.get_ref().add_trait('training_sexservice_adv')
+			parent.get_ref().set_slave_category('slave_trained')
+			parent.get_ref().add_trait('training_workforce')
+
+			parent.get_ref().add_stat('base_exp_direct', 150)
+			res_text += "\n%s + 150" % statdata.statdata.base_exp.name
+		'slave_training_warrior': 
+			if randf() < 0.5:
+				parent.get_ref().add_stat('tame_factor', 1)
+				res_text += "\n%s + 1" % statdata.statdata.tame_factor.name
+			else:
+				parent.get_ref().add_stat('authority_factor', 1)
+				res_text += "\n%s + 1" % statdata.statdata.authority_factor.name
+			
+			parent.get_ref().add_trait('training_broke_in')
+			parent.get_ref().add_trait('training_relation')
+			parent.get_ref().add_trait('training_callmaster')
+			parent.get_ref().add_trait('training_sexservice')
+			parent.get_ref().add_trait('training_sexservice_adv')
+			parent.get_ref().set_slave_category('slave_trained')
+			parent.get_ref().add_trait('training_warrior')
+
+			parent.get_ref().add_stat('base_exp_direct', 150)
+			res_text += "\n%s + 150" % statdata.statdata.base_exp.name
+		'slave_training_service': 
+			if randf() < 0.5:
+				parent.get_ref().add_stat('tame_factor', 1)
+				res_text += "\n%s + 1" % statdata.statdata.tame_factor.name
+			else:
+				parent.get_ref().add_stat('authority_factor', 1)
+				res_text += "\n%s + 1" % statdata.statdata.authority_factor.name
+			
+			parent.get_ref().add_trait('training_broke_in')
+			parent.get_ref().add_trait('training_relation')
+			parent.get_ref().add_trait('training_callmaster')
+			parent.get_ref().add_trait('training_sexservice')
+			parent.get_ref().add_trait('training_sexservice_adv')
+			parent.get_ref().set_slave_category('slave_trained')
+			parent.get_ref().add_trait('training_service')
+
+			parent.get_ref().add_stat('base_exp_direct', 150)
+			res_text += "\n%s + 150" % statdata.statdata.base_exp.name
+		'academy':
+			for st in ['physics', 'wits']:
+				var tmp = globals.rng.randi_range(20, 30)
+				parent.get_ref().add_stat(st + '_direct', tmp)
+				res_text += "\n%s + %d" % [statdata.statdata[st].name, tmp]
+			parent.get_ref().add_stat('base_exp_direct', 500)
+			res_text += "\n%s + 500" % statdata.statdata.base_exp.name
+		'heir':
+			for st in ['physics', 'wits', 'charm']:
+				var tmp = globals.rng.randi_range(35, 50)
+				parent.get_ref().add_stat(st + '_direct', tmp)
+				res_text += "\n%s + %d" % [statdata.statdata[st].name, tmp]
+			var st = input_handler.random_from_array(['physics_factor', 'wits_factor', 'charm_factor', 'sexuals_factor'])
+			var st1 = input_handler.random_from_array(['physics_factor', 'wits_factor', 'charm_factor', 'sexuals_factor'])
+			parent.get_ref().add_stat(st, 1) 
+			parent.get_ref().add_stat(st1, 1) 
+			if st == st1:
+				res_text += "\n%s + %d" % [statdata.statdata[st].name, 2]
+			else:
+				res_text += "\n%s + %d" % [statdata.statdata[st].name, 1]
+				res_text += "\n%s + %d" % [statdata.statdata[st1].name, 1]
+			var tr = parent.get_ref().get_random_trait_tag('positive')
+			parent.get_ref().add_trait(tr)
+			res_text += "\nAcquired %s" % tr(Traitdata.traits[tr].name)
+			parent.get_ref().add_stat('base_exp_direct', 1000)
+			res_text += "\n%s + 1000" % statdata.statdata.base_exp.name
+		_: pass
+	var data = {text = '', tags = ['skill_report_event'], options = [], image = null} #not sure if this tag is correct and/or reqiured
+	data.text = res_text # there may be more to it, some header maybe
+	data.options.append({code = 'close', text = tr("DIALOGUECLOSE"), reqs = []})
+	input_handler.interactive_message(data, 'direct')
+	quest_id = ''
+	work = ''
+
+
+func select_brothel_activity():
+	var non_sex_rules = []
+	var sex_rules = []
+	
+	if brothel_rules.waitress:
+		parent.get_ref().add_stat('metrics_waitress', 1)
+	
+	var no_consent = false
+	for i in brothel_rules:
+		if !brothel_rules[i] || i in ['males','futa','females']: continue
+		if variables.brothel_non_sex_options.has(i):
+			non_sex_rules.append(i)
+		else:
+			sex_rules.append(i)
+	
+	if sex_rules.size() > 0 && (brothel_rules.males || brothel_rules.futa || brothel_rules.females):
+		parent.get_ref().add_stat('metrics_serviceperformed', 1)
+		if parent.get_ref().has_status('harlotry'):
+			parent.get_ref().rest_tick()
+
+		var remove_from_sex = []
+
+		#every rule toggled only has 50% chance to be picked by default
+		for i in sex_rules:
+			if randf() >= 0.5:
+				remove_from_sex.append(i)
+		if remove_from_sex.size() == sex_rules.size(): #make sure at least 1 option is sill available in the end
+			remove_from_sex.remove(randi() % remove_from_sex.size())
+		for i in remove_from_sex:
+			sex_rules.erase(i)
+
+		var highest_value = get_highest_value(sex_rules)
+		var data = tasks.gold_tasks_data[highest_value.code]
+		var bonus_gold = 0
+
+		var possible_customer_genders = []
+		if brothel_rules.males:
+			possible_customer_genders.append('male')
+		if brothel_rules.females:
+			possible_customer_genders.append('female')
+		if brothel_rules.futa:
+			possible_customer_genders.append('futa')
+		var brothel_customer_gender = possible_customer_genders[randi() % possible_customer_genders.size()]
+
+
+		var penis_check = ((brothel_rules.males || brothel_rules.futa) && brothel_customer_gender in ["male", "futa"])
+
+		if sex_rules.has('pussy') && penis_check:
+			parent.get_ref().take_virginity('vaginal', 'brothel_customer')
+			bonus_gold += parent.get_ref().calculate_price(false, true) * 0.01
+		if sex_rules.has('pussy') && penis_check:
+			var tmpchar = ResourceScripts.scriptdict.class_slave.new("test_main")
+			tmpchar.create('random', 'male', 'random')
+			if randf() < variables.brothel_pregnancy_chance:
+				globals.impregnate(tmpchar, parent.get_ref())
+			tmpchar.is_active = false
+		if sex_rules.has('anal') && penis_check:
+			parent.get_ref().take_virginity('anal', 'brothel_customer')
+
+		if data.workstats.size() > 0:
+			work_tick_values(input_handler.random_from_array(data.workstats))
+		parent.get_ref().try_rise_fame('service')
+
+		parent.get_ref().add_stat('metrics_randompartners', globals.fastif(sex_rules.has('group'), 2, 1))
+
+		var desirability = get_service_desirability(sex_rules)
+		var goldearned = highest_value.value
+		goldearned *= 1.0 + max(0, desirability - variables.desirability_gold_cap) * variables.desirability_overcap_gold_bonus #every point of desirability above cap gives +gold%
+		var full_gold_chance = clamp(desirability, 0.0, variables.desirability_gold_cap) / 100.0
+		var full_gold = randf() < full_gold_chance
+		if !full_gold:
+			goldearned *= variables.sex_service_partial_gold_mult
+		goldearned += bonus_gold
+		if parent.get_ref().get_stat('consent') < data.min_consent:
+			goldearned *= variables.consent_lock_gold_mult
+
+		if parent.get_ref().check_trait('harlot'):
+			var proc_skill_level = get_action_skill_level(data.code)
+			if variables.harlot_proc_multiplier.has(proc_skill_level) and randf() < variables.harlot_proc_chance:
+				goldearned *= variables.harlot_proc_multiplier[proc_skill_level]
+
+		goldearned = apply_boosters(goldearned)
+		goldearned = round(goldearned)
+
+
+		parent.get_ref().add_stat('metrics_goldearn', goldearned)
+
+		ResourceScripts.game_res.money += goldearned
+
+
+		#TODO add decriptions and impregnation
+		update_brothel_log(parent.get_ref().get_stat('name'), goldearned, data, brothel_customer_gender, full_gold)
+		return
+	elif non_sex_rules.size() > 0:
+		parent.get_ref().add_stat('metrics_serviceperformed', 1)
+		if parent.get_ref().has_status('harlotry'):
+			parent.get_ref().rest_tick()
+		
+		var highest_value = get_highest_value(non_sex_rules)
+		
+		var data = tasks.gold_tasks_data[highest_value.code]
+		if data.workstats.size() > 0:
+			work_tick_values(input_handler.random_from_array(data.workstats))
+		parent.get_ref().try_rise_fame('service')
+		
+		var goldearned = highest_value.value
+		if highest_value.code == 'waitress':
+			if parent.get_ref().get_trainer() != null and randf() < variables.waitress_training_point_chance:
+				parent.get_ref().add_stat('training_points', 1)
+		else:
+			var desirability = parent.get_ref().get_stat('desirability')
+			goldearned *= 1.0 + max(0, desirability - variables.non_sex_desirability_threshold) * variables.non_sex_desirability_gold_bonus
+
+		goldearned = apply_boosters(goldearned)
+		goldearned = round(goldearned)
+		
+		parent.get_ref().add_stat('metrics_goldearn', goldearned)
+		
+		ResourceScripts.game_res.money += goldearned
+		update_brothel_log(parent.get_ref().get_stat('name'), goldearned, data)
+	else:
+		remove_from_task()
+		parent.get_ref().rest_tick()
+	
+
+func update_brothel_log(ch_name, gold, data, customer_gender = "", full_gold = true):
+	if globals.log_node != null && weakref(globals.log_node).get_ref():
+#		if ResourceScripts.game_globals.hour == 4:
+#			globals.log_node.clean_log()
+		var text = ""
+		if customer_gender != "":
+			if full_gold:
+				text = tr("BROTHELLOGSEX")  % [tr(ch_name), str(gold), tr("BROTHEL" + data.code.to_upper()), customer_gender.capitalize()]
+			else:
+				text = tr("BROTHELLOGSEXPARTIAL")  % [tr(ch_name), str(gold), tr("BROTHEL" + data.code.to_upper()), customer_gender.capitalize()]
+			#text = tr(ch_name) + " earned " + str(gold) + " gold doing " + tr("BROTHEL" + data.code.to_upper()) + " with a " + customer_gender
+		else:
+			text = tr("BROTHELLOGNO_SEX")  % [tr(ch_name), str(gold), tr("BROTHEL" + data.code.to_upper())]
+			#text = tr(ch_name) + " earned " + str(gold) + " gold working as " + tr("BROTHEL" + data.code.to_upper())
+		globals.text_log_add('work', text)
+#		var ServiceLog = globals.log_node.get_node("ServiceLog")
+#		var newfield = ServiceLog.get_node("VBoxContainer/field").duplicate()
+#		newfield.show()
+#		newfield.get_node("text").bbcode_text = text
+#		ServiceLog.get_node("VBoxContainer").add_child(newfield)
+#		var textfield = newfield.get_node('text')
+#		textfield.rect_size.y = textfield.get_content_height()
+#		newfield.rect_min_size.y = textfield.rect_size.y
+#		yield(globals.get_tree(), 'idle_frame')
+#		ServiceLog.scroll_vertical = ServiceLog.get_v_scrollbar().max_value
+
+
+func apply_boosters(value):
+	var mul = 1.0
+	for i in range(3):
+		var id = 'boost%d' % (i + 1)
+		var res = service_boosters[id].res
+		if !service_boosters[id].value:
+			break
+		if ResourceScripts.game_res.materials.has(res) and ResourceScripts.game_res.materials[res] > 1:
+			ResourceScripts.game_res.materials[res] -= 1
+			mul = variables.booster_value[i]
+		else:
+			break
+	return value * mul
+
+
+func get_highest_value(array):#find highest profit option
+	var values = {}
+	var highest_value = {code = '', value = 0}
+	for i in array:
+		values[i] = max(1,round(get_gold_value(i) * (1.0 - variables.sex_service_fluctuation + randf() * variables.sex_service_fluctuation * 2))) #fluctuation randomness to value
+		if highest_value.value < values[i]:
+			highest_value.code = i
+			highest_value.value = values[i]
+
+	return highest_value
+
+
+func get_gold_value(task):
+	var value = call(tasks.gold_tasks_data[task].formula)
+	value = value * (parent.get_ref().get_stat('productivity') * parent.get_ref().get_stat(tasks.gold_tasks_data[task].workmod)/100.0)
+
+	return value
+
+
+func get_enabled_sex_actions():
+	var res = []
+	for i in variables.brothel_rules:
+		if variables.brothel_non_sex_options.has(i) or i in ['males','futa','females']:
+			continue
+		if brothel_rules.get(i, false):
+			res.append(i)
+	return res
+
+
+func get_action_skill_level(action):#best sex_training level among the skill(s) relevant to this action
+	var relevant_skills = [action]
+	if action == 'group':
+		relevant_skills = ['anal', 'pussy']
+	elif action == 'sextoy':
+		relevant_skills = ['petting', 'oral', 'pussy', 'anal', 'penetration', 'tail']
+	var best = 'novice'
+	for skill in relevant_skills:
+		var level = parent.get_ref().get_stat('sex_training_' + skill)
+		if level == 'mastered':
+			return 'mastered'
+		if level == 'skilled':
+			best = 'skilled'
+	return best
+
+
+func is_action_trained(action):#at least skilled in the skill(s) relevant to this action
+	return get_action_skill_level(action) != 'novice'
+
+
+func get_service_desirability(enabled_actions = null):
+	if enabled_actions == null:
+		enabled_actions = get_enabled_sex_actions()
+	var trained_count = 0
+	for i in enabled_actions:
+		if is_action_trained(i):
+			trained_count += 1
+	var desirability = parent.get_ref().get_stat('desirability')
+	desirability += variables.desirability_per_enabled_action * trained_count
+	if parent.get_ref().check_trait('harlot'):
+		desirability = min(desirability, variables.harlot_desirability_cap)
+	return desirability
+
+
+func get_booster_multiplier_preview():#same as apply_boosters, but doesn't consume materials
+	var mul = 1.0
+	for i in range(3):
+		var id = 'boost%d' % (i + 1)
+		var res = service_boosters[id].res
+		if !service_boosters[id].value:
+			break
+		if ResourceScripts.game_res.materials.has(res) and ResourceScripts.game_res.materials[res] > 1:
+			mul = variables.booster_value[i]
+		else:
+			break
+	return mul
+
+
+func get_estimated_service_value():#best-case gold per tick for the currently toggled sex actions, incl. boosters/service/productivity bonuses and the over-cap desirability bonus, but not the full/half gold roll
+	var enabled = get_enabled_sex_actions()
+	if enabled.size() == 0:
+		return 0
+	var best = 0
+	for i in enabled:
+		best = max(best, get_gold_value(i))
+	var desirability = get_service_desirability(enabled)
+	best *= 1.0 + max(0, desirability - variables.desirability_gold_cap) * variables.desirability_overcap_gold_bonus
+	best *= get_booster_multiplier_preview()
+	return best
+
+
+func get_enabled_non_sex_actions():
+	var res = []
+	for i in variables.brothel_non_sex_options:
+		if brothel_rules.get(i, false):
+			res.append(i)
+	return res
+
+
+func get_estimated_non_sex_service_value():#best-case gold per tick for the currently toggled non-sex actions, incl. boosters/service/productivity bonuses and the desirability bonus (waitress excluded)
+	var enabled = get_enabled_non_sex_actions()
+	if enabled.size() == 0:
+		return 0
+	var best = 0
+	for i in enabled:
+		var value = get_gold_value(i)
+		if i != 'waitress':
+			var desirability = parent.get_ref().get_stat('desirability')
+			value *= 1.0 + max(0, desirability - variables.non_sex_desirability_threshold) * variables.non_sex_desirability_gold_bonus
+		best = max(best, value)
+	best *= get_booster_multiplier_preview()
+	return best
+
+
+func quest_tick():
+	if !is_on_quest():
+		return
+	if work != 'learning':
+		work_tick_values(input_handler.random_from_array(['physics', 'charm', 'wits']))
+
+
+func get_farming_rules():
+	var tmp = []
+	for res in farming_rules:
+		if !farming_rules[res]:
+			continue
+		var task = tasks.farm_tasks[res]
+		if !parent.get_ref().checkreqs(task.reqs):
+			farming_rules[res] = false
+		else:
+			tmp.push_back(res)
+	return tmp
+
+
+func _work_check():
+	if is_on_quest:
+		return false
+	
+	if !parent.get_ref().is_worker():
+		if !messages.has("refusedwork"):
+			globals.text_log_add('char', parent.get_ref().get_short_name() + ": Refused to work")
+			messages.append("refusedwork")
+		return false
+	return true
+
+
+func add_metric_for_outcome(res_id, amount = 1):
+	if res_id == 'gold':
+		parent.get_ref().add_stat('metrics_goldearn', amount)
+	else:
+		var matdata = Items.materiallist[res_id]
+		if matdata.type == 'food':
+			parent.get_ref().add_stat('metrics_foodearn', amount)
+		#2add correct material check
+		else:
+			parent.get_ref().add_stat('metrics_materialearn', amount)
+
+
+func work_tick_values(workstat):
+	if !parent.get_ref().has_status('no_working_bonuses'):
+		if workstat.findn("sex_skills") < 0:
+			parent.get_ref().add_stat(workstat, 0.36)
+		parent.get_ref().add_stat('base_exp', 5)
+
+
+func predict_active_task():
+	var joborder = get_job_order(true) 
+	for job in joborder:
+		var real_job = job + '_material'
+		var curupgrade = ResourceScripts.game_res._active_task_find(ResourceScripts.game_res.crafting_lists[real_job])
+		if curupgrade != null:
+			return curupgrade
+	
+	joborder = get_job_order(false) 
+	for job in joborder:
+		var real_job = job
+		if job != 'building':
+			real_job += '_item'
+		var curupgrade = ResourceScripts.game_res._active_task_find(ResourceScripts.game_res.crafting_lists[real_job])
+		if curupgrade != null:
+			return curupgrade
+	return null
+
+
+func get_task_crit_chance():
+	return task_mods.crit
+
+
+func get_task_efficiency_tool():
+	return task_mods.eff
+
+
+func get_task_diff():
+	return task_mods.diff
+
+
+var task_mods = {
+	eff = 0.0,
+	crit = 0.0,
+	diff = 0,
+}
+
+func _get_base_crafting_diff(): #2add
+	return 0 
+
+func fill_task_mods(task):
+	task_mods.crit = parent.get_ref().get_stat('base_task_crit_chance')
+	task_mods.diff = _get_base_crafting_diff()
+	task_mods.eff = 0
+	if task.has('worktool'):
+		var item = task.worktool
+		task_mods.eff = parent.get_ref().get_stat('task_efficiency_' + item)
+		task_mods.diff += 10 * parent.get_ref().get_stat('task_efficiency_' + item)
+		task_mods.crit += parent.get_ref().get_stat('task_crit_' + item)
+		task_mods.diff += 40 * parent.get_ref().get_stat('task_crit_' + item)
+	
+	if parent.get_ref().has_status('no_task_crit'):
+		task_mods.crit = 0
+	
+	if ResourceScripts.game_globals.diff_bonus_taskmod:
+		task_mods.diff *= 1.5
+	task_mods.diff = int(task_mods.diff)
+
+
+func fill_task_mods_res(task):
+	task_mods.crit = parent.get_ref().get_stat('base_task_crit_chance')
+	task_mods.diff = 0
+	task_mods.eff = 0
+	if task.has('worktool'):
+		var item = task.worktool
+		task_mods.eff = parent.get_ref().get_stat('task_efficiency_' + item)
+		task_mods.crit += parent.get_ref().get_stat('task_crit_' + item)
+	
+	if parent.get_ref().has_status('no_task_crit'):
+		task_mods.crit = 0
+
+
+func get_job_value(temptask, count_crit = false):
+	if !tasks.tasklist.has(temptask): 
+		return 0
+	if !_work_check():
+		 return 0
+	var location = ResourceScripts.world_gen.get_location_from_code(parent.get_ref().get_location())
+	var task = tasks.tasklist[temptask]
+	var value = call(task.progress_function)
+	fill_task_mods(task)
+	value *= 1.0 + get_task_efficiency_tool()
+	value = value * (parent.get_ref().get_stat('productivity') * parent.get_ref().get_stat(task.mod)/100.0)
+	
+	if count_crit == true && randf() <= get_task_crit_chance():
+		value = value * 2
+	if location.has('gather_mod'): #maybe 2fix, idk if non-dungeons still has their gather mods intact
+		value *= location.gather_mod
+	return value
+
+
+func get_progress_resource(tempresource, count_crit = false):
+	var resource = Items.materiallist[tempresource]
+	var location = ResourceScripts.world_gen.get_location_from_code(parent.get_ref().get_location())
+	# var subtask = task.production[tempsubtask]
+	
+	var value = call(resource.progress_formula)
+	fill_task_mods_res(resource)
+	
+	value *= 1.0 + get_task_efficiency_tool()
+	value = value * (parent.get_ref().get_stat('productivity') * parent.get_ref().get_stat(resource.workmod)/100.0) 
+	
+	if count_crit == true && randf() <= get_task_crit_chance():
+		value = value * 2
+	if location.type == 'dungeon':
+		value *= Items.get_loot().get_gather_mod_from_loc(location, tempresource)
+	elif location.has('gather_mod'): #2fix
+		value *= location.gather_mod
+	return value
+
+
+func get_progress_farm(res):
+	var task = tasks.farm_tasks[res]
+	return call(task.formula)
+
+
+func recruit_tick(task): #maybe incomplete
+	var taskdata = tasks.tasklist[task.job]
+	var val = 1
+	if taskdata.has('function'):
+		val = call(taskdata.function)
+	val += val * parent.get_ref().get_fame_bonus('recruit_bonus')
+	work_tick_values(taskdata.workstat)
+	return val
+
+
+func special_tick(task): #maybe incomplete
+	parent.get_ref().add_stat("base_exp", 3)
+	var val = 1
+	if task.has('function'):
+		val = call(task.function)
+	if task.has('workstat'):
+		work_tick_values(task.workstat)
+	return val
+
+
+func get_farming_limit():
+	return max(parent.get_ref().get_stat('growth_factor') - 2, 1)
+
+func can_add_farming():
+	var n = get_farming_limit()
+	for res in variables.farming_rules:
+		if farming_rules[res]:
+			n -= 1
+	return (n > 0)
+

@@ -1,0 +1,289 @@
+extends Reference
+
+var parent_ref
+var template
+var value
+var dmgf
+var damagestat
+var damage_type
+var is_drain
+var cap
+
+func _init(caller, tmp):
+	set_parent(caller)
+	template = tmp.duplicate()
+	dmgf = template.dmgf
+	damagestat = template.damagestat
+	damage_type = template.source
+	is_drain = template.is_drain
+	cap = template.cap
+
+func set_parent(caller):
+	parent_ref = weakref(caller)
+
+func get_parent():
+	return parent_ref.get_ref()
+
+func clone():
+	var tmp = template.duplicate()
+	tmp.is_drain = is_drain
+	tmp.source = damage_type
+	var tmp_ = get_script().new(null, tmp)
+	return tmp_
+
+
+func calculate_reduction(defvalue):
+	if defvalue < 100:
+		return defvalue/200.0
+	if defvalue > 250:
+		return 0.9
+	return -320.0/2700.0 + defvalue * (13.0/1800.0 - defvalue * (1.0/112500.0 + defvalue / 67500000.0))
+
+
+func apply_atomic(tmp):
+	if template.nomod: return
+	if tmp.stat == 'is_drain':
+		match tmp.type:
+			'stat_add':
+				is_drain += tmp.value
+			'stat_mul':
+				is_drain *= tmp.value
+			'stat_set':
+				is_drain = tmp.value
+		return
+	if tmp.stat == 'cap':
+		match tmp.type:
+			'stat_add':
+				cap += tmp.value
+			'stat_mul':
+				cap *= tmp.value
+			'stat_set': #not really
+				cap = tmp.value
+		return
+	if (tmp.has('stats') && !tmp.stats.has(template.damagestat)): return
+	if (tmp.has('statignore') && tmp.statignore.has(template.damagestat)): return
+	if get_parent().get_tags().has('no_caster_bonuses'):
+		return
+	match tmp.type:
+		'stat_add':
+			value += tmp.value
+		'stat_mul':
+			value *= tmp.value
+		'stat_set':
+			value = tmp.value
+
+func resolve_value(check_m):
+	var parent = get_parent()
+	var dmgmod = 1
+	if !parent.get_tags().has('no_caster_bonuses'):
+		dmgmod = parent.caster.get_damage_mod(parent.template)
+		if !parent.get_tags().has('heal'):
+			dmgmod += parent.caster.get_value_damage_mod(self) - 1
+	var endvalue
+	var atk
+	var stat
+	var data = parent.caster.get_stat_data()
+	if parent.ability_type == 'skill':
+		stat = parent.caster.get_stat(data['skill_stat'])
+		atk = parent.caster.get_stat(data['skill_atk'])
+	elif parent.ability_type == 'spell':
+		stat = parent.caster.get_stat(data['spell_stat'])
+		atk = parent.caster.get_stat(data['spell_atk'])
+	else:
+		stat = 0
+		atk = 0
+	var t1 = input_handler.calculate_number_from_string_array(template.value1, parent.caster, parent.target)
+	var t2 = input_handler.calculate_number_from_string_array(template.value2, parent.caster, parent.target)
+	var t3 = input_handler.calculate_number_from_string_array(template.value3, parent.caster, parent.target)
+#
+#	print("atk " + str(atk))
+#
+#	print("t1 " + str(t1))
+#	print("t2 " + str(t2))
+#	print("t3 " + str(t3))
+#
+#	print("dmgmod " + str(dmgmod))
+	endvalue = (t1 * atk + t2) * (1 + stat/250.0) + t3
+	
+	#print("endvalue " + str(endvalue))
+	#modify melee atk from backrow and apply dmgmod
+	if !template.nomod:
+		var rangetype = parent.target_range
+		if rangetype == 'weapon': rangetype = parent.caster.get_weapon_range()
+		if rangetype == 'melee' && input_handler.combat_node.FindFighterRow(parent.caster) == 'backrow' && check_m:
+			endvalue /= 2
+		endvalue *= dmgmod
+	#print("endvalue2 " + str(endvalue))
+	value = endvalue
+
+func apply_random():
+	var rmin
+	var rmax
+	if variables.relative_random_add:
+		rmin = 0
+		rmax = template.random_factor
+	else:
+		rmin = -template.random_factor
+		rmax = template.random_factor
+	var val_add = globals.rng.randi_range(rmin, rmax)
+	rmin = 1.0 - template.random_factor_p
+	rmax = 1.0 + template.random_factor_p
+	var val_mul = globals.rng.randf_range(rmin,rmax)
+	value += val_add
+	value *= val_mul
+
+func calculate_dmg():
+	var parent = get_parent()
+	apply_random()
+	#crit modification
+	if parent.hit_res == variables.RES_CRIT and !template.nocrit and !template.nomod:
+		value *= parent.critmod
+	
+#	if parent.ability_type == 'skill':
+	#current formulae add ap to spell damage cap
+	cap += parent.armor_p * 0.5
+	var reduction = 0
+	if parent.target.is_players_character:
+		if parent.ability_type == 'skill':
+			reduction = max(0, parent.target.get_stat('armor') - parent.armor_p)
+		else:
+			reduction = max(0, parent.target.get_stat('mdef'))
+		if !template.nodef and !template.nomod and !parent.tags.has('nodef'):
+			value -= reduction
+	else:
+		if parent.ability_type == 'skill':
+			reduction = calculate_reduction(parent.target.get_stat('armor') * (1.0 - 0.01 * parent.armor_p))
+		else:
+			reduction = calculate_reduction(parent.target.get_stat('mdef'))
+		if !template.nodef and !template.nomod and !parent.tags.has('nodef'):
+			value *= (1.0 - reduction)
+	
+	value = max(value, cap)
+	#reduction
+#	var reduction = 0
+#	if parent.ability_type == 'skill':
+#		reduction = max(0, parent.target.get_stat('armor') - parent.armor_p)
+#		reduction = min(95, reduction)
+#	elif parent.ability_type == 'spell':
+#		reduction = max(0, parent.target.get_stat('mdef'))
+#		reduction = min(100, reduction)
+#
+#	if !template.nodef and !template.nomod:
+#		value *= (float(100 - reduction)/100.0)
+		
+	#damage resists
+	reduction = 0
+	if parent.get_tags().has('aoe'):
+		reduction = parent.target.get_stat('resist_aoe')
+	elif parent.target_range == 'any': #or add tags for this
+		reduction = parent.target.get_stat('resist_ranged')
+	elif parent.target_range == 'melee': #or add tags for this
+		reduction = parent.target.get_stat('resist_melee')
+	if !template.nodef and !template.nomod and !parent.get_tags().has('nodef'):
+		value *= (float(100 - reduction)/100.0)
+	if parent.get_tags().has('heal'):
+		reduction = parent.target.get_stat('resist_heal')
+	if !template.nomod: #there may be errors due to damagestat templating
+		value *= (float(100 - reduction)/100.0)
+	
+	value = round(value)
+
+func check_conditions():
+	var parent = get_parent()
+	var res = true
+	if template.has('caster_reqs'): res = res and parent.caster.checkreqs(template.caster_reqs)
+	if template.has('target_reqs'): res = res and parent.target.checkreqs(template.target_reqs)
+	return res
+
+func setup_weapon_element():
+	if damage_type == 'weapon':
+		damage_type = get_parent().caster.get_weapon_element()
+
+func get_damage_type_name():
+	return tr("DAMAGETYPE"+damage_type.to_upper())
+
+func get_ability_type():
+	return tr("DAMAGETYPE"+get_parent().ability_type.to_upper())
+
+func execute():
+	var parent = get_parent()
+	var text = ""
+	
+	if !check_conditions(): 
+		return text
+	if damagestat == 'no_stat': 
+		return text
+	if damagestat == 'damage_hp' and dmgf == 0: #drain, damage, damage no log, drain no log
+		var rval
+		if is_drain > 0.0 && parent.get_tags().has('no_log'):
+			rval = parent.target.deal_damage(value, damage_type)
+			var rval2 = parent.caster.heal(rval * is_drain)
+		elif is_drain > 0.0:
+			rval = parent.target.deal_damage(value, damage_type)
+			var rval2 = parent.caster.heal(rval * is_drain)
+			text += tr("LOG_COMBAT_DRAIN_HEALTH") % [parent.caster.get_short_name(), rval, parent.target.get_short_name(), rval2]
+		elif parent.get_tags().has('no_log') && is_drain <= 0.0:
+			rval = parent.target.deal_damage(value, damage_type)
+		else:
+			rval = parent.target.deal_damage(value, damage_type)
+			text += tr("LOG_COMBAT_HIT_DAMAGE") % [parent.target.get_short_name(), rval, get_ability_type(), get_damage_type_name()]#, s_skill2.value[i]]
+		if (rval > 0
+				and !input_handler.globalsettings.no_damage_shake
+				and input_handler.combat_node != null
+				and input_handler.combat_node.is_visible_in_tree()
+			):
+			var params = get_shake_params(rval)
+			ResourceScripts.core_animations.ShakeAnimation(input_handler.combat_node, params.time, params.magnitude)
+	elif damagestat == 'damage_hp' and dmgf == 1: #heal, heal no log
+		if parent.get_tags().has('no_log'):
+			var rval = parent.target.heal(value)
+		else:
+			var rval = parent.target.heal(value)
+			text += tr("LOG_COMBAT_HEAL_HEALTH") % [parent.target.get_short_name(), rval]
+	elif damagestat == 'restore_mana' and dmgf == 0: #heal, heal no log
+		if !parent.get_tags().has('no log'):
+			var rval = parent.target.mana_update(value)
+			text += tr("LOG_COMBAT_RESTORE_MANA") % [parent.target.get_short_name(), rval]
+		else:
+			parent.target.mana_update(value)
+	elif damagestat == 'restore_mana' and dmgf == 1: #drain, damage, damage no log, drain no log
+		var rval = parent.target.mana_update(-value)
+		if is_drain > 0.0:
+			var rval2 = parent.caster.mana_update(rval * is_drain)
+			if !parent.get_tags().has('no log'):
+				text += tr("LOG_COMBAT_DRAIN_MANA") % [parent.caster.get_short_name(), rval, parent.target.get_short_name(), rval2]
+		if !parent.get_tags().has('no log'):
+			text += tr("LOG_COMBAT_LOSE_MANA") % [parent.target.get_short_name(), rval]
+	else:
+		var mod = dmgf
+		var stat = damagestat
+		if mod == 0:
+			var rval = parent.target.stat_update(stat, value)
+			if !parent.get_tags().has('no log'):
+				text += tr("LOG_COMBAT_RESTORE_STAT") % [parent.target.get_short_name(), rval, tr(stat)]
+		elif mod == 1:
+			var rval = parent.target.stat_update(stat, -value)
+			if is_drain > 0.0:
+				var rval2 = parent.caster.stat_update(stat, -rval * is_drain)
+				if !parent.get_tags().has('no log'):
+					text += tr("LOG_COMBAT_DRAIN_STAT") % [parent.caster.get_short_name(), value, tr(stat),  parent.target.get_short_name()]
+			elif !parent.get_tags().has('no log'):
+				text += tr("LOG_COMBAT_LOSE_STAT") % [parent.target.get_short_name(), -rval, tr(stat)]
+		elif mod == 2:
+			var rval = parent.target.stat_update(stat, value, true)
+			if is_drain > 0.0:# use this on your own risk
+				var rval2 = parent.caster.stat_update(stat, -rval * is_drain)
+				if !parent.get_tags().has('no log'):
+					text += tr("LOG_COMBAT_DRAIN_STAT") % [parent.caster.get_short_name(), value, tr(stat),  parent.target.get_short_name()]
+			elif !parent.get_tags().has('no log'):
+				text += tr("LOG_COMBAT_SET_STAT") % [parent.target.get_short_name(), tr(stat), value]
+		else:
+			print('error in damagestat %s' % damagestat) #obsolete in new format
+	
+	return text
+
+
+func get_shake_params(damage):
+	for tab in variables.damage_shake:
+		if !tab.has('max_damage') or damage < tab.max_damage:
+			return tab

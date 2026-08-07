@@ -1,0 +1,169 @@
+extends Reference
+class_name eff_stack
+
+var id
+var code
+var template
+var effects = {}
+var owner
+
+var buffs = []
+
+func serialize():
+	var tmp = {
+		type = 'stack',
+		effects = effects.duplicate(),
+		id = id,
+		code = code,
+		owner = owner
+	}
+	return tmp
+
+
+func deserialize(dict):
+	id = dict.id
+	code = dict.code
+	template = Effectdata.stacks[code]
+	effects = dict.effects.duplicate(true)
+	owner = dict.owner
+
+
+func create_from_template(t_id):
+	code = t_id
+	template = Effectdata.stacks[t_id]
+
+
+func get_applied_object():
+	return characters_pool.get_char_by_id(owner)
+
+
+func cleanup():
+	if !effects.empty():
+		print("wrong stack cleanup call")
+		return
+	var obj = get_applied_object()
+	if obj != null:
+		obj.remove_effect_stack(id)
+
+
+func process_event(ev, data = {}):
+	var cash = []
+	for eff in effects:
+		cash.push_back([eff, effects[eff]])
+	cash.sort_custom(input_handler, 'timestamp_sort')
+	for rec in get_active_effects():
+		var tmp = effects_pool.get_effect_by_id(rec)
+		if tmp.template.type == 'trigger':
+			tmp.process_act(ev, data)
+	for rec in cash:
+		var tmp = effects_pool.get_effect_by_id(rec[0])
+		if tmp.template.type == 'temp_s':
+			tmp.process_tick(ev)
+
+
+func process_act(ev, data = {}):
+	for rec in get_active_effects():
+		var tmp = effects_pool.get_effect_by_id(rec)
+		if tmp.template.type == 'trigger':
+			tmp.process_act(ev, data)
+
+
+func process_tick(ev):
+	var cash = []
+	for eff in effects:
+		cash.push_back([eff, effects[eff]])
+	cash.sort_custom(input_handler, 'timestamp_sort')
+	for rec in cash:
+		var tmp = effects_pool.get_effect_by_id(rec[0])
+		if tmp.template.type == 'temp_s':
+			tmp.process_tick(ev)
+
+
+func process_reset(ev):
+	for rec in get_active_effects():
+		var tmp = effects_pool.get_effect_by_id(rec)
+		if tmp.template.type == 'trigger':
+			tmp.process_reset(ev)
+	for rec in effects.keys().duplicate():
+		var tmp = effects_pool.get_effect_by_id(rec)
+		if tmp is temp_e_simple:
+			tmp.process_remove(ev)
+
+
+
+func add_effect(eff, timestamp):
+	effects[eff] = timestamp
+	if input_handler.combat_node != null and !Effectdata.effect_nolog.has(code):
+		input_handler.combat_node.combatlogadd(get_apply_message())
+
+
+func remove_effect(eff):
+	effects.erase(eff)
+
+
+func update_buffs():
+	buffs.clear()
+	if !template.has('buff'):
+		for eid in get_active_effects():
+			var eff = effects_pool.get_effect_by_id(eid)
+			eff.rebuild_buffs()
+			for b in eff.buffs:
+				buffs.push_back(b)
+	else:
+		var un_desc = ""
+		var f = false
+		for eid in get_active_effects():
+			f = true
+			var eff = effects_pool.get_effect_by_id(eid)
+			eff.rebuild_buffs()
+			for b in eff.buffs:
+				un_desc += tr(b.description) + '\n'
+		if !f:
+			return
+		if un_desc != "":
+			un_desc = un_desc.trim_suffix('\n')
+		var t_buff = template.buff
+		var buff = Buff.new(self)
+		buff.createfromtemplate(t_buff)
+#		buff.calculate_args()
+		if buff.tags.has('unified_desc'):
+			buff.description = un_desc
+		buffs.push_back(buff) 
+
+
+func get_active_effects():
+	var res = {}
+	for eid in effects:
+		var eff = effects_pool.get_effect_by_id(eid)
+		if !(eff is triggered_effect) and eff.template.has('conditions'):
+			if !get_applied_object().checkreqs(eff.template.conditions):
+				continue
+		res[eid] = effects[eid]
+	return res
+
+
+func clear_nonstored_effs():
+	for eid in effects:
+		var eff = effects_pool.get_effect_by_id(eid)
+		if eff.is_stored:
+			continue
+		if eff.parent is String and eff.parent.begins_with('hid'):
+			eff.is_applied = false
+
+
+func get_duration():
+	return null
+
+
+func get_apply_message():
+	var tres = tr('LOGEFFECTAPPLY')
+	return tres % [get_applied_object().get_short_name(), tr('EFFECTNAME_' + code.to_upper())]
+
+
+func get_update_message(): #for inhereted classes
+	var tres = tr('LOGEFFECTRENEW')
+	return tres % [tr('EFFECTNAME_' + code.to_upper()), get_applied_object().get_short_name()]
+
+
+func has_effect(eff):
+	return effects.has(eff)

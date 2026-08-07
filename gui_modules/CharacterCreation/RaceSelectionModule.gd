@@ -1,0 +1,200 @@
+extends Panel
+
+var selected_race = ""
+var fallback_icon = preload("res://assets/images/gui/panels/noimage.png")
+
+func _ready():
+	$ConfirmButton.connect("pressed", self, "select_character_race")
+	$CancelButton.connect("pressed", self, "cancel_race_selection")
+	$RandomButton.connect("pressed", self, "roll_random_race")
+	$RaceSelection/ScrollContainer2/VBoxContainer/Button.hide()
+
+
+func select_race():
+	show()
+	get_parent().ClassSelection.hide()
+	var person = get_parent().person
+	selected_race = person.get_stat("race")
+	input_handler.ClearContainer($RaceSelection/ScrollContainer/VBoxContainer)
+	var available_races = get_parent().get_available_races()
+	var locked_races = []
+	var ordered_races = []
+	for id in races.racelist:
+		if available_races.has(id):
+			ordered_races.append(id)
+		else:
+			locked_races.append(id)
+	ordered_races.append_array(locked_races)
+	for id in ordered_races:
+		var i = races.racelist[id]
+		var newbutton = input_handler.DuplicateContainerTemplate($RaceSelection/ScrollContainer/VBoxContainer)
+		if person.get_stat('race') == i.code: newbutton.pressed = true
+		newbutton.get_node('name').text = i.name
+		newbutton.get_node('icon').texture = i.icon
+		newbutton.set_meta('race', id)
+		if available_races.has(id):
+			# newbutton.connect("mouse_entered", self, 'show_race_info',[i.code])
+			newbutton.connect("pressed", self, "show_race_info", [id])
+		else:
+			newbutton.disabled = true
+			newbutton.modulate = Color(1, 1, 1, 0.5)
+			globals.connecttexttooltip(newbutton, tr("RACE_LOCKED_NGPLUS") % tr("ACHIBONUS_ALL_RACES"))
+	show_race_info(person.get_stat("race"))
+
+
+func roll_random_race():
+	var available_races = []
+	for button in $RaceSelection/ScrollContainer/VBoxContainer.get_children():
+		if button.name == "Button":
+			continue
+		if !button.visible:
+			continue
+		if button.disabled:
+			continue
+		available_races.append(button.get_meta('race'))
+	if available_races.empty():
+		return
+	selected_race = input_handler.random_from_array(available_races)
+	show_race_info(selected_race)
+
+
+func select_character_race():
+	hide()
+	# var person = get_parent().person
+	if get_parent().person.get_stat('race') != selected_race:
+		get_parent().person.set_stat('race', selected_race)
+		get_parent().preservedsettings["race"] = selected_race
+		get_parent().preservedsettings.erase('surname') #think it is right
+		get_parent().rebuild_slave()
+		get_parent().build_race()
+
+
+func show_race_info(temprace):
+	selected_race = temprace
+	var person = get_parent().person
+	var race = races.racelist[temprace]
+	var image
+	var text = race.descript
+	
+#	text += "\n\n{color=yellow|" + tr("RACE_BONUSES") + ": " + globals.build_desc_for_bonusstats(race.race_bonus)
+	text += "\n\n[center]" + tr("RACE_BONUSES") + "\n" + globals.build_desc_for_bonusstats(race.race_bonus) + "[/center]"
+#	for i in race.race_bonus:
+#		if (i as String).begins_with('resist'):
+#			text += i.replace("resist_","").capitalize() + " Resist: " + str(race.race_bonus[i]) + "%, "
+#			continue
+#		if statdata.statdata[i].percent == true:
+#			text += statdata.statdata[i].name + ": " + str(race.race_bonus[i]*100) + '%, '
+#		else:
+#			text += statdata.statdata[i].name + ": " + str(race.race_bonus[i]) + ', '
+#	text = text.substr(0, text.length() - 2) + ".}"
+	
+	$RaceSelection/ScrollContainer2/VBoxContainer/RichTextLabel.bbcode_text = globals.TextEncoder(text)
+	_update_race_exclusive_entries(temprace)
+	text = race.code.to_lower().replace('halfkin','beastkin')
+	var tmp = person.get_stat('sex')
+	if tmp != null:
+		if tmp == 'male':
+			text += "_m"
+		else:
+			text += "_f"
+		
+#		if images.shades.has(text):
+#			image = images.shades[text]
+		image = images.get_shade(text)
+	
+	$RaceSelection/TextureRect.texture = image
+	update_buttons()
+
+
+func _update_race_exclusive_entries(race_id):
+	var person = get_parent().person
+	var container = $RaceSelection/ScrollContainer2/VBoxContainer
+	input_handler.ClearContainer(container, ['RichTextLabel', 'Button'])
+	for skill_id in _get_race_exclusive_skills(race_id):
+		var skill = Skilldata.get_template(skill_id, person)
+		var newbutton = input_handler.DuplicateContainerTemplate(container)
+		newbutton.set_meta('display_only', true)
+		newbutton.get_node('Label').text = tr("RACE_EXCLUSIVE_SKILL_LABEL") % skill.name
+		newbutton.get_node('Icon').texture = _get_entry_icon(skill.icon)
+		if skill.has('container'):
+			globals.connecttexttooltip(newbutton, tr(skill.descript))
+		else:
+			globals.connectskilltooltip(newbutton, skill.code, person)
+	for class_id in _get_race_exclusive_classes(race_id):
+		var classdata = classesdata.professions[class_id]
+		var newbutton = input_handler.DuplicateContainerTemplate(container)
+		newbutton.get_node('Label').text = tr("RACE_EXCLUSIVE_CLASS_LABEL") % ResourceScripts.descriptions.get_class_name(classdata, person)
+		newbutton.get_node('Icon').texture = _get_entry_icon(classdata.icon)
+		globals.connectclasstooltip(newbutton, person, class_id)
+
+
+func _get_race_exclusive_skills(race_id):
+	var race = races.racelist[race_id]
+	var skill_list = []
+	for group in ['social_skills', 'combat_skills', 'explore_skills']:
+		if !race.has(group):
+			continue
+		for skill_id in race[group]:
+			if !skill_list.has(skill_id):
+				skill_list.append(skill_id)
+	return skill_list
+
+
+func _get_race_exclusive_classes(race_id):
+	var class_list = []
+	var race_is_beast = _is_race_beast(race_id)
+	for class_id in classesdata.professions:
+		var classdata = classesdata.professions[class_id]
+		if _is_disabled_class(classdata):
+			continue
+		if class_id == 'pet':
+			continue
+		if _has_matching_race_requirement(classdata.showupreqs, race_id, race_is_beast) or _has_matching_race_requirement(classdata.reqs, race_id, race_is_beast):
+			class_list.append(class_id)
+	class_list.sort()
+	return class_list
+
+
+func _has_matching_race_requirement(reqs, race_id, race_is_beast):
+	for req in reqs:
+		match req.code:
+			'race':
+				if req.check and req.race == race_id:
+					return true
+			'one_of_races':
+				if req.value.has(race_id):
+					return true
+			'race_is_beast':
+				if req.check == race_is_beast:
+					return true
+	return false
+
+
+func _is_disabled_class(classdata):
+	if classdata.tags.has('obsolete'):
+		return true
+	for req_group in ['showupreqs', 'reqs']:
+		for req in classdata[req_group]:
+			if req.code == 'disabled' and req.check:
+				return true
+	return false
+
+
+func _is_race_beast(race_id):
+	return races.racelist[race_id].tags.has('beast')
+
+
+func _get_entry_icon(icon):
+	if icon != null:
+		return icon
+	return fallback_icon
+
+func update_buttons():
+	for button in $RaceSelection/ScrollContainer/VBoxContainer.get_children():
+		if button.name == "Button":
+			continue
+		button.pressed = selected_race == button.get_meta('race')
+
+
+func cancel_race_selection():
+	hide()

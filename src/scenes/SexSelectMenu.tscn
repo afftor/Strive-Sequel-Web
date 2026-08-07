@@ -1,0 +1,242 @@
+[gd_scene load_steps=24 format=2]
+
+[ext_resource path="res://assets/MainTheme.tres" type="Theme" id=1]
+[ext_resource path="res://assets/Textures_v2/icon_question_small.png" type="Texture" id=2]
+[ext_resource path="res://assets/Textures_v2/D_pressed.png" type="Texture" id=3]
+[ext_resource path="res://src/scenes/SexSelectMenu.gd" type="Script" id=4]
+[ext_resource path="res://assets/Themes_v2/UNIVERSAL/MansionJournalModule.tres" type="StyleBox" id=5]
+[ext_resource path="res://assets/images/portraits/cali_prt/cali_default_prt_bold.png" type="Texture" id=6]
+[ext_resource path="res://assets/Textures_v2/W_normal.png" type="Texture" id=7]
+[ext_resource path="res://assets/Textures_v2/F_hover.png" type="Texture" id=8]
+[ext_resource path="res://assets/Textures_v2/MANSION/CharacterList/Buttons/button_job_chars_pressed.png" type="Texture" id=9]
+[ext_resource path="res://button_job_chars.png" type="Texture" id=10]
+[ext_resource path="res://button_job_chars_hover.png" type="Texture" id=11]
+[ext_resource path="res://assets/Textures_v2/W_pressed.png" type="Texture" id=12]
+[ext_resource path="res://assets/Textures_v2/M_hover.png" type="Texture" id=13]
+[ext_resource path="res://assets/Textures_v2/W_hover.png" type="Texture" id=14]
+[ext_resource path="res://assets/Textures_v2/F_normal.png" type="Texture" id=15]
+[ext_resource path="res://assets/Textures_v2/M_pressed.png" type="Texture" id=16]
+[ext_resource path="res://assets/Textures_v2/F_pressed.png" type="Texture" id=17]
+[ext_resource path="res://assets/Textures_v2/M_normal.png" type="Texture" id=18]
+[ext_resource path="res://assets/Textures_v2/D_hover.png" type="Texture" id=19]
+[ext_resource path="res://assets/Textures_v2/D_normal.png" type="Texture" id=20]
+[ext_resource path="res://assets/Themes_v2/UNIVERSAL/VScrollBar.tres" type="Theme" id=21]
+[ext_resource path="res://assets/images/sexicons/female.png" type="Texture" id=22]
+[ext_resource path="res://assets/Textures_v2/icon_question_small_alt.png" type="Texture" id=23]
+
+[node name="SexSelectMenu" type="Panel"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+margin_left = 353.0
+margin_top = 101.0
+margin_right = -367.0
+margin_bottom = -94.0
+theme = ExtResource( 1 )
+custom_styles/panel = ExtResource( 5 )
+script = ExtResource( 4 )
+
+[node name="Background" type="Panel" parent="."]
+self_modulate = Color( 0, 0, 0, 0.823529 )
+show_behind_parent = true
+margin_top = 2.0
+margin_right = 1200.0
+margin_bottom = 882.0
+
+[node name="ScrollContainer" type="ScrollContainer" parent="."]
+margin_left = 52.0
+margin_top = 164.0
+margin_right = 492.0
+margin_bottom = 704.0
+theme = ExtResource( 21 )
+scroll_horizontal_enabled = false
+
+[node name="VBoxContainer" type="VBoxContainer" parent="ScrollContainer"]
+margin_right = 440.0
+size_flags_horizontal = 3
+
+[node name="Button" type="TextureButton" parent="ScrollContainer/VBoxContainer"]
+visible = false
+margin_right = 440.0
+margin_bottom = 52.0
+rect_min_size = Vector2( 350, 50 )
+texture_normal = ExtResource( 10 )
+texture_pressed = ExtResource( 9 )
+texture_hover = ExtResource( 11 )
+
+[node name="Label" type="Label" parent="ScrollContainer/VBoxContainer/Button"]
+margin_left = 55.0
+margin_top = 8.0
+margin_right = 295.0
+margin_bottom = 41.0
+text = "Cali"
+
+[node name="Consent" type="Label" parent="ScrollContainer/VBoxContainer/Button"]
+margin_left = 297.065
+margin_top = 8.62808
+margin_right = 395.065
+margin_bottom = 41.6281
+text = "Consent"
+
+[node name="Icon" type="TextureRect" parent="ScrollContainer/VBoxContainer/Button"]
+margin_left = 2.58582
+margin_top = 2.76776
+margin_right = 47.5858
+margin_bottom = 46.7678
+texture = ExtResource( 6 )
+expand = true
+stretch_mode = 6
+
+[node name="SexIcon" type="TextureRect" parent="ScrollContainer/VBoxContainer/Button"]
+margin_left = 393.915
+margin_top = 4.76761
+margin_right = 433.915
+margin_bottom = 44.7676
+texture = ExtResource( 22 )
+expand = true
+stretch_mode = 6
+
+[node name="SelectedContainer" type="ScrollContainer" parent="."]
+margin_left = 652.0
+margin_top = 164.0
+margin_right = 1092.0
+margin_bottom = 704.0
+theme = ExtResource( 21 )
+scroll_horizontal_enabled = false
+
+[node name="VBoxContainer" type="VBoxContainer" parent="SelectedContainer"]
+margin_right = 440.0
+size_flags_horizontal = 3
+
+[node name="Button" type="TextureButton" parent="SelectedContainer/VBoxContainer"]
+visible = false
+margin_right = 440.0
+margin_bottom = 52.0
+rect_min_size = Vector2( 350, 50 )
+texture_normal = ExtResource( 10 )
+texture_pressed = ExtResource( 9 )
+texture_hover = ExtResource( 11 )
+
+[node name="Label" type="Label" parent="SelectedContainer/VBoxContainer/Button"]
+margin_left = 55.0
+margin_top = 8.0
+margin_right = 295.0
+margin_bottom = 41.0
+text = "Cali"
+
+[node name="Consent" type="Label" parent="SelectedContainer/VBoxContainer/Button"]
+margin_left = 297.065
+margin_top = 8.62808
+margin_right = 395.065
+margin_bottom = 41.6281
+text = "Consent"
+
+[node name="Icon" type="TextureRect" parent="SelectedContainer/VBoxContainer/Button"]
+margin_left = 2.58582
+margin_top = 2.76776
+margin_right = 47.5858
+margin_bottom = 46.7678
+texture = ExtResource( 6 )
+expand = true
+stretch_mode = 6
+
+[node name="SexIcon" type="TextureRect" parent="SelectedContainer/VBoxContainer/Button"]
+margin_left = 393.915
+margin_top = 4.76761
+margin_right = 433.915
+margin_bottom = 44.7676
+texture = ExtResource( 22 )
+expand = true
+stretch_mode = 6
+
+[node name="ConfirmButton" type="Button" parent="."]
+margin_left = 434.402
+margin_top = 807.225
+margin_right = 701.402
+margin_bottom = 857.225
+text = "Confirm"
+
+[node name="Categories" type="HBoxContainer" parent="."]
+margin_left = 121.527
+margin_top = 56.0711
+margin_right = 334.527
+margin_bottom = 96.0711
+
+[node name="all" type="TextureButton" parent="Categories"]
+margin_right = 50.0
+margin_bottom = 50.0
+rect_min_size = Vector2( 40, 40 )
+toggle_mode = true
+texture_normal = ExtResource( 20 )
+texture_pressed = ExtResource( 3 )
+texture_hover = ExtResource( 19 )
+
+[node name="male" type="TextureButton" parent="Categories"]
+margin_left = 54.0
+margin_right = 104.0
+margin_bottom = 50.0
+rect_min_size = Vector2( 40, 40 )
+toggle_mode = true
+texture_normal = ExtResource( 18 )
+texture_pressed = ExtResource( 16 )
+texture_hover = ExtResource( 13 )
+
+[node name="female" type="TextureButton" parent="Categories"]
+margin_left = 108.0
+margin_right = 158.0
+margin_bottom = 50.0
+rect_min_size = Vector2( 40, 40 )
+toggle_mode = true
+texture_normal = ExtResource( 7 )
+texture_pressed = ExtResource( 12 )
+texture_hover = ExtResource( 14 )
+
+[node name="futa" type="TextureButton" parent="Categories"]
+margin_left = 162.0
+margin_right = 212.0
+margin_bottom = 50.0
+rect_min_size = Vector2( 40, 40 )
+toggle_mode = true
+texture_normal = ExtResource( 15 )
+texture_pressed = ExtResource( 17 )
+texture_hover = ExtResource( 8 )
+
+[node name="TextureRect" type="TextureButton" parent="."]
+margin_left = 32.0557
+margin_top = 49.6268
+margin_right = 96.0557
+margin_bottom = 113.627
+texture_normal = ExtResource( 23 )
+texture_hover = ExtResource( 2 )
+
+[node name="InteractionLimitLabel" type="Label" parent="."]
+margin_left = 325.0
+margin_top = 765.0
+margin_right = 810.0
+margin_bottom = 798.0
+text = "Interactions: 0/0"
+align = 1
+
+[node name="Characters" type="Label" parent="."]
+margin_left = 150.0
+margin_top = 121.0
+margin_right = 411.0
+margin_bottom = 154.0
+text = "CRAFTCHARACTERS"
+align = 1
+
+[node name="Characters2" type="Label" parent="."]
+margin_left = 754.031
+margin_top = 121.0
+margin_right = 1015.03
+margin_bottom = 154.0
+text = "SELECTED_LABEL"
+align = 1
+
+[node name="ParticipantLabel" type="Label" parent="."]
+margin_left = 758.036
+margin_top = 69.5155
+margin_right = 1025.04
+margin_bottom = 102.516
+text = "Participants: 0/0"
+align = 1
+valign = 1

@@ -1,0 +1,3454 @@
+extends Node
+const gameversion = '0.15.0c'
+
+#time
+signal hour_tick
+signal task_added
+signal slave_added
+signal slave_arrived
+signal travel_completed
+signal slave_departed
+signal update_clock
+signal task_removed
+
+var hour_turns_set = 1
+
+#guistate maybe for removing
+var CurrentTextScene
+var CurrentScreen
+var CurrentLine = 0
+var log_node
+var log_storage = []
+
+var start_new_game = false
+var gameover_process = false
+
+#var SpriteDict = {}
+var EventList
+
+var rng := RandomNumberGenerator.new()
+var rng_controllable := RandomNumberGenerator.new()
+var file = File.new()
+var dir = Directory.new()
+var _save_thread = Thread.new()
+
+var workersdict
+var randomgroups
+
+var enemylist
+var upgradelist
+var skills
+var effects
+var combateffects
+var explorationares
+
+#var current_level
+#var current_stage
+var current_enemy_group
+
+var scenes = {}
+
+var sex_actions_dict = {}
+
+#warning-ignore:unused_signal
+signal scene_changed
+signal scene_change_start
+
+var can_manifest = false
+
+
+func _init():
+	#load sex actions
+	for i in input_handler.dir_contents('res://src/actions'):
+		if i.ends_with('.gd'):
+			var newaction = load(i).new()
+			sex_actions_dict[newaction.code] = newaction
+	#crash bypass
+	#reset_roll_data will crash here
+	char_roll_data.no_roll = false
+
+func _ready():
+	#for logging purposes
+	print("Game Version: " + str(gameversion))
+	print("OS: " +  OS.get_name())
+	#make saves dirs
+	if dir.dir_exists(variables.userfolder + 'saves') == false:
+		dir.make_dir(variables.userfolder + 'saves')
+	if !dir.dir_exists(variables.userfolder + 'savedcharacters'):
+		dir.make_dir(variables.userfolder + 'savedcharacters')
+	if !dir.dir_exists(variables.userfolder + 'portraits'):
+		dir.make_dir(variables.userfolder + 'portraits')
+	#init scenedata
+	for i in input_handler.dir_contents("res://assets/data/events"):
+		if i.find('.gd') < 0:
+			continue
+		var newscript  = load(i).new()
+		for k in newscript.data:
+			if scenedata.scenedict.has(k):
+				print("Error: Scene data key already exists: " + k)
+			else:
+				scenedata.scenedict[k] = newscript.data[k]
+		if newscript.get('comic_events') != null:
+			for k in newscript.comic_events:
+				if scenedata.comic_events.has(k):
+					print("Error: Scene data key already exists: " + k)
+				else:
+					scenedata.comic_events[k] = newscript.comic_events[k]
+
+	randomize() #for legacy code sake
+	rng.randomize()
+	rng_controllable.randomize()
+	
+	ResourceScripts.load_scripts()
+	ResourceScripts.recreate_singletons()
+	ResourceScripts.revert_gamestate()
+	ResourceScripts.char_events.supplement_events()
+	modding_core.load_mods()
+	Effectdata.fix_eff_data()
+	
+	if OS.has_feature('editor'):
+		for loc_path in input_handler.scanfolder(variables.LocalizationFolder):
+			var loc_code = loc_path.replace(variables.LocalizationFolder, '')
+			if loc_code != "en":
+				update_localization_file(loc_code)
+	
+	#console
+	var console = load("res://gui_modules/Console/console.tscn").instance()
+	get_tree().root.call_deferred("add_child", console)
+	
+	if log_alert != null and is_instance_valid(log_alert):
+		log_alert.fix_cur_log_position()#should miss starting irrelevant strings in log by this time in game load
+	
+	get_tree().get_root().connect("ready", self, 'free_manifest', [], CONNECT_ONESHOT)
+
+
+#not used
+#func EventCheck():
+#	if state.CurEvent != "": return;
+#	for s in get_tree().get_nodes_in_group('char_sprite'):
+#		s.set_active_val();
+#	for event in EventList.keys():
+#		if SimpleEventCheck(event, false):
+#			StartEventScene(event);
+#			break;
+#
+#func SimpleEventCheck(event, skip = true):
+#	#var tmp_d = {global = 'skip'};
+#	if state.OldEvents.has(event):
+#		return false
+#	for check in EventList[event]:
+#		if check.size() == 0:
+#			if skip:
+#				continue
+#			else:
+#				return false
+#		if !globals.valuecheck(check):
+#			return false
+#	return true
+#
+#func LoadEvent(name):
+#	var dict
+#
+#	if file.file_exists("res://assets/data/events/"+ name + '.json'):
+#		file.open("res://assets/data/events/"+ name + '.json', File.READ)
+#		dict = parse_json(file.get_as_text())
+#		file.close()
+#	else:
+#		print('Event not found: ' + name)
+#	return dict
+#
+#func StartEventScene(name, debug = false, line = 0):
+#	state.CurEvent = name;
+#	scenes[name] = LoadEvent(name)
+#	var scene = input_handler.get_spec_node(input_handler.NODE_EVENT) #input_handler.GetEventNode()
+#	scene.visible = true
+#	scene.Start(scenes[name], debug, line)
+
+func get_duplicate_id_if_exist(item):
+	var itemtemplate = Items.itemlist[item.itembase]
+	if itemtemplate.has('tags') and itemtemplate.tags.has('no_stack'):
+		return null
+	if item.curse != null or !item.enchants.empty():
+		return null
+	for i in ResourceScripts.game_res.items.values():
+		if i.curse != null or !i.enchants.empty():
+			continue
+		if str(i.itembase) == str(item.itembase) and str(i.parts) == str(item.parts) and i.quality == item.quality and i.owner == null: #mb more
+			return i.id
+	return null
+
+
+func CreateGearItem(item, parts, newname = null, quality = ""): #obsolete for modular
+	if parts is String:
+		parts = Items.get_materials_by_grade(parts, item)
+	var newitem = Item.new()
+	newitem.CreateGear(item, parts, {no_enchant = true})
+	if quality != "":
+		newitem.set_quality_level(quality)
+	else:
+		newitem.autoassign_quality()
+	if newname != null:
+		newitem.name = newname
+	return newitem
+
+
+#CreateGear() generates quality by itself (CreateGearItemLoot() uses it)
+#here we just overrun it. So it's same as CreateGearItemLoot() except quality
+func CreateGearItemQuality(item, parts, quality, no_enchant = true, newname = null): 
+	if parts is String:
+		parts = Items.get_materials_by_grade(parts, item)
+	var newitem = Item.new()
+	newitem.CreateGear(item, parts, {no_enchant = no_enchant})
+	newitem.quality = quality
+	if newname != null:
+		newitem.name = newname
+	return newitem
+
+
+func CreateGearItemQualityEnchants(item, parts, quality, newname = null): 
+	if parts is String:
+		parts = Items.get_materials_by_grade(parts, item)
+	var newitem = Item.new()
+	newitem.CreateGear(item, parts, {})
+	newitem.quality = quality
+	newitem.fill_enchants()
+	if newname != null:
+		newitem.name = newname
+	return newitem
+
+
+func CreateGearItemData(item, parts, diffdata,  newname = null): 
+	if parts is String:
+		parts = Items.get_materials_by_grade(parts, item)
+	var newitem = Item.new()
+	newitem.CreateGear(item, parts, diffdata)
+	if newname != null:
+		newitem.name = newname
+	return newitem
+
+
+func CreateGearItemQuest(item, parts, quest, newname = null):
+	var diffdata = {boost = 0, prof = false}
+	match quest.difficulty:
+		'easy':
+			diffdata.boost = 2
+		'medium':
+			diffdata.boost = 4
+		'hard':
+			diffdata.boost = 6
+	
+	if parts is String:
+		parts = Items.get_materials_by_grade(parts, item)
+	
+	var newitem = Item.new()
+	newitem.CreateGear(item, parts, diffdata)
+	if newname != null:
+		newitem.name = newname
+	return newitem
+
+
+func CreateGearItemCraft(item, parts, person, newname = null):
+	var diffdata = {boost = 0, prof = false, no_enchant = true}
+	if Items.recipes.has(item):
+		match Items.recipes[item].worktype:
+			'smith':
+				diffdata.prof = person.has_status('master_smith')
+			'tailor':
+				diffdata.prof = person.has_status('master_tailor')
+			'alchemy':
+				diffdata.prof = person.has_status('master_alchemist')
+		diffdata.boost += person.get_task_diff()
+	var newitem = Item.new()
+	newitem.CreateGear(item, parts, diffdata)
+	if newname != null:
+		newitem.name = newname
+	return newitem
+
+
+func CreateGearItemLoot(item, parts, newname = null, no_enchant = false):
+	var diffdata = {boost = 0, prof = false, no_enchant = no_enchant}
+	match char_roll_data.diff:
+		'easy':
+			diffdata.boost = 2
+		'medium':
+			diffdata.boost = 4
+		'hard':
+			diffdata.boost = 6
+	diffdata.boost += 2 + 0.4 * char_roll_data.lvl + char_roll_data.mf
+	if ResourceScripts.game_globals.diff_bonus_loot:
+		diffdata.boost *= 1.5
+	diffdata.boost = int(diffdata.boost)
+	
+	if parts is String:
+		parts = Items.get_materials_by_grade(parts, item)
+	
+	var newitem = Item.new()
+	newitem.CreateGear(item, parts, diffdata)
+	if newname != null:
+		newitem.name = newname
+	return newitem
+
+
+func CreateGearItemShop(item, parts, newname = null):
+	var diffdata = {boost = 0, shop = true, no_enchant = true}
+	if parts is String:
+		parts = Items.get_materials_by_grade(parts, item)
+	
+	var newitem = Item.new()
+	newitem.CreateGear(item, parts, diffdata)
+	if newname != null:
+		newitem.name = newname
+	return newitem
+
+
+func CreateUsableItem(item, amount = 1):
+	var newitem = Item.new()
+	newitem.CreateUsable(item, amount)
+	return newitem
+
+func AddItemToInventory(item, dont_duplicate = true):
+#	item.inventory = ResourceScripts.game_res.items
+	if item.get("itembase") != null:
+		input_handler.achievements.try_add_item_achimnt(item.itembase)
+	if dont_duplicate && item.stackable == false:
+		var duplicate = get_duplicate_id_if_exist(item)
+		if duplicate != null:
+			ResourceScripts.game_res.items[duplicate].amount += 1
+			item.amount = 0
+			return
+	if item.stackable == false:
+		item.id = "i" + str(ResourceScripts.game_res.itemcounter)
+		ResourceScripts.game_res.items[item.id] = item
+		ResourceScripts.game_res.itemcounter += 1
+	else:
+		var id = get_item_id_by_code(item.itembase)
+		if id != null:
+			ResourceScripts.game_res.items[id].amount += item.amount
+		else:
+			item.id = "i" + str(ResourceScripts.game_res.itemcounter)
+			ResourceScripts.game_res.items[item.id] = item
+			ResourceScripts.game_res.itemcounter += 1
+
+
+func remove_item(item):
+	var duplicate = get_duplicate_id_if_exist(item)
+	if duplicate != null:
+		ResourceScripts.game_res.items[duplicate].amount -= 1
+	else:
+		item.amount = 0
+		ResourceScripts.game_res.items.erase(item.id)
+
+
+func get_item_id_by_code(itembase):
+	return ResourceScripts.game_res.get_item_id_by_code(itembase)
+
+
+func disconnect_text_tooltip(node):
+	if node == null or !is_instance_valid(node):
+		return
+	if node.is_connected("mouse_entered",self,'showtexttooltip'):
+		node.disconnect("mouse_entered",self,'showtexttooltip')
+
+func connecttexttooltip(node, text, move_right = false):
+	if node.is_connected("mouse_entered",self,'showtexttooltip'):
+		node.disconnect("mouse_entered",self,'showtexttooltip')
+	node.connect("mouse_entered",self,'showtexttooltip', [node, text, move_right])
+
+func get_character_personality_tooltip(personality):
+	var text = tr("INFOPERSONALITY")
+	return highlight_current_personality_bonus_tooltip(text, personality)
+
+func highlight_current_personality_bonus_tooltip(text, personality):
+	if personality == null:
+		return text
+	var personality_name = tr("PERSONALITYNAME" + personality.to_upper())
+	var section_start = text.find("[center]" + personality_name + "[/center]")
+	if section_start == -1:
+		return text
+	var section_end = text.find("\n[center]", section_start + 1)
+	if section_end == -1:
+		section_end = text.length()
+	var section = text.substr(section_start, section_end - section_start)
+	return text.substr(0, section_start) + "{color=green|" + section + "}" + text.substr(section_end, text.length() - section_end)
+
+func showtexttooltip(node, text, move_right):
+	if node == null or !is_instance_valid(node) or !node.is_visible_in_tree():
+		return
+	var texttooltip = input_handler.get_spec_node(input_handler.NODE_TEXTTOOLTIP) #input_handler.GetTextTooltip()
+	texttooltip.showup(node, text, move_right)
+
+func connectitemtooltip(node, item):
+	if node.is_connected("mouse_entered",item,'tooltip'):
+		node.disconnect("mouse_entered",item,'tooltip')
+	node.connect("mouse_entered",item,'tooltip', [node])
+
+
+func connectitemtooltip_v2(node, item):
+	for dir in node.get_signal_connection_list("mouse_entered"):
+		node.disconnect(dir.signal, dir.target, dir.method)
+#	if node.is_connected("mouse_entered",item,'tooltip_v2'):
+#		node.disconnect("mouse_entered",item,'tooltip_v2')
+	node.connect("mouse_entered",item,'tooltip_v2', [node])
+
+
+func disconnect_temp_item_tooltip(node):
+	if node.is_connected("mouse_entered",self,'tempitemtooltip'):
+		node.disconnect("mouse_entered",self,'tempitemtooltip')
+
+func connecttempitemtooltip(node, item, mode):
+	if node.is_connected("mouse_entered",self,'tempitemtooltip'):
+		node.disconnect("mouse_entered",self,'tempitemtooltip')
+	node.connect("mouse_entered",self,'tempitemtooltip', [node, item, mode])
+#	node.connect("mouse_entered",item,'tooltip_v2', [node])
+
+func tempitemtooltip(targetnode, item, mode):
+	var node = input_handler.get_spec_node(input_handler.NODE_ITEMTOOLTIP) #input_handler.GetItemTooltip()
+	var data = {}
+	var text = '[center]' + item.name + '[/center]\n' + item.descript
+	data.text = text
+	data.item = item
+	data.icon = item.icon
+	data.price = str(item.price)
+	data.amount = ResourceScripts.game_res.get_item_amount(item.code)
+	node.showup(targetnode, data, mode)
+
+func connectskilltooltip(node, skill, character):
+	if node.is_connected("mouse_entered",self,'showskilltooltip'):
+		node.disconnect("mouse_entered",self,'showskilltooltip')
+	node.connect("mouse_entered",self,'showskilltooltip', [skill,node,character])
+
+func showskilltooltip(skill, node, character):
+	var skilltooltip = input_handler.get_spec_node(input_handler.NODE_SKILLTOOLTIP) #input_handler.GetSkillTooltip()
+	skilltooltip.showup(node, skill, character)
+
+func closeskilltooltip():
+	var skilltooltip = input_handler.get_spec_node(input_handler.NODE_SKILLTOOLTIP) #input_handler.GetSkillTooltip()
+	skilltooltip.set_process(false)
+	skilltooltip.hide()
+
+func connectgallerytooltip(node, scene_name):
+	if node.is_connected("mouse_entered",self,'showgallerytooltip'):
+		node.disconnect("mouse_entered",self,'showgallerytooltip')
+	node.connect("mouse_entered",self,'showgallerytooltip', [scene_name, node])
+
+func showgallerytooltip(scene_name, node):
+	var gallerytooltip = input_handler.get_spec_node(input_handler.NODE_GALLERYTOOLTIP) #input_handler.GetSkillTooltip()
+	gallerytooltip.showup(node, scene_name)
+
+func closegallerytooltip():
+	var gallerytooltip = input_handler.get_spec_node(input_handler.NODE_GALLERYTOOLTIP) #input_handler.GetSkillTooltip()
+	gallerytooltip.set_process(false)
+	gallerytooltip.hide()
+
+func connectclasstooltip(node, person, classid):
+	if node.is_connected("mouse_entered",self,'showclasstooltip'):
+		node.disconnect("mouse_entered",self,'showclasstooltip')
+	node.connect("mouse_entered",self,'showclasstooltip', [node, person, classid])
+
+func showclasstooltip(node, person, classdata):
+	var classtooltip = input_handler.get_spec_node(input_handler.NODE_CLASSTOOLTIP)
+	classtooltip.showup(node, person, classdata)
+
+func closeclasstooltip():
+	var classtooltip = input_handler.get_spec_node(input_handler.NODE_CLASSTOOLTIP)
+	classtooltip.set_process(false)
+	classtooltip.hide()
+
+#func disconnectitemtooltip(node, item):
+#	if node.is_connected("mouse_entered",item,'tooltip'):
+#		node.disconnect("mouse_entered",item,'tooltip')
+
+func connectmaterialtooltip(node, material, bonustext = '', type = null):
+	if node.is_connected("mouse_entered",self,'mattooltip'):
+		node.disconnect("mouse_entered",self,'mattooltip')
+	if type == null:
+		node.connect("mouse_entered",self,'mattooltip', [node, material, bonustext])
+	else:
+		node.connect("mouse_entered",self,'mattooltip', [node, material, bonustext, type])
+
+func connectslavetooltip(node, person):
+	if node.is_connected("mouse_entered",self,'slavetooltip'):
+		node.disconnect("mouse_entered",self,'slavetooltip')
+	node.connect("mouse_entered",self,'slavetooltip', [node, person])
+
+func slavetooltip(targetnode, person):
+	var node = input_handler.get_spec_node(input_handler.NODE_SLAVETOOLTIP) #input_handler.GetSlaveTooltip()
+	node.showup(targetnode, person)
+
+#what a food item is worth to anyone: its demand tier, how long it keeps a character fed
+#and the buff it leaves behind. used by every material tooltip and by the food column header
+func get_food_info_text(item):
+	if item.type != 'food':
+		return ''
+	var res = "\n\n%s: {color=%s|%s}" % [tr("FOODDEMAND"),
+		variables.food_demand_colors[item.demand], tr("FOODDEMAND" + item.demand.to_upper())]
+	res += "\n%s: %d" % [tr("FOODVALUE"), item.food_value]
+	if item.has('food_buff') and Effectdata.effect_table.has(item.food_buff):
+		for buff in Effectdata.effect_table[item.food_buff].get('buffs', []):
+			#buff descriptions escape their percent signs for Buff.get_tooltip()
+			res += "\n{color=green|%s}" % tr(buff.description).replace("%%", "%")
+	return res
+
+
+#the part of a food tooltip that only makes sense for one character. reads the cached
+#demand rather than recomputing it - call person.get_food_demand() once first if the
+#value may be stale
+func get_food_char_text(item, person):
+	if item.type != 'food':
+		return ''
+	var res = ''
+	if person.food.is_liked(item.code):
+		res += "\n{color=green|%s}" % tr("FOODTOOLTIPLIKED")
+	if !person.food.ignores_demand() and person.food.get_food_rank(item.code) < person.food.get_demand_rank():
+		res += "\n{color=red|%s}" % tr("FOODTOOLTIPBELOWDEMAND")
+	return res
+
+
+#tooltip for the food column of the slave list: what they last ate, how long it holds and
+#what it is doing to them
+func get_food_state_tooltip(person):
+	var st = person.food.get_state()
+	if st.state == 'starving':
+		return ("[center]{color=red|%s}[/center]\n%s" %
+			[tr("FOODSTATESTARVING"), tr("TRAITEFFECTSTARVE").replace("%%", "%")])
+	if st.state == 'undead':
+		return "[center]%s[/center]\n%s" % [tr("FOODSTATEUNDEAD"), tr("FOODSTATEUNDEADDESCRIPT")]
+	if st.state == 'none':
+		return "[center]%s[/center]\n%s" % [tr("FOODSTATENONE"), tr("FOODSTATENONEDESCRIPT")]
+	var item = Items.materiallist[st.meal]
+	var res = "[center]%s[/center]" % (tr("FOODSTATELASTMEAL") % item.name)
+	res += "\n" + tr("FOODSTATEFEDFOR") % st.fed
+	if item.has('food_buff') and Effectdata.effect_table.has(item.food_buff):
+		for buff in Effectdata.effect_table[item.food_buff].get('buffs', []):
+			res += "\n{color=green|%s}" % tr(buff.description).replace("%%", "%")
+	if st.state == 'poor':
+		res += "\n{color=red|%s}" % tr("TRAITEFFECTCHEAPFOOD").replace("%%", "%")
+	return res
+
+
+func mattooltip(targetnode, material, bonustext = '', type = 'materialowned'):
+	var image
+	var node = input_handler.get_spec_node(input_handler.NODE_ITEMTOOLTIP) #input_handler.GetItemTooltip()
+	var data = {}
+	var text = material.descript #'[center]' + material.name + '[/center]\n' + material.descript
+	text += get_food_info_text(material)
+	data.text = text + bonustext
+	data.item = material
+	data.icon = material.icon
+	data.price = str(material.price)
+	data.type = material.type
+	if ResourceScripts.game_res.materials[material.code] > 0:
+		data.amount = ResourceScripts.game_res.materials[material.code]
+	else:
+		type = 'material'
+	
+	node.showup(targetnode, data, type)
+
+#func mattooltip(targetnode, material, bonustext = '', type = 'materialowned'):
+#	var image
+#	var node = input_handler.get_spec_node(input_handler.NODE_ITEMTOOLTIP) #input_handler.GetItemTooltip()
+#	var data = {}
+#	var text = '[center]' + material.name + '[/center]\n' + material.descript
+#	data.text = text + bonustext
+#	data.item = material
+#	data.icon = material.icon
+#	data.price = str(material.price)
+#	data.type = material.type
+#	if ResourceScripts.game_res.materials[material.code] > 0:
+#		data.amount = ResourceScripts.game_res.materials[material.code]
+#
+#	node.showup(targetnode, data, type)
+
+
+func get_traitlist_for_char(person):
+	var traitlist = []
+	for b in person.get_all_buffs():
+		if !b.tags.has('show_in_traits'): continue
+		var text = person.translate(b.description)
+#		text += build_relationship_buff_names_text(person, b)
+		traitlist.append({
+			icon = b.icon,
+			text = text
+		})
+	var trlist = person.get_traits_by_arg('visible', true)
+	for tr in trlist:
+		var trdata = Traitdata.traits[tr]
+		var desc = person.translate(trdata.descript)
+		var bonus_desc = person.try_get_bonus_mastery_desc(tr)
+		if !bonus_desc.empty():
+#			desc += "\n" + bonus_desc
+			#it's a crude patch for monster_mastery descriptions, as they are same as names
+			#at the moment. Ideally there should be some systematic solution for traits, wich are
+			#also buffs, and therefore needs name in description
+			desc = bonus_desc
+		var entry = {
+			trait_code = tr,
+			name = tr(trdata.name),
+			text_with_name = "[center]{color=yellow|" + tr(trdata.name) + '}[/center]\n' + desc,
+			text = desc
+		}
+		if trdata.has('tags') and trdata.tags.has('simple_icon'):
+			entry.icon = trdata.icon
+		else:
+			entry.complex_icon = true
+			if trdata.has('icon') and trdata.icon != null:
+				entry.icon = trdata.icon
+			if trdata.has('cross') and trdata.cross:
+				entry.cross = true
+			else:
+				if trdata.tags.has('positive'):
+					entry.positive = true
+				if trdata.tags.has('negative'):
+					entry.negative = true
+		traitlist.append(entry)
+	return traitlist
+
+
+func build_traitlist_for_char(person, node):
+	var traitlist = get_traitlist_for_char(person)
+	input_handler.ClearContainer(node, ['Button', 'Button2'])
+	for entry in traitlist:
+		var tooltip_text = entry.text
+		if entry.has("text_with_name"):
+			tooltip_text = entry.text_with_name
+		if !entry.has("complex_icon"):
+			var button = input_handler.DuplicateContainerTemplate(node, 'Button2')
+			if entry.icon is String:
+				button.texture = load(entry.icon)
+			else:
+				button.texture = entry.icon
+			button.get_node("Label").hide()
+			connecttexttooltip(button, tooltip_text)
+		else:
+			var button = input_handler.DuplicateContainerTemplate(node, 'Button')
+			connecttexttooltip(button, tooltip_text)
+			if entry.has('icon'):
+				if entry.icon is String:
+					button.get_node('icon').texture = load(entry.icon)
+				else:
+					button.get_node('icon').texture = entry.icon
+			if entry.has('cross'):
+				button.get_node('cross').visible = true
+			else:
+				button.get_node('cross').visible = false
+				if entry.has('positive'):
+					button.texture_normal = load("res://assets/images/iconstraits/green.png")
+				if entry.has('negative'):
+					button.texture_normal = load("res://assets/images/iconstraits/red.png")
+
+
+func build_training_traitlist(person, node):
+	input_handler.ClearContainer(node, ['Button'])
+	for tr in person.get_traits_by_tag('training') + person.get_traits_by_tag('servant_training'):
+		if tr in ['untrained', 'training_broke_in']:
+			continue
+		var upgrade_data = Traitdata.traits[tr]
+		var button = input_handler.DuplicateContainerTemplate(node, 'Button')
+		var text = '[center]'+tr(upgrade_data.name)+'[/center]\n'
+		text += build_desc_for_bonusstats(upgrade_data.bonusstats)
+		text += person.translate(tr(upgrade_data.descript))
+		connecttexttooltip(button, text)
+#		button.self_modulate = Color(variables.hexcolordict.green)
+		if upgrade_data.icon is String:
+			button.get_node('icon').texture = load(upgrade_data.icon)
+		else:
+			button.get_node('icon').texture = upgrade_data.icon
+
+
+
+func build_buffs_for_char(person, node, mode):
+	input_handler.ClearContainer(node, ['Button'])
+	var list
+	match mode:
+		'mansion': list = person.get_mansion_buffs()
+		'combat': list = person.get_combat_buffs()
+		'all': list = person.get_all_buffs()
+	for i in list:
+		if i.tags.has('show_in_traits'): continue
+		var newnode = input_handler.DuplicateContainerTemplate(node, 'Button')
+		newnode.texture = i.icon
+		if i.tags.has('show_amount'):
+			newnode.get_node("Label").text = str(i.get_stacks())
+		else:
+			var tmp = i.get_duration()
+			if tmp != null:
+				newnode.get_node("Label").text = str(tmp.count)
+			else:
+				newnode.get_node("Label").hide()
+		if i.template.has('bonuseffect'):
+			match i.template.bonuseffect:
+				'barrier':
+					newnode.get_node("Label").show()
+					newnode.get_node("Label").text = str(person.shield)
+				'lust':
+					newnode.get_node("Label").show()
+					newnode.get_node("Label").text = str(person.get_stat('lust'))
+				'counterattacks':
+					newnode.get_node("Label").show()
+					newnode.get_node("Label").text = str(person.get_stat('counterattacks'))
+				'fed':
+					newnode.get_node("Label").show()
+					newnode.get_node("Label").text = str(person.get_stat('fed'))
+#			match tmp.event:
+#				'hours':
+#					newnode.get_node("Label").set("custom_colors/font_color",Color(0,0,1))
+#				'turns':
+#					newnode.get_node("Label").set("custom_colors/font_color",Color(0,1,0))
+#				'hits':
+#					newnode.get_node("Label").set("custom_colors/font_color",Color(1,0,0))
+#				'attacks':
+#					newnode.get_node("Label").set("custom_colors/font_color",Color(1,0,0))
+		connecttexttooltip(newnode, person.translate(i.description))
+
+
+func build_attrs_for_char(node, person):
+	node.get_node('Portrait').texture = person.get_icon()
+	node.get_node('sex').texture = images.get_icon(person.get_stat('sex'))
+	node.get_node('race').texture = races.racelist[person.get_stat('race')].icon
+	node.get_node('age').texture = images.ages[person.get_stat('age')]
+	connecttexttooltip(node.get_node('sex'), tr("MSLMSex")+": " + tr("SLAVESEX" + person.get_stat('sex').to_upper()))
+	connecttexttooltip(node.get_node('age'), tr("STATAGE")+": " + tr("SLAVEAGE" + person.get_stat("age").to_upper()))
+	connecttexttooltip(node.get_node('race'), "[center]{color=green|"+ races.racelist[person.get_stat('race')].name +"}[/center]\n\n"+ person.show_race_description())
+
+
+func build_desc_for_effect(effect_desc, mul = 1): #stub as it is
+	var res = effect_desc
+	var amount = int(res)
+	res = res.replace(str(amount), str(amount * mul))
+	return res
+
+
+func build_desc_for_bonusstats(bonusstats, mul = 1):
+	var text = ""
+	for i in bonusstats:
+		if i  in ['enchant_capacity', 'enchant_capacity_mod']: 
+			continue
+		if i == 'weapon_element':
+			text += tr("WEAPONELEMENTBASE") + tr("DAMAGETYPE" + bonusstats[i].to_upper()) + "\n"
+			continue
+		if i == 'weapon_element_ench':
+			text += tr("WEAPONELEMENENCHANT") + tr("DAMAGETYPE" + bonusstats[i].to_upper()) + "\n"
+			continue
+		if bonusstats[i] is bool or bonusstats[i] is Array or bonusstats[i] != 0:
+			var bonus
+			var data
+			var value = bonusstats[i]
+			if !(value is bool or value is Array):
+				value *= mul
+			var change = ''
+			if statdata.statdata.has(i):
+				data = statdata.statdata[i]
+				if data.tags.has('hidden'): 
+					continue
+				bonus = data.default_bonus
+				
+			else:
+				for suffix in ['add', 'add_part', 'add2', 'add_part2', 'mul', 'mul2', 'set', 'append', 'maxcap', 'mincap']:
+					if i.ends_with('_' + suffix):
+						data = statdata.statdata[i.trim_suffix('_' + suffix)]
+						bonus = suffix
+						break
+			
+			text += get_bonus_name_string(bonus, data, value)
+			text += make_bonus_value_string(bonus, data, value) + '\n'
+	return text
+
+func get_bonus_name_string(bonus_type, data, value):
+	if bonus_type == 'set':
+		return ""
+	if data.has('container') and data.container == 'resists' and !(value is bool or value is Array) and value >= 100:
+		return get_resist_effect_name(data.code).capitalize() + ': '
+	else:
+		return data.name + ': '
+
+func make_bonus_value_string(bonus_type, data, value):
+	var text = ''
+	var change = ''
+	match bonus_type:
+		"add", "add2":
+			if data.has('container') and data.container == 'resists' and value >= 100:
+				return '{color=green|' + tr("IMMUNITY") + '}'
+			text += '{color='
+			if data.percent and (!data.has('base_100') or !data.base_100):
+				value = value*100
+			if value > 0:
+				change = '+'
+			if value > 0 and !data.tags.has('is_negative') or value < 0 and data.tags.has('is_negative'):
+				text += 'green|' + change
+			else:
+				text += 'red|' + change
+			text += str(stepify(value, 0.01))
+			if data.percent:
+				text += '%'
+			text += '}'
+		"add_part", "add_part2":
+			text += '{color='
+			value = value*100
+			if value > 0:
+				change = '+'
+			if value > 0 and !data.tags.has('is_negative') or value < 0 and data.tags.has('is_negative'):
+				text += 'green|' + change
+			else:
+				text += 'red|' + change
+			text += str(stepify(value, 0.01)) + '%}'
+		"mul", "mul2":
+			text += '{color='
+			value = value - 1.0
+			value = value*100
+			if value > 0:
+				change = '+'
+			if value > 0 and !data.tags.has('is_negative') or value < 0 and data.tags.has('is_negative'):
+				text += 'green|' + change
+			else:
+				text += 'red|' + change
+			text += str(stepify(value, 0.01)) + '%}'
+		'set':
+			if value:
+				text = '{color=green|' + tr(data.name + '_TRUE') + '}'
+			else:
+				text = '{color=red|' + tr(data.name + '_FALSE') + '}'
+		'array':
+			text += '{color='
+			if data.tags.has('is_negative'):
+				text += 'red|'
+			else:
+				text += 'green|'
+			for st in value:
+				match data.array_type:
+					'mastery':
+						text += "%s, " % tr(Skilldata.masteries[st].name)
+			text = text.trim_suffix(', ')
+			text += '}'
+	return text
+
+func get_resist_effect_name(stat):
+	var effect_id = stat.trim_prefix('resist_')
+	if variables.resists_list.has(effect_id):
+		return tr("DAMAGETYPE%s" % effect_id.to_upper())
+	return tr("EFFECTNAME_%s" % effect_id.to_upper())
+
+
+func build_oneline_desc_for_bonusstats(bonusstats, mul = 1):
+	var text = ""
+	for i in bonusstats:
+		if i  in ['enchant_capacity', 'enchant_capacity_mod']: 
+			continue
+		if i == 'weapon_element':
+			text += tr("WEAPONELEMENTBASE") + tr("DAMAGETYPE" + bonusstats[i].to_upper()) + ", "
+			continue
+		if i == 'weapon_element_ench':
+			text += tr("WEAPONELEMENENCHANT") + tr("DAMAGETYPE" + bonusstats[i].to_upper()) + ", "
+			continue
+		if bonusstats[i] is bool or bonusstats[i] is Array or bonusstats[i] != 0:
+			var bonus
+			var data
+			var value = bonusstats[i]
+			if !(value is bool or value is Array):
+				value *= mul
+			var change = ''
+			if statdata.statdata.has(i):
+				data = statdata.statdata[i]
+				if data.tags.has('hidden'): 
+					continue
+				bonus = data.default_bonus
+			else:
+				for suffix in ['add', 'add_part', 'add2', 'add_part2', 'mul', 'mul2', 'set', 'append', 'maxcap', 'mincap']:
+					if i.ends_with('_' + suffix):
+						data = statdata.statdata[i.trim_suffix('_' + suffix)]
+						bonus = suffix
+						break
+			match bonus:
+				"add", "add2":
+					text += data.name + ': '
+					if data.percent:
+						value = value*100
+					if value > 0:
+						change = '+'
+					text +=  change
+					value = str(stepify(value, 0.01))
+					if data.percent:
+						value = value + '%'
+					text += value + ', '
+				"add_part", "add_part2":
+					text += data.name + ': '
+					value = value*100
+					if value > 0:
+						change = '+'
+					text +=  change
+					value = str(stepify(value, 0.01))
+					value = value + '%'
+					text += value + ', '
+				"mul", "mul2":
+					text += data.name + ': '
+					value = value - 1.0
+					value = value*100
+					if value > 0:
+						change = '+'
+					text += change
+					value = str(stepify(value, 0.01))
+					value = value + '%'
+					text += value + ', '
+	return text.trim_suffix(', ')
+
+
+func TextEncoder(text, node = null):
+	var tooltiparray = []
+	var counter = 0
+	var rand_start = text.find("{^")
+	while rand_start >= 0:
+		var rand_end = text.find("}", rand_start)
+		var next_block_start = text.find("{", rand_start + 2)
+		var line_end = text.find("\n", rand_start)
+		var malformed = rand_end == -1
+		if next_block_start != -1 && next_block_start < rand_end:
+			malformed = true
+		if line_end != -1 && (rand_end == -1 || line_end < rand_end):
+			malformed = true
+		if malformed:
+			print ("error in random formatted text - } not found in string:")
+			print (text.substr(rand_start, min(60, text.length() - rand_start)) + "...")
+			rand_end = text.length()
+			if next_block_start != -1:
+				rand_end = min(rand_end, next_block_start)
+			if line_end != -1:
+				rand_end = min(rand_end, line_end)
+			var badtext = text.substr(rand_start, rand_end - rand_start)
+			text = text.replace(badtext, badtext.replace("{^", "").replace("}",""))
+			break
+		else:
+			rand_end += 1
+		var temptext = text.substr(rand_start, rand_end - rand_start)
+		text = text.replace(temptext, temptext.split(":")[randi()%temptext.split(":").size()].replace("{^", "").replace("}",""))
+		rand_start = text.find("{^")
+	#return text
+
+	while text.find("{") != -1:
+		if text.find("}") == -1:
+			print ("error in formatted text - } not found in string:")
+			print (text.substr(0, 20) + "...")
+			text = text + "}"
+		var newtext = text.substr(text.find("{"), text.find("}") - text.find("{")+1)
+		var newtextarray = newtext.split("|")
+		var originaltext = newtextarray[newtextarray.size()-1].replace("}",'')
+		newtextarray.remove(newtextarray.size()-1)
+		var startcode = ''
+		var endcode = ''
+		for data1 in newtextarray:
+			data1 = data1.replace('{','')
+			var data = data1.split("=")
+			match data[0]:
+				'color':
+					startcode += '[color=' + variables.hexcolordict[data[1]] + ']'
+					endcode = '[/color]' + endcode
+				'url':
+					tooltiparray.append(data[1])
+					startcode += '[url=' + str(counter) + ']'
+					endcode = '[/url]' + endcode
+					counter += 1
+				'check':
+					if input_handler.evaluate(data1.trim_prefix('check=')) == false:
+						originaltext = ''
+				'random_chat':
+					var character = input_handler.scene_characters[int(data[1])]
+					originaltext = character.translate(input_handler.get_random_chat_line(character, originaltext))
+				'random_chat_active':
+					var character = input_handler.active_character
+					originaltext = character.translate(input_handler.get_random_chat_line(character, originaltext))
+				'custom_text_function':
+					originaltext = originaltext + ResourceScripts.custom_text.get_custom_text(data[1])
+
+		text = text.replace(newtext, startcode + originaltext + endcode)
+	if node != null:
+		node.bbcode_text = text
+		if tooltiparray.size() != 0:
+			node.set_meta('tooltips', tooltiparray)
+			if node.is_connected("meta_hover_started", self, "BBCodeTooltip") == false:
+				node.connect("meta_hover_started", self, "BBCodeTooltip", [node])
+				node.connect("meta_hover_ended",self, 'hidetooltip')
+	else:
+		return input_handler.text_cut_excessive_lines(text)
+
+func BBCodeTooltip(meta, node):
+	var text = node.get_meta('tooltips')[int(meta)]
+	#showtooltip(text, node)
+
+var shrine_offering_items = ['alcohol','wine','wine2','beer']
+
+func ItemSelect(targetscript, type, function, requirements = null):
+	var node
+	if get_tree().get_root().has_node("ItemSelect"):
+		node = get_tree().get_root().get_node("ItemSelect")
+		get_tree().get_root().remove_child(node)
+		get_tree().get_root().add_child(node)
+	else:
+		node = load(ResourceScripts.scenedict.itemselect).instance()
+		get_tree().get_root().add_child(node)
+		input_handler.AddPanelOpenCloseAnimation(node)
+		node.name = 'ItemSelect'
+	
+	node.show()
+	
+	input_handler.ClearContainer(node.get_node("ScrollContainer/GridContainer"))
+	var array = []
+	if type == 'gear':
+		for i in ResourceScripts.game_res.items.values():
+			if i.type != 'gear': 
+				continue
+			if i.owner != null:
+				continue
+			if requirements == null:
+				array.append(i)
+			else:
+				pass #add here any proper check, items have valuecheck() method after all
+	elif type == 'sex_use':
+		for i in ResourceScripts.game_res.items.values():
+			if i.interaction_use == true:
+				array.append(i)
+	elif type == 'date_use':
+		for i in ResourceScripts.game_res.items.values():
+			if i.type == 'gear':
+				continue
+			if Items.itemlist[i.code].tags.has('date'):
+				array.append(i)
+	elif type == 'material':
+		for i in ResourceScripts.game_res.materials:
+			if ResourceScripts.game_res.materials[i] > 0:
+				array.append(i)
+	elif type == 'item':
+		for item in ResourceScripts.game_res.items.values():
+			if item.check_reqs(requirements):
+				array.append({type = 'item', code = item.itembase, amount = item.amount, item = item})
+	elif type == 'shrine_offering':
+		for i in ResourceScripts.game_res.materials:
+			if ResourceScripts.game_res.materials[i] > 0:
+				array.append({type = 'material', code = i, amount = ResourceScripts.game_res.materials[i]})
+		for item in ResourceScripts.game_res.items.values():
+			var template = Items.itemlist[item.itembase]
+			if template.code in shrine_offering_items:
+				array.append({type = 'item', code = item.itembase, amount = item.amount, item = item})
+#		if requirements != null and requirements.has("allow_alcohol_items") and requirements.allow_alcohol_items:
+#			for item in ResourceScripts.game_res.items.values():
+#				if item.owner != null:
+#					continue
+#				if item.amount <= 0:
+#					continue
+#				var template = Items.itemlist[item.itembase]
+#				if !template.has("interaction_effect"):
+#					continue
+#				if template.interaction_effect in ['alcohol', 'beer']:
+#					array.append({kind = 'item', code = item.itembase, amount = item.amount, item = item})
+
+	for i in array:
+		var newnode = input_handler.DuplicateContainerTemplate(node.get_node("ScrollContainer/GridContainer"))
+		match type:
+			'gear':
+				i.set_icon(newnode.get_node("icon"))
+#				newnode.get_node("Percent").show()
+#				newnode.get_node("Percent").text = str(input_handler.calculatepercent(i.durability, i.maxdurability)) + '%'
+				connectitemtooltip_v2(newnode, i)
+			'sex_use', 'date_use':
+				i.set_icon(newnode.get_node("icon"))
+				newnode.get_node("Percent").show()
+				newnode.get_node('name').text = i.name
+				newnode.get_node("Percent").text = str(i.amount)
+				connectitemtooltip_v2(newnode, i)
+			'material':
+				newnode.get_node("icon").texture = Items.materiallist[i].icon
+				newnode.get_node("Percent").show()
+				newnode.get_node('name').text = Items.materiallist[i].name
+				newnode.get_node("Percent").text = str(ResourceScripts.game_res.materials[i])
+				connectmaterialtooltip(newnode, Items.materiallist[i])
+			'shrine_offering', 'item':
+				match i.type:
+					'material':
+						newnode.get_node("icon").texture = Items.materiallist[i.code].icon
+						newnode.get_node("Percent").show()
+						newnode.get_node('name').text = Items.materiallist[i.code].name
+						newnode.get_node("Percent").text = str(i.amount)
+						connectmaterialtooltip(newnode, Items.materiallist[i.code])
+					'item':
+						i.item.set_icon(newnode.get_node("icon"))
+						newnode.get_node("Percent").show()
+						newnode.get_node('name').text = i.item.name
+						newnode.get_node("Percent").text = str(i.amount)
+						connectitemtooltip_v2(newnode, i.item)
+		
+		newnode.connect('pressed', targetscript, function, [i])
+		newnode.connect('pressed',input_handler,'CloseSelection', [node])
+
+func QuickSave():
+	SaveGame('QuickSave')
+
+#spread = serialize over several frames instead of one blocking call. Only safe while the
+#caller guarantees the game state is not changing in between (turn processing, input locked)
+func autosave(overwrite = false, spread = false):
+	if spread: #always a coroutine when asked for, so callers can yield on 'completed'
+		yield(get_tree(), 'idle_frame')
+	if input_handler.hard_tutorial_active:
+		return
+	if input_handler.globalsettings.autosave_number <= 0:
+		return
+	if !overwrite:
+		var savedir = Directory.new()
+		var path = variables.userfolder + 'saves'
+		if !savedir.dir_exists(path):
+			savedir.make_dir(path)
+		if savedir.open(path) != OK:
+			print('ERROR opening savedir')
+			return
+		#delete existing last save
+		if savedir.file_exists('autosave_%d.sav' % input_handler.globalsettings.autosave_number):
+			savedir.remove('autosave_%d.sav' % input_handler.globalsettings.autosave_number)
+		if savedir.file_exists('autosave_%d.dat' % input_handler.globalsettings.autosave_number):
+			savedir.remove('autosave_%d.dat' % input_handler.globalsettings.autosave_number)
+		#move all other saves 1 point up
+		for i in range(input_handler.globalsettings.autosave_number -1, 0, -1):
+			if savedir.file_exists('autosave_%d.sav' % i):
+				savedir.rename('autosave_%d.sav' % i, 'autosave_%d.sav' % (i + 1))
+			if savedir.file_exists('autosave_%d.dat' % i):
+				savedir.rename('autosave_%d.dat' % i, 'autosave_%d.dat' % (i + 1))
+	if spread:
+		yield(SaveGame('autosave_1', true), 'completed')
+	else:
+		SaveGame('autosave_1')
+
+const SAVE_SERIALIZE_CHUNK = 10
+
+func SaveGame(name, spread = false):
+	var savedict = {}#state.serialize();
+	if spread:
+		savedict.charpool = yield(characters_pool.serialize_chunked(SAVE_SERIALIZE_CHUNK), 'completed')
+	else:
+		savedict.charpool = characters_pool.serialize()
+	savedict.effpool = effects_pool.serialize()
+
+#	ResourceScripts.game_res.fix_items_inventory(true)
+	for p in ResourceScripts.gamestate:
+		if spread:
+			yield(get_tree(), 'idle_frame')
+			if p == 'game_party':
+				savedict[p] = yield(_serialize_party_chunked(SAVE_SERIALIZE_CHUNK), 'completed')
+				continue
+		savedict[p] = ResourceScripts.get(p).serialize()
+#	ResourceScripts.game_res.fix_items_inventory(false)
+
+	var config_data = {version = gameversion, time = OS.get_datetime(), master_name = ResourceScripts.game_party.get_master().get_stat('name'), day = ResourceScripts.game_globals.date, hour = ResourceScripts.game_globals.hour, population = ResourceScripts.game_party.characters.size(), gold = ResourceScripts.game_res.money, master_icon = ResourceScripts.game_party.get_master().get_icon(true), preset = ResourceScripts.game_globals.starting_preset}
+	if _save_thread.is_active():
+		_save_thread.wait_to_finish()
+	_save_thread.start(self, "_save_thread_write", [name, savedict, config_data])
+
+func _save_thread_write(args):
+	var name = args[0]
+	var savedict = args[1]
+	var config_data = args[2]
+	var f = File.new()
+	f.open(variables.userfolder + 'saves/' + name + '.sav', File.WRITE)
+	f.store_line(to_json(savedict))
+	f.close()
+	var metadata = ConfigFile.new()
+	for i in config_data:
+		metadata.set_value('details', i, config_data[i])
+	metadata.save(variables.userfolder + "saves/" + name + ".dat")
+	call_deferred("_save_complete", name)
+
+func _save_complete(name):
+	input_handler.SystemMessage("Game saved as " + name + ".sav")
+
+
+#game_party is a Reference and has no access to the tree, so its chunked variant lives here
+func _serialize_party_chunked(chunk):
+	yield(get_tree(), 'idle_frame')
+	var party = ResourceScripts.game_party
+	var res = party.serialize_base()
+	var counter = 0
+	for p in party.characters:
+		res.characters[p] = party.characters[p].serialize()
+		counter += 1
+		if counter % chunk == 0:
+			yield(get_tree(), 'idle_frame')
+	for p in party.babies:
+		res.babies[p] = party.babies[p].serialize()
+		counter += 1
+		if counter % chunk == 0:
+			yield(get_tree(), 'idle_frame')
+	return res
+
+
+func LoadGame(filename):
+#	print(effects_pool.serialize())
+	if !file.file_exists(variables.userfolder+'saves/'+ filename + '.sav') :
+		print("no file %s" % (variables.userfolder+'saves/'+ filename + '.sav'))
+		return
+	
+	ResourceScripts.core_animations.BlackScreenTransition(1)
+	yield(get_tree().create_timer(1), 'timeout')
+#	input_handler.CloseableWindowsArray.clear()
+	gui_controller.revert_scenes_data()
+	ResourceScripts.revert_gamestate()
+	input_handler.emit_signal("clear_cashed")
+	
+	file.open(variables.userfolder+'saves/'+ filename + '.sav', File.READ)
+	var savedict = parse_json(file.get_as_text())
+	file.close()
+
+	for faction in savedict.game_world.areas.plains.factions:
+		var current_faction = savedict.game_world.areas.plains.factions[faction]
+		if !current_faction.has("bonus_actions"):
+			savedict.game_world.areas.plains.factions[faction]["bonus_actions"] = worlddata.factiondata[faction].bonus_actions
+	
+#	state.deserialize(savedict)
+	effects_pool.deserialize(savedict.effpool)
+	characters_pool.deserialize(savedict.charpool)
+	for p in ResourceScripts.gamestate:
+		ResourceScripts.set(p, dict2inst(savedict[p]))
+	input_handler.connect("EnemyKilled", ResourceScripts.game_world, "quest_kill_receiver")
+	ResourceScripts.game_globals.fix_serialization()
+	ResourceScripts.game_res.fix_serialization()
+#	ResourceScripts.game_res.fix_items_inventory(false)
+	ResourceScripts.game_party.fix_serialization()
+	ResourceScripts.game_world.fix_serialization()
+	ResourceScripts.game_progress.fix_serialization()
+	characters_pool.cleanup()
+	characters_pool.postload()
+	effects_pool.cleanup()
+	effects_pool.postload()
+#	print(effects_pool.serialize())
+	#mind! that characters_pool's fix_serialization_postload is inside game_party's
+	ResourceScripts.game_party.fix_serialization_postload()
+	ResourceScripts.game_party.force_update_portraits()
+	
+	if is_instance_valid(gui_controller.mansion):
+		gui_controller.mansion.queue_free()
+	if is_instance_valid(gui_controller.current_screen):
+		gui_controller.current_screen.queue_free()
+	input_handler.ChangeScene('mansion');
+	yield(self, "scene_changed")
+	if is_instance_valid(gui_controller.clock):
+		gui_controller.clock.update_labels()
+		gui_controller.clock.set_sky_pos()
+	
+	input_handler.SystemMessage("Game Loaded")
+	
+	if !compare_version(ResourceScripts.game_globals.original_version, '0.9.0c'):
+		if globals.valuecheck({type = "active_quest_stage", value = 'princess_search', stage = 'stage2', state = true}):
+			globals.common_effects([{code = "decision", value = "AllowSearch"},{code = 'make_quest_location', value = 'quest_rebels_backrooms'}])
+	if !compare_version(ResourceScripts.game_globals.original_version, '0.9.1'):
+		if !globals.valuecheck({type = 'location_exists', location = 'quest_mages_xari'}):
+			globals.common_effects([{code = 'make_quest_location', value = 'quest_mages_xari'}])
+
+
+func compare_version(v1:String, v2:String):
+	var vp1 = v1.split('.')
+	var vp2 = v2.split('.')
+	for i in range(vp1.size()):
+		if i >= vp2.size(): 
+			return true
+		if vp1[i].naturalnocasecmp_to(vp2[i]) != 0: 
+			return vp1[i].naturalnocasecmp_to(vp2[i]) > 0
+	return true
+
+
+func ImportGame(filename):
+	if !file.file_exists(variables.userfolder+'saves/'+ filename + '.sav') :
+		print("no file %s" % (variables.userfolder+'saves/'+ filename + '.sav'))
+		return
+
+	ResourceScripts.core_animations.BlackScreenTransition(1)
+	yield(get_tree().create_timer(1), 'timeout')
+#	input_handler.CloseableWindowsArray.clear()
+	ResourceScripts.revert_gamestate()
+	gui_controller.revert_scenes_data()
+	input_handler.emit_signal("clear_cashed")
+
+	file.open(variables.userfolder+'saves/'+ filename + '.sav', File.READ)
+	var savedict = parse_json(file.get_as_text())
+	file.close()
+
+	input_handler.connect("EnemyKilled", ResourceScripts.game_world, "quest_kill_receiver")
+	ResourceScripts.game_res = dict2inst(savedict.game_res)
+	ResourceScripts.game_res.fix_serialization()
+	ResourceScripts.game_world.make_world()
+	ResourceScripts.game_world.fix_import(savedict.game_world)
+	ResourceScripts.game_party = dict2inst(savedict.game_party)
+	ResourceScripts.game_party.fix_serialization()
+	ResourceScripts.game_party.fix_import()
+	ResourceScripts.game_globals = dict2inst(savedict.game_globals)
+	ResourceScripts.game_globals.fix_import()
+	#temporally removed
+#	ResourceScripts.game_progress = dict2inst(savedict.game_progress)
+#	ResourceScripts.game_progress.fix_import()
+#	characters_pool.get_babies_from_data(savedict.charpool)
+	effects_pool.deserialize(savedict.effpool)
+
+	if !compare_version(savedict.game_globals.original_version, '0.5.5b'):
+		effects_pool.fix_durations()
+	
+	ResourceScripts.game_party.fix_serialization_postload()
+
+	if is_instance_valid(gui_controller.mansion):
+		gui_controller.mansion.queue_free()
+	if is_instance_valid(gui_controller.current_screen):
+		gui_controller.current_screen.queue_free()
+	input_handler.ChangeScene('mansion');
+	yield(self, "scene_changed")
+	if is_instance_valid(gui_controller.clock):
+		gui_controller.clock.update_labels()
+		gui_controller.clock.set_sky_pos()
+	input_handler.SystemMessage("Game Imported")
+	common_effects([
+			{code = 'add_timed_event', value = "loan_event1",
+				args = [
+					{type = 'fixed_date',
+					date = 14,
+					hour = 1}
+					]
+			},
+			{code = 'progress_quest', value = 'main_quest_loan', stage = 'stage0'},
+			{code = 'progress_quest', value = 'guilds_introduction', stage = 'start'},
+			{code = 'add_timed_event', value = "ginny_visit", args = [{type = 'add_to_date', date = [3,5], hour = 1}]}
+			])
+	
+
+
+
+func get_last_save():
+	var dir = input_handler.dir_contents(variables.userfolder + 'saves')
+	var dated_dir = {}
+	var tmp = File.new()
+	for i in dir:
+		if i.ends_with('.sav') == false:
+			continue
+		dated_dir[i] = tmp.get_modified_time(i)
+	if dated_dir.size() == 0: return null
+	var b = dated_dir.keys()[0]
+	for i in dated_dir.keys():
+		if dated_dir[i] > dated_dir[b]:
+			b = i
+	return b
+
+func datetime_comp(a, b):
+	if a.year != b.year: return (a.year > b.year)
+	if a.month != b.month: return (a.month > b.month)
+	if a.day != b.day: return (a.day > b.day)
+	if a.hour != b.hour: return (a.hour > b.hour)
+	if a.minute != b.minute: return (a.minute > b.minute)
+	if a.second > b.second: return true
+	return false
+
+
+func fastif(value, result1, result2):
+	if value:
+		return result1
+	else:
+		return result2
+
+func preexit_clear_up():
+	if input_handler.CurrentScene != null:
+		input_handler.CurrentScene.queue_free()
+	
+	if gui_controller.exploration != null:
+		gui_controller.exploration.queue_free()
+	if gui_controller.exploration_city != null:
+		gui_controller.exploration_city.queue_free()
+	if gui_controller.exploration_dungeon != null:
+		gui_controller.exploration_dungeon.queue_free()
+	
+	gui_controller.exploration = null
+	gui_controller.exploration_city = null
+	gui_controller.exploration_dungeon = null
+	
+	#input_handler.ChangeScene('menu') was here in return_to_main_menu()
+	if gui_controller.dialogue != null:
+		gui_controller.dialogue.hide()
+	ResourceScripts.revert_gamestate()
+	gui_controller.revert_scenes_data()
+#	ResourceScripts.recreate_singletons()
+
+func return_to_main_menu():
+	preexit_clear_up()
+	input_handler.ChangeScene('menu')
+
+
+func getrelativename(person, person2):
+	var result = null
+	var data1
+	var data2
+	if ResourceScripts.game_party.relativesdata.has(person.id):
+		data1 = ResourceScripts.game_party.relativesdata[person.id]
+	else:
+		ResourceScripts.game_party.createrelativesdata(person)
+		data1 = ResourceScripts.game_party.relativesdata[person.id]
+	if ResourceScripts.game_party.relativesdata.has(person2.id):
+		data2 = ResourceScripts.game_party.relativesdata[person2.id]
+	else:
+		ResourceScripts.game_party.createrelativesdata(person2)
+		data2 = ResourceScripts.game_party.relativesdata[person2.id]
+	
+	#print(data1, data2)
+	for i in ['mother','father']:
+		if str(data1[i]) == str(data2.id):
+			result = '[father]'
+		elif str(data2[i]) == str(data1.id):
+			result = '[son]'
+	for i in [data1, data2]:
+		if i.siblings.has(data1.id) || i.siblings.has(data2.id):
+			result = '[brother]'
+	if result != null:
+		result = person2.translate(result)
+	return result
+
+
+func impregnate_check(father,mother):
+	var result = {value = true, preg_disabled = false, no_womb = false, male_contraceptive = false, female_contraceptive = false, mother_breeder = false, father_breeder = false, compatible = true, already_preg_visible = false, father_undead = false, mother_undead = false}
+
+	if variables.pregenabled == false:
+		result.value = false
+		result.text = 'pregnancy_disabled'
+		result.preg_disabled = true
+
+	elif mother.get_stat('has_womb') == false:
+		result.value = false
+		result.no_womb = true
+
+	elif mother.check_work_rule('contraceptive'):
+		result.female_contraceptive = true
+		result.value = false
+	
+	
+	elif father.check_work_rule('contraceptive') == true:
+		result.male_contraceptive = true
+		result.value = false
+	
+	if father.check_trait('undead'):
+		result.father_undead = true
+	if mother.check_trait('undead'):
+		result.mother_undead = true
+	
+	if father.get_stat('race') != mother.get_stat('race'):
+		for i in [father, mother]:
+			var race = i.get_stat('race')
+			if race.find("Beastkin") >= 0:
+				race = 'Beastkin'
+			elif race.find('Halfkin') >= 0:
+				race = "Halfkin"
+
+			if variables.impregnation_compatibility.has(race) == false && input_handler.globalsettings.no_breed_incompatibility == false:
+#				if mother.has_profession('breeder') == false:
+#					result.value = false
+#					result.compatible = false
+#				else:
+#					result.value = true
+#					result.breeder = true
+				if mother.has_status('breeder'):
+					result.value = true
+					result.mother_breeder = true
+				elif father.has_status('breeder'):
+					result.value = true
+					result.father_breeder = true
+				else:
+					result.value = false
+					result.compatible = false
+	
+	if mother.get_stat('pregnancy_duration') != 0:
+		result.value = false
+		if variables.pregduration/1.5 > mother.get_stat('pregnancy_duration'):
+			result.already_preg_visible = true
+	
+	if result.no_womb || result.preg_disabled || result.male_contraceptive || result.female_contraceptive || result.father_undead || result.mother_undead:
+		result.value = false
+	
+	return result
+
+func impregnate(father, mother, skip_check = false):
+	if !skip_check and !impregnate_check(father,mother).value:
+		return
+	mother.add_stat('metrics_pregnancy',  1)
+	father.add_stat("metrics_impregnation", 1)
+	var baby = ResourceScripts.scriptdict.class_slave.new("baby")
+	baby.setup_baby(mother, father)
+
+func calculate_travel_time(location1, location2): #2remade to new mechanic
+	var time = 0
+	var adata1 = ResourceScripts.world_gen.get_area_from_location_code(location1)
+	var ldata1 = ResourceScripts.world_gen.get_location_from_code(location1)
+	var adata2 = ResourceScripts.world_gen.get_area_from_location_code(location2)
+	var ldata2 = ResourceScripts.world_gen.get_location_from_code(location2)
+	
+#	if location1 != ResourceScripts.game_world.mansion_location:
+#		time += ldata1.travel_time
+	#if location2 != ResourceScripts.game_world.mansion_location:
+	time += ldata2.travel_time
+	if adata1.code != adata2.code:
+		if !(adata1.code in ['forests', 'beastkin_tribe']) or !(adata2.code in ['forests', 'beastkin_tribe']):
+			time += adata1.travel_time + adata2.travel_time
+	
+	time = max(1, time - variables.stable_boost_per_level * ResourceScripts.game_res.upgrades.stables)
+	return {time = time}
+
+
+func text_log_add(label, text):
+	var date = ResourceScripts.game_globals.date
+	var hour = ResourceScripts.game_globals.hour
+	if label == 'travel': 
+		hour += 1
+		if hour > 4:
+			hour = 1
+			date += 1
+	var message = {type = label, text = text, date = date, hour = hour}
+	log_storage.append(message)
+	if log_node != null && weakref(log_node).get_ref():
+		log_node.add_log_message(message)
+
+#quite ugly method to stop manifest befor main viewport is ready
+#it's probably useful only for test, but still seems "normal" problem for get_spec_node()
+#If there is an another way to check viewport's readiness, change this!
+func free_manifest():
+	can_manifest = true
+func manifest(text, person = null):
+	if !can_manifest: return
+	if person == null:
+		person = ResourceScripts.game_party.get_master()
+	var node = input_handler.get_spec_node(input_handler.NODE_CHAT)
+	node.add_new_chatter(person, text)
+
+func manifest_and_log(label, text, person = null):
+	manifest(text, person)
+	text_log_add(label, text)
+
+func character_stat_change(character, data):
+	var text = "%s: %s" % [character.get_short_name(), get_stat_name(data.code)]
+	if data.operant == '+':
+		text += " + "
+		character.add_stat(data.code, data.value)
+	elif data.operant == '=':
+		text += " = "
+		character.set_stat(data.code, data.value)
+	else:
+		text += " - "
+		character.add_stat(data.code, -data.value)
+
+	text += str(data.value)
+	text_log_add('char', text)
+#	manifest(text, character)
+#	character.set(data.code, input_handler.math(data.operant, character.get(data.code), data.value))
+
+func make_local_recruit(args):
+	var newchar = ResourceScripts.scriptdict.class_slave.new("local_recruit")
+	if args == null:
+		newchar.generate_random_character_from_data(input_handler.weightedrandom(input_handler.active_location.races))
+	else:
+		var race = 'random'
+		var des_class = null
+		var difficulty = 0
+		if args.has('races'):
+			race = input_handler.weightedrandom(args.races)
+			if race == 'local':
+				race = input_handler.weightedrandom(input_handler.active_area.races)
+			elif race == 'beast':
+				var racearray = []
+				for i in races.racelist.values():
+					if i.tags.has('beast') == true:
+						racearray.append(i.code)
+				race = racearray[randi()%racearray.size()]
+		if args.has('difficulty'):
+			difficulty = round(rand_range(args.difficulty[0], args.difficulty[1]))
+		newchar.generate_random_character_from_data(race, des_class, difficulty)
+		if args.has("bonuses"):
+			newchar.add_stat_bonuses(args.bonuses)
+		if args.has("type"):
+			newchar.set_slave_category(args.type)
+	if newchar.get_stat('slave_class') == '': newchar.set_slave_category('servant')
+	if args.has("is_hirable"): newchar.set_stat('is_hirable', args.is_hirable)
+	return newchar
+
+
+func check_events(action): #partly obsolete, do not understand always returning false
+	var eventarray = []
+	if input_handler.active_location.has('scriptedevents'):
+		eventarray = input_handler.active_location.scriptedevents
+	var erasearray = []
+	var eventtriggered = false
+	for i in eventarray:
+		if i.trigger == action && check_event_reqs(i.reqs) == true:
+			if i.event == 'custom_event':
+				input_handler.interactive_message(i.args)
+			elif i.has('args'):
+				input_handler.call(i.event, i.args)
+			else:
+				input_handler.call(i.event)
+			if i.has('oneshot') && i.oneshot == true:
+				erasearray.append(i)
+	for i in erasearray:
+		eventarray.erase(i)
+	return eventtriggered
+
+
+func start_fixed_event(ev):
+	var event = scenedata.scenedict[ev]
+	if event.has('reqs'):
+		if !checkreqs(event.reqs):
+			return false
+	var eventtype = "event_selection"
+	var dict = {}
+	if event.has("default_event_type"):
+		eventtype = event.default_event_type
+	if event.has('bonus_args'):
+		dict = event.bonus_args
+	input_handler.interactive_message(ev, eventtype, dict)
+	return true
+
+
+func start_unique_event():
+	if gui_controller.exploration_dungeon == null:
+		return false
+	var eventtriggered = false
+	var location = gui_controller.exploration_dungeon.active_location
+	var active_array = []
+	for i in worlddata.random_dungeon_events:
+		var event = worlddata.random_dungeon_events[i]
+		if ResourceScripts.game_progress.seen_events.has(event.event): 
+			continue
+		if !event.dungeons.has(str(location.code)): 
+			continue
+#		if event.has('levels') and !event.levels.has(gui_controller.exploration_dungeon.active_location.current_level + 1): 
+#			continue
+		if event.has('reqs') and !checkreqs(event.reqs): 
+			continue
+		active_array.append(event.event)
+	if active_array.size() > 0:
+		var selected_event = input_handler.random_from_array(active_array)
+		var eventtype = "event_selection"
+		var dict = {}
+		if scenedata.scenedict[selected_event].has("default_event_type"):
+			eventtype = scenedata.scenedict[selected_event].default_event_type
+		if scenedata.scenedict[selected_event].has('bonus_args'):
+			dict = scenedata.scenedict[selected_event].bonus_args
+		input_handler.interactive_message(selected_event, eventtype, dict)
+		eventtriggered = true
+	return eventtriggered
+
+
+func start_random_event(): #maybe obsolete - for needed only as fallback for unique or fixed ones call if no event is avaliable
+	var eventarray = input_handler.active_location.randomevents
+	var eventtriggered = false
+	var active_array = []
+	for i in eventarray:
+		var event = scenedata.scenedict[i[0]]
+		if event.has('reqs'):
+			if checkreqs(event.reqs):
+				active_array.append(i)
+		else:
+			active_array.append(i)
+	if active_array.size() > 0:
+		active_array = input_handler.weightedrandom(active_array)
+		var eventtype = "event_selection"
+		var dict = {}
+		if scenedata.scenedict[active_array].has("default_event_type"):
+			eventtype = scenedata.scenedict[active_array].default_event_type
+		if scenedata.scenedict[active_array].has('bonus_args'):
+			dict = scenedata.scenedict[active_array].bonus_args
+		input_handler.interactive_message(active_array, eventtype, dict)
+		eventtriggered = true
+	return eventtriggered
+
+
+func check_event_reqs(reqs):
+	var progress = input_handler.active_location.progress
+	var check = true
+	for i in reqs:
+		match i.code:
+			'level':
+				check = input_handler.operate(i.operant, progress.level, i.value)
+			'stage':
+				check = input_handler.operate(i.operant, progress.stage, i.value)
+			'dungeon_complete':
+				check = i.value == input_handler.exploration_node.check_dungeon_end()
+			'value_check':
+				check = valuecheck(i)
+		if check == false:
+			break
+	return check
+
+func check_group(group):
+	var counter = 0
+	var cleararray = []
+	for i in group:
+		if ResourceScripts.game_party.characters.has(group[i]):
+			counter += 1
+		else:
+			cleararray.append(i)
+	for i in cleararray:
+		group.erase(i)
+	if counter == 0:
+		return false
+	else:
+		return true
+
+func check_location_group():
+	return check_group(input_handler.active_location.group)
+
+func StartCombat(encounter = null):
+	if input_handler.combat_node == null:
+		input_handler.combat_node = input_handler.get_combat_node()
+	var data
+	var args = {}
+	if encounter != null:
+		data = Enemydata.encounters[encounter]
+#		if data.has('no_rnd_captured') and data.no_rnd_captured:
+#			char_roll_data.no_roll = true
+		input_handler.encounter_win_script = Enemydata.encounters[encounter].win_effects
+		input_handler.encounter_lose_script = Enemydata.encounters[encounter].lose_effects
+		if data.has('enemy_stats_mod'):
+			args.enemy_stats_mod = data.enemy_stats_mod
+		if data.has('hpmod'):
+			args.hpmod = data.hpmod
+	
+#	if ResourceScripts.game_globals.skip_combat == true:
+#		input_handler.finish_combat()
+#		return
+	
+	if encounter == null:
+		StartAreaCombat()
+		return
+	
+	var enemies
+	match data.unittype:
+		'randomgroup':
+			enemies = make_enemies(data.unitcode, true)
+#	var combat = get_combat_node()
+#	combat.encountercode = data.unitcode
+	
+	input_handler.combat_node.encountercode = data.unitcode
+	input_handler.combat_node.set_norun_mode(true)
+	input_handler.combat_node.start_combat(input_handler.active_location.group, enemies, data.bg, data.bgm, args)
+
+func StartQuestCombat(encounter):
+	pass
+
+func StartAreaCombat(): #rnd all and always
+	input_handler.encounter_win_script = null
+	input_handler.encounter_lose_script = null
+	var enemydata
+	var enemygroup = {}
+	var enemies = []
+	var music = 'combattheme'
+	var background = 'background'
+	
+	if input_handler.active_location.has('custom_background'):
+		background = input_handler.active_location.custom_background
+	
+	if enemydata == null:
+		enemydata = input_handler.active_location.enemies
+
+	enemies = make_enemies(enemydata)
+
+	var enemy_stats_mod = (1 - variables.difficulty_per_level) + variables.difficulty_per_level * gui_controller.exploration_dungeon.active_location.current_level
+	var data = {enemy_stats_mod = enemy_stats_mod}
+	if input_handler.combat_node == null:
+		input_handler.combat_node = input_handler.get_combat_node()
+	input_handler.combat_node.encountercode = enemydata
+	input_handler.combat_node.set_norun_mode(false)
+	input_handler.combat_node.start_combat(input_handler.active_location.group, enemies, background, music, data)
+
+
+func StartFixedAreaCombat(data): #non-rnd, 2test, 2fix
+	input_handler.encounter_win_script = null
+	input_handler.encounter_lose_script = null
+	var enemydata
+	var enemygroup = {}
+	var enemies = []
+	var music = 'combattheme'
+	var background = 'background'
+	
+	if gui_controller.exploration_dungeon.active_location.has('custom_background'):
+		background = gui_controller.exploration_dungeon.active_location.custom_background
+	
+	enemydata = data.enemy_code
+	enemies = data.enemies.duplicate(true)
+	
+	char_roll_data.rare = data.rare
+
+#	enemies = make_enemies(enemydata)
+	if data.has('miniboss') and data.miniboss:
+		char_roll_data.mboss = true
+		for pos in enemies:
+			if enemies[pos] == null: 
+				continue
+			if enemies[pos].ends_with('_rare'):
+				enemies[pos] = enemies[pos].trim_suffix("_rare")
+			enemies[pos] += "_miniboss"
+	
+	var enemy_stats_mod
+	if gui_controller.exploration_dungeon.active_location.tags.has('infinite'):
+		enemy_stats_mod = 1 + gui_controller.exploration_dungeon.active_location.current_level * variables.difficulty_per_level_survival
+	else:
+		enemy_stats_mod = (1 - variables.difficulty_per_level) + variables.difficulty_per_level * gui_controller.exploration_dungeon.active_location.current_level
+	var combat_data = {enemy_stats_mod = enemy_stats_mod}
+	for arg in ['instawin', 'hpmod', 'xp_mod']:
+		if data.has(arg):
+			combat_data[arg] = data[arg]
+	if input_handler.combat_node == null:
+		input_handler.combat_node = input_handler.get_combat_node()
+	if data.has('intimidate') and data.intimidate:
+		combat_data.instawin = true
+		data.intimidate = false
+	input_handler.combat_node.encountercode = enemydata
+	input_handler.combat_node.set_norun_mode(false)
+	input_handler.combat_node.start_combat(gui_controller.exploration_dungeon.active_location.group, enemies, background, music, combat_data)
+
+
+func make_enemies(enemydata, quest = false):
+	var enemies
+	if typeof(enemydata) == TYPE_ARRAY:
+		enemies = input_handler.weightedrandom(enemydata)
+		enemies = makerandomgroup(Enemydata.enemygroups[enemies], quest)
+	elif Enemydata.enemygroups.has(enemydata):
+		enemies = makerandomgroup(Enemydata.enemygroups[enemydata], quest)
+	else:
+		enemies = makespecificgroup(enemydata)
+	return enemies
+
+func makespecificgroup(group):
+	var enemies = Enemydata.predeterminatedgroups[group]
+	var combatparty = {1 : null, 2 : null, 3 : null, 4 : null, 5 : null, 6 : null}
+	for i in enemies.group:
+		combatparty[i] = enemies.group[i]
+
+	return combatparty
+
+func makerandomgroup(enemygroup, quest = false):
+	var array = []
+	for i in enemygroup.units:
+		var size = rng.randi_range(enemygroup.units[i][0], enemygroup.units[i][1])
+#		var size = rng_controllable.randi_range(enemygroup.units[i][0],enemygroup.units[i][1])
+		if size != 0:
+			array.append({units = i, number = size})
+	var countunits = 0
+	for i in array:
+		countunits += i.number
+	if countunits > 6:
+		array[randi() % array.size()].number -= (countunits - 6)
+
+	#Assign units to rows
+	var combatparty = {1 : null, 2 : null, 3 : null, 4 : null, 5 : null, 6 : null}
+	for i in array:
+		var unit = Enemydata.enemies[i.units]
+		while i.number > 0:
+			var temparray = []
+
+			if true:
+				#smart way
+				for j in combatparty:
+					if combatparty[j] != null:
+						continue
+					var aiposition = input_handler.random_from_array(unit.ai_position)
+#					var aiposition = input_handler.random_from_array(unit.ai_position, rng_controllable)
+					if aiposition == 'melee' && j in [1,2,3]:
+						temparray.append(j)
+					if aiposition == 'ranged' && j in [4,5,6]:
+						temparray.append(j)
+					if aiposition == 'any':
+						temparray.append(j)
+
+				if temparray.empty():
+					for j in combatparty:
+						if combatparty[j] == null:
+							temparray.append(j)
+			else:
+				#stupid way
+				for j in combatparty:
+					if combatparty[j] != null:
+						temparray.append(j)
+
+			if temparray.size() > 0:
+				combatparty[input_handler.random_from_array(temparray)] = i.units
+			i.number -= 1
+	
+	#handle rares
+	if !quest:
+		var champarr = []
+		for pos in combatparty:
+			if combatparty[pos] == null: continue
+			if rng.randf() < variables.enemy_rarechance:
+#			if rng_controllable.randf() < variables.enemy_rarechance:
+				champarr.push_back(pos)
+				char_roll_data.rare = true
+		while champarr.size() > 3:
+			champarr.remove(rng.randi_range(0, champarr.size()-1))
+#			champarr.remove(rng_controllable.randi_range(0, champarr.size()-1))
+		for pos in champarr:
+			combatparty[pos] += "_rare"
+	return combatparty
+
+
+func complete_location(locationid):
+	var location = ResourceScripts.world_gen.get_location_from_code(locationid)
+	if location == null: return
+	var area = ResourceScripts.world_gen.get_area_from_location_code(locationid)
+	return_characters_from_location(locationid)
+	ResourceScripts.game_progress.completed_locations[location.id] = {name = location.name, id = location.id, area = area.code}
+
+
+func Reward(selectedquest, suspend_rep = false):
+	# input_handler.PlaySound("questcomplete")
+	var return_reputation = false
+	var reputation_value = 0
+	var guild
+	if selectedquest.rewards.has('spec_rules'):
+		for spec_rule in selectedquest.rewards.spec_rules:
+			match spec_rule.rule:
+				'item_based_gold':
+					var val = spec_rule.mul * selectedquest.turned_value
+					val *= 1 + variables.master_charm_quests_gold_bonus[int(ResourceScripts.game_party.get_master().get_stat('charm_factor'))]
+					ResourceScripts.game_res.money += round(val)
+				'reputation':
+					reputation_value = round(spec_rule.value + spec_rule.value * variables.master_charm_quests_rep_bonus[int(ResourceScripts.game_party.get_master().get_stat('charm_factor'))])
+					guild = selectedquest.source
+					if suspend_rep:
+						return_reputation = true
+					else:
+						common_effects([{code = 'reputation', name = guild, value = reputation_value, operant = '+'}])
+	if selectedquest.rewards.has('gold'):
+		ResourceScripts.game_res.money += round(selectedquest.rewards.gold + selectedquest.rewards.gold
+			* variables.master_charm_quests_gold_bonus[int(ResourceScripts.game_party.get_master().get_stat('charm_factor'))])
+	if selectedquest.rewards.has('materials'):
+		for i in selectedquest.rewards.materials:
+			ResourceScripts.game_res.materials[i] += selectedquest.rewards.materials[i]
+	if selectedquest.rewards.has('items'):
+		for i in selectedquest.rewards.items:
+			AddItemToInventory(i)
+	
+	#old (loot-system less) rewords. Legacy code for bug fix. Delete with time (31 oct 2025)
+#	var is_recount_reputation = false
+#	for i in selectedquest.rewards:
+#		match i.code:
+#			'gold':
+#				if i.value is Array:
+#					var val = i.value[0] * selectedquest.turned_value
+#					val *= 1 +  variables.master_charm_quests_gold_bonus[int(ResourceScripts.game_party.get_master().get_stat('charm_factor'))]
+#					ResourceScripts.game_res.money += round(val)
+#				else:
+#					ResourceScripts.game_res.money += round(i.value + i.value * variables.master_charm_quests_gold_bonus[int(ResourceScripts.game_party.get_master().get_stat('charm_factor'))])
+#			'reputation':
+#				# ResourceScripts.game_world.areas[selectedquest.area].factions[selectedquest.source].reputation += round(i.value + i.value * variables.master_charm_quests_rep_bonus[int(ResourceScripts.game_party.get_master().get_stat('charm_factor'))])
+#				# ResourceScripts.game_world.areas[selectedquest.area].factions[selectedquest.source].totalreputation += round(i.value + i.value * variables.master_charm_quests_rep_bonus[int(ResourceScripts.game_party.get_master().get_stat('charm_factor'))])
+#				reputation_value = round(i.value + i.value * variables.master_charm_quests_rep_bonus[int(ResourceScripts.game_party.get_master().get_stat('charm_factor'))])
+#				guild = selectedquest.source
+#				is_recount_reputation = true
+#			'gear':
+#				AddItemToInventory(CreateGearItemQuest(i.item, i.itemparts, selectedquest))
+#			'gear_static':
+#				AddItemToInventory(CreateGearItem(i.item, {}))
+#			'material':
+#				ResourceScripts.game_res.materials[i.item] += i.value
+#			'usable':
+#				AddItemToInventory(CreateUsableItem(i.item, i.value))
+
+	#remake into data system
+	if selectedquest.area == 'plains':
+		for i in ResourceScripts.game_world.areas[selectedquest.area].factions.values():
+			if i.totalreputation >= 300 && ResourceScripts.game_progress.get_active_quest("guilds_introduction") != null && ResourceScripts.game_progress.get_active_quest("guilds_introduction").stage == 'stage1':
+				ResourceScripts.game_progress.get_active_quest("guilds_introduction").stage = 'stage1_5'
+				common_effects([{code = 'add_timed_event', value = "guilds_elections_switch", args = [{type = 'add_to_date', date = [1,1], hour = 1}]}])
+	if ResourceScripts.game_progress.get_active_quest("guilds_introduction") != null && ResourceScripts.game_progress.get_active_quest("guilds_introduction").stage == 'stage1_5':
+		var counter = false
+		for i in ResourceScripts.game_progress.stored_events.timed_events:
+			if i.has('action'):
+				continue
+			if i.code == 'guilds_elections_switch':
+				counter = true
+		if counter == false:
+			common_effects([{code = 'add_timed_event', value = "guilds_elections_switch", args = [{type = 'add_to_date', date = [1,1], hour = 1}]}])
+	if return_reputation:
+		return {value = reputation_value, guild = guild}
+	return null
+
+
+
+func remove_location(locationid):
+	var location = ResourceScripts.world_gen.get_location_from_code(locationid)
+	if location == null: return
+	if location.type == 'capital':
+		print('WARNING - incorrect location removal')
+		return
+	var area = ResourceScripts.world_gen.get_area_from_location_code(locationid)
+	ResourceScripts.game_res.remove_tasks_for_location(location.id)
+	return_characters_from_location(locationid)
+	if location.has('captured_characters'):
+		for id in location.captured_characters:
+			var tchar = characters_pool.get_char_by_id(id)
+			var val = tchar.calculate_price(true) / 2
+			ResourceScripts.game_res.money += int(val)
+			tchar.is_active = false
+#	area.locations.erase(location.id)
+#	area.questlocations.erase(location.id)
+#	ResourceScripts.game_world.location_links.erase(location.id)
+	ResourceScripts.game_world.remove_location(locationid)
+	
+	input_handler.update_slave_list()
+	gui_controller.nav_panel.build_accessible_locations()
+	if gui_controller.current_screen == gui_controller.mansion:
+		gui_controller.mansion.mansion_state_set("default")
+		return
+	if input_handler.active_location == location and gui_controller.exploration != null and gui_controller.exploration.is_visible_in_tree():
+		gui_controller.nav_panel.select_location('aliron')
+
+
+func unquest_location(locationid):
+	var location = ResourceScripts.world_gen.get_location_from_code(locationid)
+	if location == null: return
+	location.tags.erase('quest')
+	var area = ResourceScripts.world_gen.get_area_from_location_code(locationid)
+	var ldata = ResourceScripts.game_world.location_links[locationid]
+	if ldata.category != "questlocations":
+		print ("warning - location %s is not quest" % locationid)
+		return
+	if !location.has("questid"):
+		print ("error - quest location %s has no associated quest" % locationid)
+		return
+	if ResourceScripts.game_progress.if_quest_active(location.questid):
+		print ("error - quest for location %s is active" % locationid)
+		return
+	ldata.category = "locations"
+	area.questlocations.erase(locationid)
+	area.locations[locationid] = location
+
+
+func return_characters_from_location(locationid):
+	var location = ResourceScripts.world_gen.get_location_from_code(locationid)
+	if location == null:
+		#possibly not that simple
+		return
+	var area = ResourceScripts.world_gen.get_area_from_location_code(locationid)
+	for id in ResourceScripts.game_party.character_order:
+		var person = ResourceScripts.game_party.characters[id]
+		if person.check_location(location.id):
+			if ResourceScripts.game_globals.instant_travel:
+				person.travel.location = ResourceScripts.game_world.mansion_location
+				person.return_to_task()
+			else:
+				person.return_to_mansion() 
+
+
+var char_roll_data = {}
+func reset_roll_data():
+	char_roll_data.no_roll = false
+	char_roll_data.max_amount = 4
+	char_roll_data.lvl = 0
+	char_roll_data.mf = 0
+	char_roll_data.rare = false
+	char_roll_data.mboss = false
+	char_roll_data.uniq = false
+	char_roll_data.event = false
+	char_roll_data.trait_bonus = false
+	char_roll_data.area = 'plains'
+	char_roll_data.diff = 'medium'
+#	match ResourceScripts.game_globals.difficulty:
+#		'easy':
+#			char_roll_data.diff = 2
+#		'medium':
+#			char_roll_data.diff = 4
+#		'hard':
+#			char_roll_data.diff = 6
+
+
+func get_rolled_diff(): #excluding event bonus
+	var t_diff = 0
+	match char_roll_data.diff:
+		'easy':
+			t_diff = 2
+		'medium':
+			t_diff = 4
+		'hard':
+			t_diff = 6
+		'infinite':
+			if char_roll_data.lvl <= 10:
+				t_diff = char_roll_data.lvl * 0.5
+			else:
+				t_diff = 3 + char_roll_data.lvl * 0.2
+	t_diff += char_roll_data.lvl
+	if char_roll_data.rare: t_diff += 1
+	if char_roll_data.uniq: t_diff += 2 
+#	if char_roll_data.trait_bonus: t_diff += 2 not implemented
+	
+	return t_diff
+
+
+
+func roll_characters():
+	var res = []
+	if char_roll_data.no_roll:
+		reset_roll_data()
+		return res
+	var chance1 = variables.dungeon_character_chances.initial_char_chance
+	var chance2 = variables.dungeon_character_chances.initial_second_char_chance
+	
+	if char_roll_data.rare: 
+		chance1 = variables.dungeon_character_chances.rare_char_chance
+		chance2 = variables.dungeon_character_chances.rare_second_char_chance
+	if char_roll_data.uniq: 
+		chance1 = variables.dungeon_character_chances.boss_chance
+	if char_roll_data.mboss: 
+		chance1 = variables.dungeon_character_chances.mboss_chance
+		chance2 = variables.dungeon_character_chances.mboss_second_chance
+#	if char_roll_data.trait_bonus: not implemented
+#		chance1 = 0.5
+#		chance2 = 0.15
+	
+	var t_diff = get_rolled_diff()
+	if char_roll_data.event: t_diff += variables.dungeon_character_chances.event_diff_bonus
+	if char_roll_data.mboss: t_diff += variables.dungeon_character_chances.mboss_diff_bonus
+	
+	var t_race = 'random'
+	var areadata = input_handler.active_area
+	var locdata = input_handler.active_location
+	var racedata = []
+	if areadata.has('races'):
+		racedata = areadata.races.duplicate()
+	elif worlddata.lands[areadata.code].has('races'):
+		areadata.races = worlddata.lands[areadata.code].races
+		racedata = areadata.races.duplicate()
+	else:
+		print("ERROR - no racedata for %s" % areadata.code)
+	var manhunt_values = []
+	for ch_id in input_handler.active_location.group.values():
+		var scout = characters_pool.get_char_by_id(ch_id)
+		if scout != null:
+			manhunt_values.push_back(scout.get_stat('manhunt') + scout.get_fame_bonus('manhunt_bonus'))
+	manhunt_values.sort()
+	var manhunt_bonus = 0.0
+	for i in range(max(manhunt_values.size() - 2, 0), manhunt_values.size()):
+		manhunt_bonus += manhunt_values[i] * 0.1
+	if locdata.has('character_data'):
+		locdata = locdata.character_data
+		if locdata.has('chance_mod'):
+			var chance_mod = locdata.chance_mod + manhunt_bonus
+			chance1 *= chance_mod
+			chance2 *= chance_mod
+		if locdata.has('races'):
+			racedata = locdata.races.duplicate()
+		 #or weight_random if data is weighted 
+#		race = input_handler.weightedrandom(input_handler.active_area.races)
+	
+	var n = 0
+	if rng.randf() < chance1:
+		if racedata is Array and !racedata.empty():
+			t_race = input_handler.weightedrandom(racedata)
+		if t_race == 'local':
+			if areadata.has('races'):
+				t_race = input_handler.weightedrandom(areadata.races)
+			else:
+				print("ERROR - no racedata for %s" % areadata.code)
+		var newslave = ResourceScripts.scriptdict.class_slave.new("random_combat")
+		newslave.generate_random_character_from_data(t_race, null, t_diff)
+		newslave.is_active = true
+#		newslave.set_slave_category('servant')
+		res.push_back(newslave.id)
+		n += 1
+		while rng.randf() < chance2 and n < char_roll_data.max_amount:
+			if racedata is Array and !racedata.empty():
+				t_race = input_handler.weightedrandom(racedata)
+			if t_race == 'local':
+				t_race = input_handler.weightedrandom(areadata.races)
+			newslave = ResourceScripts.scriptdict.class_slave.new("random_combat")
+			newslave.generate_random_character_from_data(t_race, null, t_diff)
+			newslave.is_active = true
+#			newslave.set_slave_category('servant')
+			res.push_back(newslave.id)
+			n += 1
+	
+	reset_roll_data()
+	return res
+
+
+func roll_hirelings(loc, recruiter = null):
+	var t_diff = 10 #stub main
+	if char_roll_data.event: t_diff += 2
+	
+	var t_race = 'random'
+	var locdata = ResourceScripts.world_gen.get_location_from_code(loc)
+	var areadata = ResourceScripts.world_gen.get_area_from_location_code(loc)
+	var racedata = []
+	if areadata.has('races'):
+		racedata = areadata.races.duplicate()
+	if locdata.has('character_data'):
+		var locdata1 = locdata.character_data
+		if locdata1.has('races'):
+			racedata = locdata1.races.duplicate()
+		if locdata1.has('diff_roll'):
+			t_diff = locdata1.diff_roll
+	if recruiter != null:
+		t_diff += recruiter.get_stat('manhunt') + recruiter.get_fame_bonus('manhunt_bonus')
+	
+	
+	if racedata is Array and !racedata.empty():
+		t_race = input_handler.weightedrandom(racedata)
+	if t_race == 'local':
+		t_race = input_handler.weightedrandom(areadata.races)
+	var newslave = ResourceScripts.scriptdict.class_slave.new("random_hireling")
+	newslave.generate_random_character_from_data(t_race, null, t_diff)
+	newslave.is_active = true
+	newslave.set_slave_category('servant')
+	
+	if !locdata.has('captured_characters'):
+		locdata.captured_characters = []
+	locdata.captured_characters.push_back(newslave.id)
+	input_handler.emit_signal("LocationSlavesUpdate")
+
+
+var yes
+var no
+
+func common_effects(effects, from_event = false):
+	for i in effects:
+		match i.code:
+			'money_change':
+				ResourceScripts.game_res.update_money(i.operant, i.value)
+				text_log_add('mansion', "Gold: %s%s " % [i.operant, i.value])
+			'material_change':
+				ResourceScripts.game_res.update_materials(i.operant, i.material, i.value)
+				text_log_add("mansion", "%s %s %s" % [
+					Items.materiallist[i.material].name, i.operant, i.value])
+			'make_story_character':
+				if ResourceScripts.game_party.get_unique_slave(i.value.to_lower()) != null:
+					continue
+				var newslave = ResourceScripts.scriptdict.class_slave.new("common_story")
+				newslave.generate_predescribed_character(worlddata.pregen_characters[i.value])
+				if "recruit_from_location" in i:
+					newslave.travel.area = input_handler.active_area.code
+					newslave.travel.location = input_handler.active_location.id
+				if "send_to_mansion" in i:
+					if i.send_to_mansion:
+						newslave.return_to_mansion()
+				if "slave_category" in i:
+					newslave.set_slave_category(i.slave_category)
+				#newslave.set_slave_category(newslave.slave_class)
+				ResourceScripts.game_party.add_slave(newslave)
+				ResourceScripts.game_party.build_starting_relations(newslave.id)
+				if from_event:
+					var unique_code = newslave.get_stat("unique")
+					if unique_code != null:
+						var recruited_decision = "%s_recruited" % str(unique_code).to_lower()
+						if !ResourceScripts.game_progress.decisions.has(recruited_decision):
+							ResourceScripts.game_progress.decisions.append(recruited_decision)
+			'add_timed_event':
+				if i.has('skip_existing') and i.skip_existing and ResourceScripts.game_progress.timed_event_exists(i.value):
+					continue
+				var newevent = {reqs = [], code = i.value}
+				for k in i.args:
+					match k.type:
+						'add_to_date':
+							var newreq = [{type = 'date', operant = 'eq', value = ResourceScripts.game_globals.date + round(rand_range(k.date[0], k.date[1]))}, {type = 'hour', operant = 'eq', value = k.hour}]
+							newevent.reqs += newreq
+						'fixed_date':
+							var newreq = [{type = 'date', operant = 'eq', value = k.date}, {type = 'hour', operant = 'eq', value = k.hour}]
+							newevent.reqs += newreq
+						'add_to_hour':
+							var date = ResourceScripts.game_globals.date
+							var hour = ResourceScripts.game_globals.hour + round(rand_range(k.hour[0], k.hour[1]))
+							if hour > 4: hour = hour - 4
+							if ResourceScripts.game_globals.hour == 4:
+								date += 1
+							var newreq = [{type = 'date', operant = 'eq', value = date}, {type = 'hour', operant = 'eq', value = hour}]
+							newevent.reqs += newreq
+						'action_to_date':
+							var newreq = [{type = 'date', operant = 'eq', value = ResourceScripts.game_globals.date + round(rand_range(k.date[0], k.date[1]))}, {type = 'hour', operant = 'eq', value = k.hour}]
+							newevent.action = k.action
+							newevent.reqs += newreq
+				ResourceScripts.game_progress.stored_events.timed_events.append(newevent)
+			'remove_timed_events':
+				var array = []
+				for k in ResourceScripts.game_progress.stored_events.timed_events:
+					if k.code in i.value:
+						array.append(k)
+				for k in array:
+					ResourceScripts.game_progress.stored_events.timed_events.erase(k)
+			'unique_character_changes':
+				var character
+				if i.value == "master":
+					character = ResourceScripts.game_party.get_master()
+				else:
+					character = ResourceScripts.game_party.get_unique_slave(i.value)
+				if character == null:
+					continue
+				for k in i.args:
+					if k.has('reqs') and !character.checkreqs(k.reqs):
+						continue
+					if k.code == 'sextrait':
+						match k.operant:
+							'add':
+								character.add_sex_trait(k.value, k.known)
+					elif k.code == 'tag':
+						match k.operant:
+							'remove':
+								character.tags.erase(k.value)
+								if k.value == 'no_sex' and !character.has_status('no_sex'):
+									var text = character.get_short_name() + ": " + tr("CHARLOG_SEX_ACCESS_UNLOCKED")
+									text_log_add('char', text)
+#									manifest(text, character)
+								
+								#character.stats.tags.erase(k.value)
+					elif k.code == 'assign_to_quest_and_make_unavalible':
+						character.assign_to_quest_and_make_unavalible(k.quest, k.work_time)
+					elif k.code == 'remove_character':
+						ResourceScripts.game_party.remove_slave(character)
+					elif k.code == 'add_profession':
+						character.unlock_class(k.profession)
+					elif k.code == 'add_trait':
+						character.add_trait(k.trait)
+					elif k.code == 'create_and_equip': #there should be static items only
+						var item = CreateGearItem(k.item, k.parts)
+						AddItemToInventory(item, false)
+						character.equip(item)
+					elif k.code == 'take_virginity':
+						if k.partner == 'master':
+							k.partner = ResourceScripts.game_party.get_master().id
+						character.take_virginity(k.type, k.partner)
+					elif k.code == 'add_partner':
+						if k.partner == 'master':
+							k.partner = ResourceScripts.game_party.get_master().id
+						character.add_partner(k.partner)
+					elif k.code == 'remove_combat_skill':
+						character.unlearn_c_skill(k.skill)
+					elif k.code == 'remove_social_skill':
+						character.unlearn_skill(k.skill)
+					elif k.code == 'remove_explore_skill':
+						character.unlearn_e_skill(k.skill)
+					else:
+						character_stat_change(character, k)
+			'start_event':
+				input_handler.interactive_message(i.data, 'start_event', i.args)
+			'spend_money_for_scene_character':
+				ResourceScripts.game_res.update_money('-', input_handler.scene_characters[i.value].calculate_price(true))
+#				money -= input_handler.scene_characters[i.value].calculate_price()
+#				text_log_add('money',"Gold used: " + str(input_handler.scene_characters[i.value].calculate_price()))
+			'bool_scene_characters':
+				if i.type == 'all':
+					for k in input_handler.scene_characters:
+						k.set_stat(i.stat, i.value)
+			'affect_scene_characters': #idk why it is the same as above and why it is used instead of above
+				if i.type == 'all':
+					for k in input_handler.scene_characters:
+						k.set_stat(i.stat, i.value)
+			'real_affect_scene_characters':
+#				if i.type == 'all':
+				for k in input_handler.scene_characters:
+					k.affect_char(i, true)
+			'affect_one_scene_character':
+				#char_num is human-readable (begins with 1, not 0)
+				if input_handler.scene_characters.size() >= i.char_num:
+					input_handler.scene_characters[i.char_num - 1].affect_char(i, true)
+			'change_type_scene_characters':
+				if i.type == 'all':
+					for k in input_handler.scene_characters:
+						k.set_slave_category(i.value)
+			'active_character_switch':
+				input_handler.active_character = input_handler.scene_characters[i.value]
+			'affect_active_character':
+				input_handler.active_character.affect_char(i, true)
+			'affect_master':
+				ResourceScripts.game_party.get_master().affect_char(i, true)
+			'make_loot':
+				#in most cases "pool" array is redundant, as there is only one position,
+				#but i'm keeping it "as is" so CqEditor couldn't hurt an event
+				var loot_name = input_handler.weightedrandom(i.pool)
+				#mind, that "chest" can be lockless, therefore just loot
+				input_handler.scene_loot = ResourceScripts.world_gen.make_chest_loot(loot_name)
+			'open_loot':
+				# input_handler.get_spec_node(input_handler.NODE_LOOTTABLE).open(input_handler.scene_loot, '[center]Acquired Items:[/center]')
+					var loot_win = input_handler.get_spec_node(input_handler.ANIM_LOOT)
+					if !gui_controller.windows_opened.has(loot_win):
+						gui_controller.windows_opened.append(loot_win)
+					loot_win.open(input_handler.scene_loot)
+					loot_win.raise()
+			'make_scene_character':
+				for k in i.value:
+					var newcharacter
+					var number = 1
+					if k.has("number"):
+						number = round(rand_range(k.number[0], k.number[1]))
+					while number > 0:
+						match k.type:
+							'raw':
+								newcharacter = ResourceScripts.scriptdict.class_slave.new("common_scene_raw")
+#								newcharacter.is_active = false
+								newcharacter.generate_random_character_from_data(k.race, k.class, k.difficulty)
+								newcharacter.set_slave_category(k.slave_type)
+							'function':
+								newcharacter = call(k.function, k.args)
+						newcharacter.is_active = false
+						input_handler.active_character = newcharacter
+						input_handler.scene_characters.append(newcharacter)
+						if i.has('add_to_captives') and i.add_to_captives:
+							if !input_handler.active_location.has('captured_characters'):
+								input_handler.active_location.captured_characters = []
+							input_handler.active_location.captured_characters.push_back(newcharacter.id)
+							newcharacter.is_active = true
+						number -= 1
+			'update_guild':
+				if gui_controller.exploration_city == null:
+					gui_controller.exploration_city = input_handler.get_spec_node(input_handler.NODE_EXPLORATION_CITY, null, false, false)
+				gui_controller.exploration_city.enter_guild(gui_controller.exploration_city.active_faction)
+			'update_city':
+				if gui_controller.exploration_city == null:
+					gui_controller.exploration_city = input_handler.get_spec_node(input_handler.NODE_EXPLORATION_CITY, null, false, false)
+				gui_controller.exploration_city.open_city()
+			'update_party':
+				if gui_controller.exploration != null:
+					gui_controller.exploration.build_location_group()
+				if gui_controller.exploration_dungeon != null:
+					gui_controller.exploration_dungeon.build_location_group()
+			'update_prts':
+				for ch in ResourceScripts.game_party.characters.values():
+					ch.update_prt()
+			'rewrite_save': #obsolete
+				pass
+#				if (int(ResourceScripts.game_globals.date) % input_handler.globalsettings.autosave_frequency == 0) and int(ResourceScripts.game_globals.hour) == 1:
+#					autosave(true)
+			'background_noise':
+				match i.value:
+					'start':
+						input_handler.PlayBackgroundSound(i.sound)
+					'stop':
+						input_handler.StopBackgroundSound()	
+					'resume':
+						input_handler.ResumeBackgroundSound()
+			'update_location':
+				if input_handler.exploration_node == null:
+					input_handler.exploration_node = gui_controller.exploration
+				input_handler.exploration_node.open_location(input_handler.active_location)
+			'advance_location':
+				pass
+				gui_controller.exploration_dungeon.clear_subroom()#test
+#				if input_handler.exploration_node == null:
+#					input_handler.exploration_node = gui_controller.exploration
+#				if input_handler.combat_explore:
+#					input_handler.exploration_node.advance()
+			'open_location': # {code = 'open_location', location = "SETTLEMENT_PLAINS1", area = "plains"}
+#				gui_controller.exploration.show()
+				if input_handler.exploration_node == null:
+					input_handler.exploration_node = gui_controller.exploration
+				var location
+				for a in ResourceScripts.game_world.areas[i.area].locations.values():
+					if a.code.matchn(i.location): # SETTLEMENT_PLAINS1
+						location = a
+				# trying to find capital
+				if location == null:
+					var area = null
+					var data = i
+					if data.has('area'):
+						if ResourceScripts.game_world.areas.has(data.area): area = ResourceScripts.game_world.areas[data.area]
+						else:
+							print("error - no area %s" % data.area)
+							continue
+						if area.has('capital'):
+							location = ResourceScripts.game_world.get_area_capital(area)
+							area = area.code
+#					location = {id = location, area = area}
+					location = ResourceScripts.world_gen.get_location_from_code(location)
+#					input_handler.active_location = location
+#					input_handler.exploration_node.open_city(location.id)
+					gui_controller.nav_panel.select_location(location.id)
+				else:
+					location = ResourceScripts.world_gen.get_location_from_code(location.id) #dont understand why it is reqired
+#					input_handler.active_location = location
+#					input_handler.exploration_node.open_location(location)
+					gui_controller.nav_panel.select_location(location.id)
+			'open_city': 
+				if input_handler.exploration_node == null:
+					input_handler.exploration_node = gui_controller.exploration
+				input_handler.exploration_node.open_city(i.city)
+			'create_character':
+				if !ResourceScripts.game_globals.diff_solo:
+					input_handler.get_spec_node(input_handler.NODE_CHARCREATE, ['slave', i.type])
+			'progress_quest':
+				var quest_exists = false
+				for k in ResourceScripts.game_progress.active_quests:
+					if k.code == i.value:
+						quest_exists = true
+						k.stage = i.stage
+						text_log_add("quest", "Quest Updated: " + tr(scenedata.quests[k.code].stages[k.stage].name) + ". ")
+						var args = {}
+						args["label"] = "Quest Updated"
+						args["info"] =  tr(scenedata.quests[k.code].stages[k.stage].name)
+						args["sound"] = "class_aquired"
+						input_handler.play_animation("quest", args)
+				if quest_exists == false:
+					ResourceScripts.game_progress.active_quests.append({code = i.value, stage = i.stage})
+					text_log_add("quest", "Quest Received: " + tr(scenedata.quests[i.value].stages[i.stage].name) + ". ")
+					var args = {}
+					args["label"] = "Quest Received"
+					args["info"] = tr(scenedata.quests[i.value].stages[i.stage].name)
+					args["sound"] = "class_aquired"
+					input_handler.play_animation("quest", args)
+			'complete_quest':
+				for k in ResourceScripts.game_progress.active_quests:
+					if k.code == i.value:
+						ResourceScripts.game_progress.active_quests.erase(k)
+						text_log_add("quest","Quest Completed: " + tr(scenedata.quests[k.code].stages[k.stage].name) + ". ")
+						
+						var args = {}
+						args["label"] = "Quest Completed"
+						args["name"] =  tr(scenedata.quests[k.code].stages[k.stage].name)
+						#args["sound"] = "class_aquired"
+						input_handler.play_animation("quest_completed", args)
+						break
+				ResourceScripts.game_progress.completed_quests.append(i.value)
+				input_handler.achievements.try_add_quest_achimnt(i.value)
+			'complete_active_location':
+				complete_location(input_handler.active_location.id)
+#			'set_completed_quest_location':
+#				var data = ResourceScripts.world_gen.get_faction_from_code(i.id)
+#				data.completed = true
+#				data.active = false
+			'set_completed_active_location':
+				#input_handler.active_location.progress.level = input_handler.active_location.levels.size()
+#				input_handler.active_location.progress.stage = input_handler.active_location.levels["L" + str(input_handler.active_location.levels.size())].stages
+				if gui_controller.exploration_dungeon != null and gui_controller.exploration_dungeon.visible:
+					gui_controller.exploration_dungeon.active_location.completed = true
+					gui_controller.exploration_dungeon.active_location.active = false
+				if gui_controller.exploration != null and gui_controller.exploration.visible:
+					gui_controller.exploration.active_location.completed = true
+					gui_controller.exploration.active_location.active = false
+					gui_controller.exploration.open_location_actions()
+			'remove_active_location':
+				remove_location(input_handler.active_location.id)
+			'reputation':
+				var data = ResourceScripts.world_gen.get_faction_from_code(i.name)
+				var guild = ResourceScripts.game_world.areas[data.area].factions[data.code]
+				var n1 = get_nquest_for_rep(guild.totalreputation)
+				guild.reputation = input_handler.math(i.operant, guild.reputation, i.value)
+				guild.totalreputation = input_handler.math(i.operant, guild.totalreputation, i.value) #guess there should be a + operant check before it
+				var n = get_nquest_for_rep(guild.totalreputation) - n1
+				if n > 0:
+#					guild.questsetting.total += n
+#					guild.questsetting.easy += n
+					var args = {}
+					args["label"] = guild.name
+					args["info"] = "Reputation: +%d Total Quest" % n
+					args["sound"] = "class_aquired"
+					input_handler.play_animation("quest", args)
+			'decision':
+				if !ResourceScripts.game_progress.decisions.has(i.value):
+					ResourceScripts.game_progress.decisions.append(i.value)
+			'remove_decision':
+				if ResourceScripts.game_progress.decisions.has(i.value):
+					ResourceScripts.game_progress.decisions.erase(i.value)
+			'screen_black_transition':
+				ResourceScripts.core_animations.BlackScreenTransition(i.value)
+			'screen_shake':
+				if i.has('delay'):
+					yield(get_tree().create_timer(i.delay),'timeout')
+				ResourceScripts.core_animations.ShakeAnimation(gui_controller.current_screen, i.length, i.strength)
+				ResourceScripts.core_animations.ShakeAnimation(gui_controller.dialogue, i.length, i.strength)
+			'start_combat':
+				current_enemy_group = i.value
+				input_handler.get_spec_node(input_handler.NODE_COMBATPOSITIONS)
+			'start_quest_combat':
+				StartQuestCombat(i.value)
+			'make_quest_location':
+				ResourceScripts.world_gen.make_quest_location(i.value)
+			'remove_quest_location':
+				remove_location(i.value)
+			'return_characters_from_location':
+				return_characters_from_location(i.value)
+			'set_music':
+				input_handler.SetMusic(i.value)
+			'play_sound':
+				input_handler.PlaySound(i.value)
+			'lose_game':
+				input_handler.PlaySound('transition_sound')
+				gameover_process = true
+				ResourceScripts.core_animations.GameOverScreen()
+				yield(get_tree().create_timer(7.5), "timeout")
+				return_to_main_menu()
+			'complete_active_location_quests':
+				if input_handler.active_location.has('questid'):
+					var quest = ResourceScripts.game_world.get_quest_by_id(input_handler.active_location.questid)
+					if quest != null:#can be forfited
+						for req in quest.requirements:
+							if req.code in ['complete_location','complete_dungeon'] && req.area == input_handler.active_area.code && req.location == input_handler.active_location.id:
+								req.completed = true
+			'affect_active_party':
+				for k in input_handler.get_active_party():
+					k.affect_char(i, true)
+			'affect_unique_character':
+				var k = ResourceScripts.game_party.get_unique_slave(i.name.to_lower())
+				if k != null:
+					k.affect_char(i, true)
+			'progress_active_location':
+				gui_controller.exploration.skip_to_boss()
+			'dialogue_counter':
+				ResourceScripts.game_progress.operate_counter(i.name, i.op)
+			'unlock_class':
+				if !ResourceScripts.game_progress.unlocked_classes.has(i.name):
+					ResourceScripts.game_progress.unlocked_classes.append(i.name)
+#					input_handler.play_unlock_class_anim(i.name)
+					input_handler.play_animation('class_unlocked', {new_class = i.name})
+			'reset_day_count':
+				ResourceScripts.game_progress.reset_day_count(i.quest)
+			#to_loc and from_loc are location-defining data dicts
+			#in formats:
+			#{area = area_id} - means area capital
+			#{location = location_id}
+			#{code = location_code} - means first id-wise existing location with given code
+			'teleport_active_character':
+				input_handler.active_character.teleport(i.to_loc)
+				gui_controller.nav_panel.build_accessible_locations()
+			'teleport_active_location':
+				var location
+				for a in ResourceScripts.game_world.areas[i.to_loc.area].locations.values():
+					if a.code == i.to_loc.location.to_upper() || a.code == i.to_loc.location: # SETTLEMENT_PLAINS1
+						location = a
+				# trying to find capital
+				if location == null:
+					var area = null
+					var data = i.to_loc
+					if data.has('area'):
+						if ResourceScripts.game_world.areas.has(data.area): area = ResourceScripts.game_world.areas[data.area]
+						else:
+							print("error - no area %s" % data.area)
+							continue
+						if area.has('capital'):
+							location = ResourceScripts.game_world.get_area_capital(area)
+							area = area.code
+					location = {location = location, area = area}
+				
+				for pos in input_handler.active_location.group:
+					var ch_id = input_handler.active_location.group[pos]
+					if ch_id != null:
+						characters_pool.get_char_by_id(ch_id).teleport(location)
+				gui_controller.nav_panel.build_accessible_locations()
+				#(i.to_loc.location)
+			'teleport_active_location_all':
+				var location
+				for a in ResourceScripts.game_world.areas[i.to_loc.area].locations.values():
+					if a.code == i.to_loc.location.to_upper() || a.code == i.to_loc.location: # SETTLEMENT_PLAINS1
+						location = a
+				# trying to find capital
+				if location == null:
+					var area = null
+					var data = i.to_loc
+					if data.has('area'):
+						if ResourceScripts.game_world.areas.has(data.area): area = ResourceScripts.game_world.areas[data.area]
+						else:
+							print("error - no area %s" % data.area)
+							continue
+						if area.has('capital'):
+							location = ResourceScripts.game_world.get_area_capital(area)
+							area = area.code
+					location = {location = location, area = area}
+				
+				for ch_id in ResourceScripts.game_party.character_order:
+					var person = characters_pool.get_char_by_id(ch_id)
+					if person.check_location(input_handler.active_location.id, true):
+						person.teleport(location)
+				gui_controller.nav_panel.build_accessible_locations()
+			'teleport_location':
+				var locdata = ResourceScripts.game_world.find_location_by_data(i.from_loc)
+				if locdata.location == null:
+					print("teleportation from %s failed" % str(i.from_loc))
+					continue
+				locdata = ResourceScripts.world_gen.get_location_from_code(locdata.location)
+				for pos in locdata.group:
+					var ch_id = locdata.group[pos]
+					if ch_id != null:
+						characters_pool.get_char_by_id(ch_id).teleport(i.to_loc)
+				gui_controller.nav_panel.build_accessible_locations()
+			'return_to_mansion':
+				gui_controller.nav_panel.return_to_mansion()
+			'update_mansion':
+				if gui_controller.current_screen == gui_controller.mansion:
+					gui_controller.nav_panel.build_accessible_locations()
+					gui_controller.nav_panel.update_buttons()
+					gui_controller.mansion.SlaveListModule.rebuild()
+			# example:
+			# location = "SETTLEMENT_PLAINS1"
+			# area = "plains"
+			# param = "type"
+			# value = "locked"
+			'set_location_param':
+				var param = i.param
+				var value = i.value
+				var loc
+				for a in ResourceScripts.game_world.areas[i.area].locations.values():
+					if a.code.matchn(i.location):
+						a[param] = value
+						loc = a
+						break
+					elif ResourceScripts.world_gen.get_location_from_code(a.code) == i.location.to_upper() || a.code == i.location:
+						a[param] = value
+						loc = a
+						break
+				if param == 'captured' && value == true && loc != null:
+					return_characters_from_location(loc.id)
+			'yes_or_no_panel':
+				yes = i.yes
+				no = i.no
+				input_handler.get_spec_node(input_handler.NODE_YESORNOPANEL, [self, "yes_message", "no_message", i.text])
+			'close_guild_window':
+				gui_controller.nav_panel.select_location("aliron")
+			'add_item':
+				var item = Items.itemlist[i.item]
+				var counter = i.number
+				if item.type == 'usable':
+					while counter > 0:
+						AddItemToInventory(CreateUsableItem(item.code))
+						counter -= 1
+				elif item.type == 'gear':
+					while counter > 0:
+						counter -= 1
+						if i.has('quality'):
+							AddItemToInventory(CreateGearItem(item.code, {}, null, i.quality)) #no parts, so no enchants
+						else:
+							AddItemToInventory(CreateGearItem(item.code, {})) #no parts, so no enchants
+			'remove_item':
+				ResourceScripts.game_res.remove_item(i.name, i.number)
+			'unlock_asset':
+				input_handler.update_progress_data(i.dir, i.key)
+			'set_spouse':
+				ResourceScripts.game_progress.spouse = input_handler.active_character.id
+#				input_handler.active_character.unlock_class('spouse')
+			'complete_wedding':
+				ResourceScripts.game_progress.marriage_completed = true
+				ResourceScripts.game_party.get_spouse().unlock_class('spouse')
+				ResourceScripts.game_party.get_spouse().set_slave_category('spouse')
+				ResourceScripts.game_party.get_spouse().set_stat('surname', ResourceScripts.game_party.get_master().get_stat('surname'))
+				input_handler.achievements.try_add_wed_achimnt(ResourceScripts.game_party.get_spouse().get_stat('unique'))
+			'after_wedding_event':
+				after_wedding_event(ResourceScripts.game_party.get_spouse().get_stat('unique'))
+			'hide_dialogue':
+				gui_controller.dialogue.hide_dialogue()
+			'plan_mansion_event':
+				if !ResourceScripts.game_progress.planned_mansion_events.has(i.value):
+					ResourceScripts.game_progress.planned_mansion_events.append(i.value)
+			'plan_loc_event':
+				ResourceScripts.game_progress.plan_loc_event(i.loc, i.event)
+			'add_special_task_for_location':
+				ResourceScripts.game_res.add_special_job(i)
+			'remove_special_task_for_location':
+				for task_id in ResourceScripts.game_res.active_tasks.special.duplicate():
+					var task = ResourceScripts.game_res.tasks_progresses[task_id]
+					if task.location != i.location:
+						continue
+					if i.has('event'):
+						var found_event = false
+						for dir in task.args:
+							if dir.code == 'start_event' and dir.data == i.event:
+								found_event = true
+								break
+						if !found_event:
+							continue
+					ResourceScripts.game_res.clean_task(task_id)
+				emit_signal("task_removed")
+			'add_hireling_to_location':
+				roll_hirelings(i.location)
+			'finish_worktask':
+				ResourceScripts.game_progress.work_quests_finished.push_back(i.value)
+			'pay_loan':
+				ResourceScripts.game_res.update_money('-', get_loan_sum(i.stage - 1))
+			'election_finish':
+				if ResourceScripts.game_globals.diff_stop_loan:
+					common_effects([{code = 'complete_quest', value = 'main_quest_loan'}, {code = 'remove_timed_events', value = ['loan_event1','loan_event2','loan_event3','loan_event4']}]) #stub, do not want recursion here
+			'plan_loan_event':
+				var newevent = {reqs = [], code = 'loan_event' + str(i.stage)}
+				var newreq = [{type = 'date', operant = 'eq', value = variables.base_loan_dates[i.stage - 1]}, {type = 'hour', operant = 'eq', value = 1}]
+				newevent.reqs += newreq
+				ResourceScripts.game_progress.stored_events.timed_events.append(newevent)
+			'add_master_points':
+				ResourceScripts.game_progress.master_points += i.value
+				input_handler.play_animation("master_points", {master_points = i.value})
+			'pay_stamina':
+				if gui_controller.exploration_dungeon != null:
+					var res
+					if i.has('modified'):
+						res = gui_controller.exploration_dungeon.pay_stamina(i.value, i.modified) 
+					else:
+						res = gui_controller.exploration_dungeon.pay_stamina(i.value)
+					manifest_and_log("dungeon", "%s stamina spent in %s" %
+						[res, tr(gui_controller.exploration_dungeon.active_location.name)])
+			'add_stamina':
+				if gui_controller.exploration_dungeon != null:
+					gui_controller.exploration_dungeon.add_stamina(i.value)
+					manifest_and_log("dungeon", "%s stamina replenished in %s" %
+						[i.value, tr(gui_controller.exploration_dungeon.active_location.name)])
+					
+			'clear_subroom':
+				if gui_controller.exploration_dungeon != null:
+					if i.has('optional'):
+						gui_controller.exploration_dungeon.clear_subroom(i.optional)
+					else:
+						gui_controller.exploration_dungeon.clear_subroom()
+			'unlock_subroom':
+				if gui_controller.exploration_dungeon != null:
+					gui_controller.exploration_dungeon.unlock_subroom()
+			'unlock_combat':
+				if gui_controller.exploration_dungeon != null:
+					gui_controller.exploration_dungeon.unlock_combat()
+			'deny_combat':
+				if gui_controller.exploration_dungeon != null:
+					gui_controller.exploration_dungeon.deny_combat()
+			'add_subroom_res':
+				if gui_controller.exploration_dungeon != null:
+					gui_controller.exploration_dungeon.add_subroom_res()
+			'reveal_active_dungeon':
+				if gui_controller.exploration_dungeon != null:
+					var loc = gui_controller.exploration_dungeon.active_location
+					for dng in loc.dungeon:
+						var ddata = ResourceScripts.game_world.dungeons[dng]
+						for room in ddata.rooms:
+							var rdata = ResourceScripts.game_world.rooms[room]
+							if rdata.status != 'cleared':
+								rdata.status = 'scouted'
+					gui_controller.exploration_dungeon.update_map()
+			'alter_combat':
+				if gui_controller.exploration_dungeon != null:
+					var room = gui_controller.exploration_dungeon.selected_room
+					var rdata = ResourceScripts.game_world.rooms[room]
+					if i.victory == true:
+						rdata.instawin = true
+					if i.has("reduce_hp"):
+						rdata.hpmod = 1.0 - i.reduce_hp
+					if i.has('xp_mod'):
+						rdata.xp_mod = i.xp_mod
+			'unlock_upgrade':
+				ResourceScripts.game_res.unlock_upgrade(i.upgrade, i.level)
+			'change_relationship':
+				if input_handler.scene_characters.size() == 2:
+					ResourceScripts.game_party.change_relationship_status(input_handler.scene_characters[0].id, input_handler.scene_characters[1].id, i.value, true)
+				else:
+					print("wrong change relationship setup")
+			'change_relationship_precise':
+				if input_handler.scene_characters.size() == 2:
+					var char1 = input_handler.scene_characters[0]
+					var char2 = input_handler.scene_characters[1]
+					ResourceScripts.game_party.add_relationship_value(char1.id, char2.id, i.value)
+					text_log_add("char",
+						"Relationships of %s and %s changed by %s" % [
+							char1.get_short_name(), char2.get_short_name(), i.value])
+				else:
+					print("wrong change relationship setup")
+			'open_arena':
+				input_handler.get_spec_node(input_handler.NODE_ARENA)
+			'try_breakdown_scene_characters':
+				for chara in input_handler.scene_characters:
+					chara.try_breakdown(i.value)
+			'check_masters_story_fame':
+				ResourceScripts.game_party.check_masters_story_fame()
+			'set_faction_factor':
+				ResourceScripts.slave_quests.set_faction_factor(i.faction, i.value)
+			'achievement':
+				input_handler.achievements.try_add_achimnt(i.value)
+			_:
+				push_error("Unknown common_effects code: %s in effect %s" % [str(i.code), str(i)])
+
+func after_wedding_event(character):
+	if character == null:
+		print_debug("unique wedding event failed")
+		return
+	var event_name = character+"_wedding_1"
+	input_handler.interactive_message(event_name, '', {})
+
+
+func yes_message():
+	input_handler.interactive_message(yes, '', {})
+
+func no_message():
+	input_handler.interactive_message(no, '', {})
+
+func get_nquest_for_rep(value):
+	if value >= variables.reputation_tresholds.back() :
+		return variables.reputation_tresholds.size()
+	var n = 0
+	while value >= variables.reputation_tresholds[n]:
+		n += 1
+	return n
+
+func checkreqs(array):
+	var check = true
+	for i in array:
+		if i.has('orflag'):
+			check = check or valuecheck(i)
+		else:
+			check = check and valuecheck(i)
+	return check
+
+func valuecheck(dict):
+	if !dict.has('type'):
+		if dict.empty():
+			return true
+		else:
+			print("Error checking reqs for: " + str(dict))
+			return true
+	match dict['type']:
+		"no_check":
+			return true
+		'false':
+			return false
+		"has_money":
+			if dict.has('check'):
+				return ResourceScripts.game_res.if_has_money(dict['value']) == dict.check
+			return ResourceScripts.game_res.if_has_money(dict['value'])
+		"has_loan_money":
+			return ResourceScripts.game_res.if_has_money(get_loan_sum(dict.stage - 1))
+		"unique_available":
+			return ResourceScripts.game_party.if_unique_available(dict['name']) == dict.check
+		"has_material":
+			return ResourceScripts.game_res.if_has_material(dict['material'], dict.operant, dict['value'])
+		"date":
+			if variables.no_event_wait_time: return true
+			return input_handler.operate(dict.operant, ResourceScripts.game_globals.date, dict.value)
+		'hour':
+			if variables.no_event_wait_time: return true
+			return input_handler.operate(dict.operant, ResourceScripts.game_globals.hour, dict.value)
+		"gamestart":
+			return ResourceScripts.game_globals.newgame
+		"has_upgrade":
+			return ResourceScripts.game_res.if_has_upgrade(dict.name, dict.value)
+		"area_progress":
+			return ResourceScripts.game_progress.if_has_area_progress(dict.value, dict.operant, dict.area)
+		"decision":
+			#print(dict.value, ResourceScripts.game_progress.decisions.has(dict.value) == dict.check)
+			return ResourceScripts.game_progress.decisions.has(dict.value) == dict.check
+		"has_multiple_decisions":
+			var counter = 0
+			for i in dict.decisions:
+				if ResourceScripts.game_progress.decisions.has(i):
+					counter += 1
+			return input_handler.operate(dict.operant, counter, dict.value)
+		"quest_completed":
+			return ResourceScripts.game_progress.completed_quests.has(dict.name) == dict.check
+		"has_items":
+			return ResourceScripts.game_res.if_has_items(dict.name, dict.operant, dict.value)
+		"has_free_items":
+			return ResourceScripts.game_res.if_has_items(dict.name, dict.operant, dict.value, true)
+		'disabled':
+			return false
+		'has_spouse':
+			var spid = ResourceScripts.game_progress.spouse
+			if spid == null: return !dict.check
+			var spouse_char = characters_pool.get_char_by_id(spid)
+			if spouse_char == null: return !dict.check
+			if !spouse_char.is_active: return !dict.check
+			return dict.check
+		'master_check':
+			var master_char = ResourceScripts.game_party.get_master()
+			if master_char == null:
+				return false
+			return master_char.checkreqs(dict.value)
+		'spouse_check':
+			var spid = ResourceScripts.game_progress.spouse
+			if spid == null: 
+				if dict.has('on_null') and dict.on_null:
+					return true
+				return false
+			var spouse_char = characters_pool.get_char_by_id(spid)
+			if spouse_char == null: return false
+			return spouse_char.checkreqs(dict.value)
+		'spouse_has_event':
+			if ResourceScripts.game_progress.spouse == null: return false
+			var spouse_char = ResourceScripts.game_party.get_spouse()
+			if spouse_char == null: return false
+			var event_name = spouse_char.get_stat('unique')+"_wedding_1"
+			return scenedata.scenedict.has(event_name)
+		'active_character_checks':
+			var character = input_handler.active_character
+			if character == null:return false
+			return character.checkreqs(dict.value)
+		'scene_character_checks':
+			if input_handler.scene_characters.empty(): return false
+			var character = input_handler.scene_characters[0]
+			if character == null: return false
+			return character.checkreqs(dict.value)
+		'unique_character_checks':
+			var character = ResourceScripts.game_party.get_unique_slave(dict.name)
+			if character == null:return false
+			return character.checkreqs(dict.value)
+		'master_is_beast':
+			return ResourceScripts.game_party.if_master_is_beast(dict.check)
+		'unique_character_at_mansion':
+			var character = ResourceScripts.game_party.get_unique_slave(dict.name)
+			if character == null:return false
+			return character.checkreqs([{code = 'is_free', check = dict.check}])
+		'has_money_for_scene_slave':
+			return ResourceScripts.game_res.money >= input_handler.scene_characters[dict.value].calculate_price(true)
+		'random':
+			return rng.randf()*100 <= dict.value
+		'dialogue_seen':
+			return ResourceScripts.game_progress.seen_dialogues.has(dict.value) == dict.check
+		'dialogue_selected':
+			return ResourceScripts.game_progress.selected_dialogues.has(dict.value) == dict.check
+		'event_seen':
+			return ResourceScripts.game_progress.seen_events.has(dict.value) == dict.check
+		
+		"real_date_range":
+			var current_date = OS.get_date().day + OS.get_date().month * 30
+			if OS.get_date().month == 1:
+				current_date = OS.get_date().day + 13 * 30
+			var start_date = dict.start[0] + dict.start[1] * 30
+			var end_date = dict.end[0] + dict.end[1] * 30
+			return current_date >= start_date and current_date <= end_date
+		
+		
+		'active_quest_stage':
+			if ResourceScripts.game_progress.get_active_quest(dict.value) == null || dict.has('stage') == false:
+				if dict.has('state') && dict.state == false:
+					return true
+				else:
+					return false
+			if dict.has('state') && dict.state == false:
+				return ResourceScripts.game_progress.get_active_quest(dict.value).stage != dict.stage
+			else:
+				return ResourceScripts.game_progress.get_active_quest(dict.value).stage == dict.stage
+		'any_quest_stage':
+			if ResourceScripts.game_progress.get_active_quest(dict.value) == null || dict.has('stages') == false:
+				return false
+			for i in dict.stages:
+				if ResourceScripts.game_progress.get_active_quest(dict.value).stage == i:
+					return true
+			return false
+		'has_active_quest':
+			var has = false
+			for i in ResourceScripts.game_progress.active_quests:
+				if i.code == dict.name:
+					has = true
+					break
+			return has == dict.check
+		'faction_reputation':
+			var data = ResourceScripts.world_gen.get_faction_from_code(dict.code)
+			var guild = ResourceScripts.game_world.areas[data.area].factions[data.code]
+			return input_handler.operate(dict.operant, guild.totalreputation, dict.value)
+		'group_size':#not sure about this implementation instead of area - party approach
+			var counter = 0
+			for i in ResourceScripts.game_party.characters.values():
+				if i.check_location(input_handler.active_location.id):
+					counter += 1
+			return input_handler.operate(dict.operant, counter, dict.value)
+		'location_exists':
+			return !ResourceScripts.game_world.find_location_by_data({code = dict.location}) == null
+		'location_has_specific_slaves':
+			var counter = 0
+			var location = input_handler.active_location.id if !dict.has("location") else ResourceScripts.game_world.find_location_by_data({code = dict.location}).location
+			var completed = dict.get("completed", false)
+			for i in ResourceScripts.game_party.characters.values():
+				if i.check_location(location, completed):
+					if i.checkreqs(dict.reqs) == true && !i.has_profession('master'):
+						counter += 1
+			if dict.has("check"):
+				return dict.check == (counter > 0)
+			return counter > 0
+		'class_unlocked':
+			return ResourceScripts.game_progress.if_class_unlocked(dict.class, dict.check, dict.operant)
+		'timed_option':
+			return ResourceScripts.game_progress.if_time_passed(dict.value, dict.quest)
+		'current_guild':
+			return ((dict.value == input_handler.active_faction.code) == dict.check)
+		'has_faction_upgrade':
+			return dict.check == input_handler.active_faction.upgrades.has(dict.value)
+		'local_counter':
+			var tval = dict.value
+			if dict.has("add_stat"):
+				var master_char = ResourceScripts.game_party.get_master()
+				if master_char != null:
+					tval -= master_char.get_stat(dict.add_stat)
+			if dict.has("sub_stat"):
+				var master_char = ResourceScripts.game_party.get_master()
+				if master_char != null:
+					tval += master_char.get_stat(dict.sub_stat)
+			return ResourceScripts.game_progress.counter_cond(dict.name, dict.operant, tval) == dict.check
+		'master_factor_check':
+			var master_char = ResourceScripts.game_party.get_master()
+			if master_char == null:
+				return false
+			else:
+				var r = rng.randi_range(dict.from, dict.to)
+				var stat = dict.value * master_char.get_stat(dict.factor)
+				var result = r > stat
+				return result == dict.check
+		'sex_filter': # return true if master.sex == scene_sex
+			# dict.scene_sex - masters gender in the next scene. If scene shows us as a male then scene_sex = male
+			if !input_handler.globalsettings.sex_filter:
+				return false
+			var master_char = ResourceScripts.game_party.get_master()
+			if master_char == null:
+				return false
+			var master_sex = master_char.get_stat('sex')
+			return master_sex == dict.scene_sex
+		'has_stamina':
+			if gui_controller.exploration_dungeon == null:
+				return false
+			if dict.has('modified'):
+				return gui_controller.exploration_dungeon.get_current_stamina(dict.modified) >= dict.value
+			else:
+				return gui_controller.exploration_dungeon.get_current_stamina() >= dict.value
+		'location_party_check':
+			if gui_controller.exploration_dungeon == null:
+				return false
+			return gui_controller.exploration_dungeon.party_check(dict.value)
+		'location_chars_check':
+			if gui_controller.exploration_dungeon == null:
+				return false
+			return gui_controller.exploration_dungeon.location_chars_check(dict.value)
+		'update_prts':
+			for ch in ResourceScripts.game_party.characters:
+				ch.update_prt()
+		'captured_number':
+			return input_handler.operate(dict.operant,input_handler.active_location.captured_characters.size(), dict.value)
+		'difficulty':
+			return ResourceScripts.game_globals.get(dict.value) == dict.check
+		'capital_closed':
+			return is_capital_closed(dict.name) == dict.check
+		'global_settings':
+			return input_handler.operate(dict.operant, input_handler.globalsettings[dict.param], dict.value)
+		'or_list':#currently not in use but added for consistency
+			var or_check = false
+			for j in dict.or_list:
+				or_check = or_check or valuecheck(j)
+			return or_check
+		'has_item_with_tag':
+			return ResourceScripts.game_res.if_has_item_with_tag(dict.value)
+		_:
+			push_error("Unknown requirement type: %s in req %s" % [str(dict.type), str(dict)])
+			return false
+
+
+func apply_starting_preset():
+	common_effects([{code = 'add_timed_event', value = 'aliron_exotic_trader', args = [{type = 'fixed_date', date = 7, hour = 1}]}])
+	if ResourceScripts.game_globals.skip_prologue:
+		var preset = starting_presets.advanced_preset
+		ResourceScripts.game_res.money = preset.gold
+		for res in preset.materials:
+			ResourceScripts.game_res.materials[res] = preset.materials[res]
+		
+		ResourceScripts.game_progress.decisions = preset.decisions.duplicate()
+		ResourceScripts.game_progress.master_points = preset.master_points
+		ResourceScripts.game_progress.active_quests = preset.active_quests.duplicate()
+		ResourceScripts.game_progress.completed_quests = preset.completed_quests.duplicate()
+		if preset.has('seen_dialogues'):
+			ResourceScripts.game_progress.seen_dialogues = preset.seen_dialogues.duplicate()
+		if preset.has("unlocked_classes"):
+			ResourceScripts.game_progress.unlocked_classes = preset.unlocked_classes.duplicate()
+		
+		if preset.has("total_reputation"):
+			for i in ['fighters','workers','servants','mages']:
+				common_effects([{code = 'reputation', name = i, operant = '+', value = preset.total_reputation}])
+		if preset.completed_quests.has("aliron_church_quest"):
+			ResourceScripts.game_progress.unlocked_classes.append('acolyte')
+		for i in preset.items:
+			if Items.itemlist[i].type == 'usable':
+				AddItemToInventory(CreateUsableItem(i, preset.items[i]))
+			elif Items.itemlist[i].type == 'gear':
+				for j in range(preset.items[i]):
+					AddItemToInventory(CreateGearItem(i, {}))
+		for i in preset.upgrades:
+			ResourceScripts.game_res.upgrades[i] = preset.upgrades[i]
+		common_effects([{code = 'add_timed_event', value = "ginny_visit", args = [{type = 'add_to_date', date = [1,1], hour = 1}]}])
+		input_handler.interactive_message('servants_election_finish6')
+	else:
+		var preset = starting_presets.preset_data[ResourceScripts.game_globals.diff_money]
+		ResourceScripts.game_res.money = preset.gold
+		preset = starting_presets.preset_data[ResourceScripts.game_globals.diff_materials]
+		for res in preset.materials:
+			ResourceScripts.game_res.materials[res] = preset.materials[res]
+		
+		input_handler.interactive_message('intro', '', {})
+		common_effects([{code = 'add_timed_event', value = "ginny_visit", args = [{type = 'add_to_date', date = [5,10], hour = 1}]}])
+
+
+
+func equip_char(ch, type, args, quality = 'poor'):
+	var newgear = CreateGearItemQuality(type, args, quality) #should add no enchantments/curses
+	AddItemToInventory(newgear, false)
+	ch.equip(newgear)
+
+
+func get_loan_sum(n):
+	var res = variables.base_loan_sum[n]
+	if ResourceScripts.game_globals.diff_small_loan:
+		res *= 0.25
+	
+	return res
+
+
+func compare_dicts(d1, d2):
+	if !d1.has_all(d2.keys()):
+		return false 
+	if !d2.has_all(d1.keys()):
+		return false 
+	for key in d1:
+		if d1[key] != d2[key]:
+			return false
+	return true
+
+func check_shop_record(item, code, dict):
+	if !(dict is Dictionary):
+		return false
+	var t_parts = dict.duplicate()
+	t_parts.erase('quality')
+#	purchase_item.itembase == i && str(purchase_item.parts) == str(active_shop[i]):
+	if item.itembase != code:
+		return false
+	if !compare_dicts(t_parts, item.parts):
+		return false
+	if dict.has('quality') and dict.quality != item.quality:
+		return false
+	return true
+
+#MIND! This func writes file to "res://", so it wouldn't (and shouldn't) work in exported version
+func update_localization_file(update_loc: String, primary_loc = "en"):
+	# find all main.gd files
+	var TranslationData = {}
+	for i in input_handler.scanfolder(variables.LocalizationFolder):
+		TranslationData[i.replace(variables.LocalizationFolder, '')] = {data = (i + "/main.gd"), info = i + "/info.gd"}
+	if !TranslationData.has(primary_loc):
+		return
+	if !TranslationData.has(update_loc):
+		return
+	
+	# load english translation from file
+	var primary_dict = load(TranslationData[primary_loc].data).new().TranslationDict
+	var update_dict = load(TranslationData[update_loc].data).new().TranslationDict
+	
+	# if size of dicts isn't equal then compare
+	if primary_dict.size() != update_dict.size():
+		var missing_keys = {} # a pair of previous key and arrays of missing keys after it. Needed to save order
+		var previous_pos = 1
+		var consecutive_key = false
+		for i in primary_dict.keys().size():
+			if not (primary_dict.keys()[i] in update_dict) and i > 0:
+				if consecutive_key:
+					previous_pos += 1
+					missing_keys[primary_dict.keys()[i-previous_pos]].append({"key": primary_dict.keys()[i], "text": primary_dict[primary_dict.keys()[i]]})
+				else:
+					missing_keys[primary_dict.keys()[i-previous_pos]] = [{"key": primary_dict.keys()[i], "text": primary_dict[primary_dict.keys()[i]]}]
+				consecutive_key = true
+			else:
+				previous_pos = 1
+				consecutive_key = false
+		if missing_keys.size() == 0:
+			return
+
+		# open localization file to add keys into it
+		var loc_file = File.new()
+		var open_result = loc_file.open(TranslationData[update_loc].data, File.READ)
+		if open_result != OK:
+			return
+		
+		# look for keys in text lines (full word that's followed by = symbol)
+		var regex = RegEx.new()
+		regex.compile("([A-Z_0-9]+(?=\\s*=))")
+		
+		# create new temporary file named main2.gd
+		var tmp_file = File.new()
+		var tmp_path = TranslationData[update_loc].data.replace("main.gd", "main2.gd")
+		var tmp_open_result = tmp_file.open(tmp_path, File.WRITE)
+		if tmp_open_result != OK:
+			loc_file.close()
+			return
+		
+		# iterate through main.gd file
+		var key = ""
+		var inserted_anchors = {}
+		while loc_file.get_position() < loc_file.get_len():
+			var line = loc_file.get_line()
+			var cleared_line = line.replace(" ", "").replace("	", "")
+			var is_commented_line = cleared_line.length() > 0 and cleared_line[0] == "#"
+			var regex_result = regex.search(line)
+			tmp_file.store_line(line)
+			
+			# if found a key in a line and it's not commented out
+			if regex_result and cleared_line.length() > 0 and !is_commented_line: 
+				key = regex_result.get_string()
+			
+			# if it's a missing key, insert keys
+			if key in missing_keys.keys():
+				var check_line = cleared_line
+				if check_line.ends_with("#MISSINGTRANSLATION"):
+					check_line = check_line.substr(0, check_line.length() - "#MISSINGTRANSLATION".length())
+				if !is_commented_line and check_line.length() > 0 and check_line[check_line.length() - 1] == ',':
+					if inserted_anchors.has(key):
+						continue
+					inserted_anchors[key] = true
+					for i in missing_keys[key].size():
+						var insert_line = "	%s = \"\"\"%s\"\"\", # MISSING TRANSLATION"
+						tmp_file.store_line(insert_line % [missing_keys[key][i].key, missing_keys[key][i].text])
+		tmp_file.close()
+		loc_file.close()
+		
+		# remove old localization and rename our temporary main2.gd into main.gd
+		var dir = Directory.new()
+		var remove_result = dir.remove(TranslationData[update_loc].data)
+		if remove_result != OK:
+			return
+		var rename_result = dir.rename(tmp_path, TranslationData[update_loc].data)
+		if rename_result != OK:
+			return
+
+
+func get_sex_action(code):
+	assert(sex_actions_dict.has(code), "no such sex_action! (%s)" % code)
+	return sex_actions_dict[code]
+
+#probably should be moved somewhere
+func is_capital_closed(capital):
+	if capital == "elf_capital":
+		if ResourceScripts.game_progress.completed_quests.has("princess_search"):
+			return false
+		for k in ResourceScripts.game_progress.active_quests:
+			if k.code == "princess_search" and (k.stage == "stage3" or k.stage == "stage4" or k.stage == "stage5"): 
+				return false
+		if (valuecheck({type = "quest_completed", name = "lira_lost_quest", check = true})
+				or valuecheck({type = "has_active_quest", name = "lira_lost_quest", check = true})
+				):
+			return false
+		return true
+	if capital == "beastkin_capital":
+		if ResourceScripts.game_progress.completed_quests.has("sword_artifact_quest"):
+			return false
+		for k in ResourceScripts.game_progress.active_quests:
+			if k.code == "sword_artifact_quest" and k.stage.lstrip("stage").to_int() > 2:
+				return false
+		return true
+	if capital == "dwarf_capital":
+		if (valuecheck({type = "quest_completed", name = "visit_dwarfs_quest", check = true})
+				or valuecheck({type = "has_active_quest", name = "visit_dwarfs_quest", check = true})
+				or valuecheck({type = "quest_completed", name = "meteorite_quest", check = true})
+				or (valuecheck({type = "has_active_quest", name = "meteorite_quest", check = true})
+					and !valuecheck({type = "any_quest_stage", value = "meteorite_quest", stages =
+						['check_out', 'return_meteor', 'find_use', 'get_inside']})
+					)
+				):
+			return false
+		return true
+
+func make_full_screen_sfx_node():
+	var screen_node = Control.new()
+	screen_node.rect_size = get_viewport().get_visible_rect().size
+#	get_tree().get_root().add_child(screen_node)
+	get_viewport().add_child(screen_node)
+	screen_node.mouse_filter = screen_node.MOUSE_FILTER_IGNORE
+	var timer = Timer.new()
+	screen_node.add_child(timer)
+	timer.connect("timeout", screen_node, "queue_free")
+	timer.start(10.0)#supposed all anims be finished by the time
+	return screen_node
+
+func ProcessSfxTarget(sfxtarget, caster, target):
+	if sfxtarget == "full_screen":
+		return make_full_screen_sfx_node()
+	match sfxtarget:
+		'caster':
+			return caster.displaynode
+		'target':
+			return target.displaynode
+	var target_pos
+	var target_type
+	match sfxtarget:
+		'target_group', 'target_line', 'target_row':
+			target_pos = target.position
+		'caster_group', 'caster_line', 'caster_row':
+			target_pos = caster.position
+	match sfxtarget:
+		'target_group', 'caster_group':
+			target_type = 'group'
+		'target_line', 'caster_line':
+			target_type = 'line'
+		'target_row', 'caster_row':
+			target_type = 'row'
+	return input_handler.combat_node.get_target_node(target_pos, target_type)
+
+
+func calculate_hit_sound(skill, caster, target):
+	var rval
+	var hitsound
+	if skill.sounddata.strike == 'weapon':
+		hitsound = caster.get_weapon_sound()
+	else:
+		hitsound = skill.sounddata.strike
+	
+	match hitsound:
+		'dodge':
+			match target.bodyhitsound:
+				'flesh':pass
+				'wood':pass
+				'stone':pass
+		'blade':
+			match target.bodyhitsound:
+				'flesh':pass
+				'wood':pass
+				'stone':pass
+	rval = 'fleshhit'
+	
+	return rval
+
+
+func show_buttons(container):
+	for button in container.get_children():
+		if button.name == "Button":
+			continue
+		ResourceScripts.core_animations.UnfadeAnimation(button, 0.3)
+		yield(get_tree().create_timer(0.3), "timeout")
+		button.set("modulate", Color(1, 1, 1, 1))
+
+func get_stat_name(stat):
+	if statdata.statdata.has(stat):
+		return statdata.statdata[stat].name
+	return tr("STAT%s" % stat.to_upper())
+
+
+func get_tr_src(src, src_val):
+	match src:
+		'innate':
+			return ["", tr("INNATE")]
+		'race':
+			var data = races.racelist[src_val]
+			return [tr("STATRACE"), data.name]
+		'class':
+			var data = classesdata.professions[src_val]
+			return [tr("CLASS_LABEL"), data.name]
+		'trait':
+			var data = Traitdata.traits[src_val]
+			return [tr("TRAITS"), data.name]
+		'effect':
+			return [tr("EFFECT"), tr("EFFECTNAME_" + src_val.to_upper())]
+		'mastery':
+			var data = statdata.statdata['mastery_' + src_val]
+			return ["", data.name]#tr("MASTER_POINTS")
+		'factor':
+			var text_name = "STAT%s_FACTOR" % src_val.to_upper()
+			if src_val == 'growth':#ugly patch, refactor if needed
+				text_name = 'STATGROWTH_FACTOR_FULLNAME'
+			return ["", tr(text_name)]#tr("STATFACTOR")
+		'item':
+			var item = ResourceScripts.game_res.items[src_val]
+			return [tr("ITEM_LABEL"), item.name]
+		'masteries_points':
+			return ["", tr("STATMASTERY_POINT_%s" % src_val.to_upper())]
+		'upgrade':
+			return ["", tr("UPGRADERESTING")]
+		_:
+			print("get_tr_src() can't decipher %s %s" % [src, src_val])
+			return [src, src_val]
+
+
+func calculate_lux_rooms():
+	var res = 0
+	for p in ResourceScripts.game_party.characters.values():
+		if p.check_work_rule("luxury"):
+			res += 1
+	return res
+
+func make_sfx_params(anim_dict, last_iteration = false):
+	var params = {}
+	if anim_dict.has('duration'): params.duration = anim_dict.duration
+	if anim_dict.has('queue_duration'):
+		params.queue_duration = anim_dict.queue_duration
+	elif anim_dict.has("is_cast") and anim_dict.is_cast:
+		params.queue_duration = 0.0
+	if anim_dict.has('no_delays'): params.no_delays = anim_dict.no_delays
+	if anim_dict.has('no_repeat_delays') and anim_dict.no_repeat_delays and !last_iteration:
+		params.no_delays = true
+	if anim_dict.has('alt_slot'): params.alt_slot = anim_dict.alt_slot
+	if anim_dict.has('force_flip'): params.force_flip = anim_dict.force_flip
+	if anim_dict.has("target") and anim_dict.target == 'caster': params.reverse_flip = true
+	return params

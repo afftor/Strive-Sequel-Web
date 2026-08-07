@@ -1,0 +1,14 @@
+# AI supplement notes (local only)
+helper stuff/
+
+# Godot-specific ignores
+.import/
+export.cfg
+export_presets.cfg
+.DS_Store
+.aider*
+AGENTS.md
+.agents/
+
+# Local development tooling. Never commit or import this directory.
+tools/

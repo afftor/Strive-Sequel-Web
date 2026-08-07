@@ -1,0 +1,633 @@
+extends Reference
+
+var name
+var person
+var mood
+var lust = 0 setget lust_set
+var sens = 0 setget sens_set
+var sensmod = 1.0
+var lewd = 0 setget lewd_set
+var lewdmod = 1.0
+var role
+var sex
+var orgasms = 0
+var lastaction_ids
+var request
+var requestsdone = 0
+var consent = 0
+var consentgain = 1
+
+var actions_resisted = {}
+var low_actions_resisted = 0
+var lack_consent = 0
+
+
+var number = 0
+var sceneref
+
+var new_action_performed = false
+var begged_for_orgasm = false
+
+var horny = 0 setget horny_set
+var hornymod = 1.0
+
+
+var svagina = 0
+var smouth = 0
+var sclit = 0
+var sbreast = 0
+var spenis = 0
+var sanus = 0
+var activeactions = []
+
+var performed_actions = {}
+var consented_actions = {}
+var new_consented_partners = 0
+
+var orgasm = false
+
+var effects = []
+#i assume that 'tied' and 'captured' effects are handled here. if not - they should have been properly made as status effects and be checked accordingly
+
+var subduedby = []
+var subduing
+
+var energy = 100
+
+var sex_traits = []
+
+var vagina
+var penis
+var clit
+var breast
+var feet
+var acc1
+var acc2
+var acc3
+var acc4
+var acc5
+var acc6
+var mouth
+var anus
+var tail
+var strapon = false
+var nipples
+var posh1
+var limbs = true
+var npc = false
+
+var unique_consented_takers = []
+var givers_with_my_consent = {}
+var bedroom_prodigy = []
+var single_partner_consents = []
+var diff_partners_orgasms = []
+var unconsented_orgasm = 0
+var shame_amount = 0
+var satisfied_partners = []
+var seen_orgasms = []
+var orgasm_with_watcher = 0
+var orgasm_effects = []
+var orgasm_tags = []
+var orgasm_actions = []
+var orgasm_partners = []
+var diff_body_orgasm = 0
+var aphrodisiac_orgasms = []
+var drunk_orgasm = 0
+var dominant = 0
+var punish_actions = []
+var mazo_actions = []
+var deviant_orgasms = 0
+var max_ongoing_actions = 0
+var gave_orgasm = false
+var skill_xp_bonus = 0
+var actions_remaining = 0
+var sex_spell_uses = {}
+
+var actionshad = {addtraits = [], removetraits = [], samesex = 0, samesexorgasms = 0, oppositesex = 0, oppositesexorgasms = 0, punishments = 0, group = 0, actions = {}}
+
+#additional fields from person
+var id
+var person_sexexp
+var person_sexskills
+var person_mods
+
+func setup_person(ch, no_loyal = false):
+	person = ch
+	id = ch.id
+	person_sexexp = person.access_sexexp()
+	person_sexskills = person.get_sex_skills()
+	person_mods = person.get_body_upgrades()
+	sex = ch.get_stat('sex')
+	lust = ch.get_stat('lust')*10
+	sens = 0
+	consent = ch.get_stat('consent')
+	name = ch.get_short_name()
+	sex_traits = ch.get_all_sex_traits().keys()
+	var tmp = ch.get_gear('crotch')
+	if tmp != null && ResourceScripts.game_res.items[tmp].itembase == 'strapon':
+		strapon = true
+	lewd = 100
+	actions_remaining = variables.sex_actions_base + int(ch.get_stat('sexuals_factor')) * variables.sex_actions_per_factor + int(ch.get_stat('sex_stamina'))
+	for i in sex_traits:
+		var trait = Traitdata.sex_traits[i]
+		for k in trait.effects:
+			if k.trigger == 'start':
+				match k.effect:
+					'maximize_hornyness':
+						horny = 100
+
+func lust_set(value):
+	lust = min(value, 1000)
+
+func sens_set(value):
+	var lastaction = get_lastaction_ref_dict()
+	var change = value - sens
+	sens += change*sensmod
+	if sens >= 1000:
+		if lastaction == null || ((lastaction.givers.has(self) && lastaction.scene.givertags.has('noorgasm')) || (lastaction.takers.has(self) && lastaction.scene.takertags.has('noorgasm'))):
+			var can_orgasm = false
+			if effects.has("aphrodisiac"):
+				can_orgasm = true
+			for i in sex_traits:
+				var trait = Traitdata.sex_traits[i]
+				for k in trait.effects:
+					if k.trigger == 'orgasm':
+						if k.effect == 'can_orgasm_regardless':
+							can_orgasm = true
+			if can_orgasm == false:
+				return
+		orgasm()
+
+func lewd_set(value):
+	var change = value - lewd
+	lewd += change*lewdmod
+
+func horny_set(value):
+	var change = value - horny
+	horny = min(100, horny + change*hornymod)
+
+
+var impregnation_texts = {
+
+	can_be_impregnated = "INTERACTION_IMPREG_CAN",
+	cant_be_impregnated = "INTERACTION_IMPREG_CANT_RACE",
+	is_breeder_father = "INTERACTION_IMPREG_BREEDER_FATHER",
+	is_breeder_mother = "INTERACTION_IMPREG_BREEDER_MOTHER",
+	female_contraceptives = "INTERACTION_IMPREG_FEMALE_CONTRACEPTIVE",
+	male_contraceptives = "INTERACTION_IMPREG_MALE_CONTRACEPTIVE",
+	already_pregnant_visible = "INTERACTION_IMPREG_ALREADY_PREGNANT",
+	mother_undead = "INTERACTION_IMPREG_MOTHER_UNDEAD",
+	father_undead = "INTERACTION_IMPREG_FATHER_UNDEAD",
+}
+
+
+func impregnation_text(second_character, mother_is_self = true):
+	var preg_status
+	var return_text = ''
+	match mother_is_self:
+		true:
+			preg_status = globals.impregnate_check(second_character.person, person)
+		false:
+			preg_status = globals.impregnate_check(person, second_character.person)
+	if preg_status.already_preg_visible:
+		return_text = impregnation_texts.already_pregnant_visible
+	
+	elif preg_status.mother_undead:
+		return_text = impregnation_texts.mother_undead
+	elif preg_status.father_undead:
+		return_text = impregnation_texts.father_undead
+		return_text = tr(return_text)
+		match mother_is_self:
+			true:
+				return_text = second_character.person.translate(return_text)
+			false:
+				return_text = person.translate(return_text)
+		return "\n[color=silver]" + return_text + "[/color]"
+	
+	elif preg_status.female_contraceptive:
+		return_text = impregnation_texts.female_contraceptives
+	elif preg_status.male_contraceptive:
+		return_text = impregnation_texts.male_contraceptives
+		return_text = tr(return_text)
+		match mother_is_self:
+			true:
+				return_text = second_character.person.translate(return_text)
+			false:
+				return_text = person.translate(return_text)
+		return "\n[color=silver]" + return_text + "[/color]"
+	
+	if return_text == '':
+		if preg_status.no_womb || preg_status.preg_disabled:
+			return return_text #or "\n[color=silver]" + return_text + "[/color]" ?
+		
+		if preg_status.mother_breeder:
+			return_text = impregnation_texts.is_breeder_mother
+		elif preg_status.father_breeder:
+			return_text = impregnation_texts.is_breeder_father
+			return_text = tr(return_text)
+			match mother_is_self:
+				true:
+					return_text = second_character.person.translate(return_text)
+				false:
+					return_text = person.translate(return_text)
+			return "\n[color=silver]" + return_text + "[/color]"
+	if return_text == '':
+		if preg_status.compatible:
+			return_text = impregnation_texts.can_be_impregnated
+		elif preg_status.compatible == false:
+			return_text = impregnation_texts.cant_be_impregnated
+	
+	match mother_is_self:
+		true:
+			return_text = tr(return_text)
+			return_text = person.translate(return_text)
+		false:
+			return_text = tr(return_text)
+			return_text = second_character.person.translate(return_text)
+	return "\n[color=silver]" + return_text + "[/color]"
+
+
+
+
+
+func orgasm(custom_text = null, show_text = true):
+	var text = ''
+	orgasm = true
+	sens = 0
+	var lastaction = get_lastaction_ref_dict()
+	if lastaction == null:
+		lastaction = {scene = load("res://src/actions/100caress.gd").new(), givers = [], takers = [self]}
+	if person_sexexp.sexexp_orgasms.has(lastaction.scene.code):
+		person_sexexp.sexexp_orgasms[lastaction.scene.code] += 1
+	else:
+		person_sexexp.sexexp_orgasms[lastaction.scene.code] = 1
+	for k in lastaction.givers + lastaction.takers:
+		if self != k:
+			if person_sexexp.sexexp_orgasmpartners.has(k.id):
+				person_sexexp.sexexp_orgasmpartners[k.id] += 1
+			else:
+				person_sexexp.sexexp_orgasmpartners[k.id] = 1
+	
+	
+	var scene
+	var temptext = ''
+	var penistext = ''
+	var vaginatext = ''
+	var anustext = ''
+	orgasms += 1
+	
+	
+#	if sceneref.participants.size() == 2 && person.has_profession("master"):
+#		if person.check_trait("Monogamous") && (sceneref.participants[0].person.has_profession("master") || sceneref.participants[1].person.has_profession("master")):
+#			person.add_stat('loyalty', rand_range(1.4,5.6))
+#		else:
+#			person.add_stat('loyalty', rand_range(1,4))
+#	elif person.has_profession("master"):
+#		person.add_stat('loyalty', rand_range(1,2))
+	#anus in use, find scene
+	if anus != null:
+		scene = form_action_ref_dict(anus)
+		for i in scene.givers:
+			ResourceScripts.game_party.add_relationship_value(person.id, i.person.id, rand_range(1,3))
+			#globals.addrelations(person, i.person, rand_range(30,50))
+		#anus in giver slot
+		if scene.givers.find(self) >= 0:
+			if randf() < 0.4:
+				anustext = tr("INTERACTION_ORGASM_ANUS_GIVER_FEEL")
+			else:
+				anustext = tr("INTERACTION_ORGASM_GIVER_NAME")
+			if scene.scene.takerpart == 'penis':
+				anustext += tr("INTERACTION_ORGASM_ANUS_GIVER_PENIS")
+			else:
+				anustext += tr("INTERACTION_ORGASM_ANUS_GIVER_BODY")
+			anustext = sceneref.decoder(anustext, [self], scene.takers)
+		#anus is in taker slot
+		elif scene.takers.find(self) >= 0:
+			if randf() < 0.4:
+				anustext = tr("INTERACTION_ORGASM_ANUS_TAKER_FEEL")
+			else:
+				anustext = tr("INTERACTION_ORGASM_TAKER_NAME")
+			if scene.scene.giverpart == 'penis':
+				anustext += tr("INTERACTION_ORGASM_ANUS_TAKER_PENIS")
+			else:
+				anustext += tr("INTERACTION_ORGASM_ANUS_TAKER_BODY")
+			anustext = sceneref.decoder(anustext, scene.givers, [self])
+		#no default conditon
+	#vagina present
+	if person.get_stat('vagina') != 'none':
+		#vagina in use, find scene
+		if vagina != null:
+			scene = form_action_ref_dict(vagina)
+			for i in scene.givers:
+				ResourceScripts.game_party.add_relationship_value(person.id, i.person.id, rand_range(1,3))
+				#globals.addrelations(person, i.person, rand_range(30,50))
+			#vagina in giver slot
+			if scene.givers.find(self) >= 0:
+				if randf() < 0.4:
+					vaginatext = tr("INTERACTION_ORGASM_PUSSY_GIVER_FEEL")
+				else:
+					vaginatext = tr("INTERACTION_ORGASM_GIVER_NAME")
+				if scene.scene.takerpart == 'penis':
+					vaginatext += tr("INTERACTION_ORGASM_PUSSY_GIVER_PENIS")
+				else:
+					vaginatext += tr("INTERACTION_ORGASM_PUSSY_GIVER_BODY")
+				vaginatext = sceneref.decoder(vaginatext, [self], scene.takers)
+			#vagina is in taker slot
+			elif scene.takers.find(self) >= 0:
+				if randf() < 0.4:
+					vaginatext = tr("INTERACTION_ORGASM_PUSSY_TAKER_FEEL")
+				else:
+					vaginatext = tr("INTERACTION_ORGASM_TAKER_NAME")
+				if scene.scene.giverpart == 'penis':
+					vaginatext += tr("INTERACTION_ORGASM_PUSSY_TAKER_PENIS")
+				else:
+					vaginatext += tr("INTERACTION_ORGASM_PUSSY_TAKER_BODY")
+				vaginatext = sceneref.decoder(vaginatext, scene.givers, [self])
+			#no default conditon
+	#penis present
+	if person.get_stat('penis_size') != '':
+		#penis in use, find scene
+		if penis != null:
+			scene = form_action_ref_dict(penis)
+			for i in scene.takers:
+					ResourceScripts.game_party.add_relationship_value(person.id, i.person.id, rand_range(1,3))
+				#globals.addrelations(person, i.person, rand_range(30,50))
+			#penis in giver slot
+			if scene.givers.find(self) >= 0:
+				if randf() < 0.4:
+					penistext = tr("INTERACTION_ORGASM_PENIS_GIVER_FEEL")
+				else:
+					penistext = tr("INTERACTION_ORGASM_PENIS_GIVER_THRUST")
+				if scene.scene.takerpart == '':
+					penistext += tr("INTERACTION_ORGASM_PENIS_GIVER_FLOOR")
+				elif ['anus','vagina','mouth'].has(scene.scene.takerpart):
+					if scene.scene.get('takerpart2') && scene.scene.givers[1] == self:
+						temptext = scene.scene.takerpart2.replace('anus', '[anus2]').replace('vagina','[pussy2]')
+					else:
+						temptext = scene.scene.takerpart.replace('anus', '[anus2]').replace('vagina','[pussy2]')
+					penistext += tr("INTERACTION_ORGASM_PENIS_GIVER_INTO") % temptext
+					if scene.scene.takerpart == 'vagina':
+						for i in scene.takers:
+							if sceneref.impregnationcheck(person,i.person) == true:
+								globals.impregnate(person, i.person)
+								penistext += impregnation_text(i, false)
+				elif scene.scene.takerpart == 'nipples':
+					penistext += tr("INTERACTION_ORGASM_PENIS_GIVER_NIPPLES")
+				elif scene.scene.takerpart == 'penis':
+					penistext += tr("INTERACTION_ORGASM_PENIS_GIVER_ON_PENIS")
+				penistext = sceneref.decoder(penistext, [self], scene.takers)
+			#penis in taker slot
+			elif scene.takers.find(self) >= 0:
+				if randf() < 0.4:
+					penistext = tr("INTERACTION_ORGASM_PENIS_TAKER_FEEL")
+				else:
+					penistext = tr("INTERACTION_ORGASM_PENIS_TAKER_THRUST")
+				if scene.scene.code in ['handjob','titjob']:
+					penistext += tr("INTERACTION_ORGASM_PENIS_TAKER_FACE")
+				elif scene.scene.code == 'tailjob':
+					penistext += tr("INTERACTION_ORGASM_PENIS_TAKER_TAIL")
+				elif scene.scene.giverpart == '':
+					penistext += tr("INTERACTION_ORGASM_PENIS_TAKER_FLOOR")
+				elif scene.scene.giverpart == 'penis':
+					penistext += tr("INTERACTION_ORGASM_PENIS_TAKER_ON_PENIS")
+				elif ['anus','vagina','mouth'].has(scene.scene.giverpart):
+					temptext = scene.scene.giverpart.replace('anus', '[anus1]').replace('vagina','[pussy1]')
+					penistext += tr("INTERACTION_ORGASM_PENIS_TAKER_INTO") % temptext
+					if scene.scene.giverpart == 'vagina':
+						for i in scene.givers:
+							if sceneref.impregnationcheck(i.person, person) == true:
+								globals.impregnate(i.person, person)
+								penistext += impregnation_text(i, false)
+				penistext = sceneref.decoder(penistext, scene.givers, [self])
+		#orgasm without penis, secondary ejaculation
+		else:
+			if randf() < 0.4:
+				penistext = tr("INTERACTION_ORGASM_PENIS_SECONDARY_TWIST")
+			else:
+				penistext = tr("INTERACTION_ORGASM_PENIS_SECONDARY_LIMIT")
+			penistext += tr("INTERACTION_ORGASM_PENIS_SECONDARY_RELEASE")
+			penistext = sceneref.decoder(penistext, null, [self])
+#	if vaginatext != '' || anustext != '' || penistext != '':
+#		text += vaginatext + " " + anustext + " " + penistext
+	if vaginatext != '':
+		text += vaginatext
+	if anustext != '':
+		if text != "":
+			text += " "
+		text += anustext
+	if penistext != "":
+		if text != "":
+			text += " "
+		text += penistext
+
+	#final default condition
+	else:
+		if randf() < 0.4:
+			temptext = tr("INTERACTION_ORGASM_BODY_FEEL")
+		else:
+			temptext = tr("INTERACTION_ORGASM_TAKER_NAME")
+		temptext += tr("INTERACTION_ORGASM_BODY_RELEASE")
+		text += sceneref.decoder(temptext, null, [self])
+
+	if lastaction.scene.code in sceneref.punishcategories && lastaction.takers.has(self):
+		if randf() >= 0.85 || effects.has("entranced"):
+			actionshad.addtraits.append("Masochist")
+#	if member.lastaction.scene.code in punishcategories && member.lastaction.givers.has(member) && member.person.asser >= 60:
+#		if randf() >= 0.85 || member.person.effects.has("entranced"):
+#			member.actionshad.addtraits.append("Dominant")
+	if lastaction.scene.code in sceneref.analcategories && (lastaction.takers.has(self) || lastaction.scene.code == 'doubledildoass'):
+		if randf() >= 0.85 || effects.has('entranced'):
+			actionshad.addtraits.append("Enjoys Anal")
+	if sceneref.isencountersamesex(lastaction.givers, lastaction.takers, self) == true:
+		actionshad.samesexorgasms += 1
+	else:
+		actionshad.oppositesexorgasms += 1
+
+	if custom_text != null:
+		text = custom_text
+	if show_text == false:
+		return
+	#return
+	yield(sceneref.get_tree().create_timer(0.1), "timeout")
+	sceneref.get_node("Panel/sceneeffects").bbcode_text += "[color=#ff5df8]" + text + "[/color]\n"
+
+func add_sens_no_orgasm(value):
+	sens = min(sens + value * sensmod, 999)
+
+
+func actioneffect(values, scenedict_ids):
+	var sensinput = 0
+	var hornyinput = 0
+	var sens_mod = 1.0
+	var horny_mod = 1.0
+	var scenedict = form_action_ref_dict(scenedict_ids)
+	if scenedict.scene.code != 'deny_orgasm':
+		set_lastaction(scenedict_ids)
+		
+	if values.has('sens'):
+		sensinput = values.sens
+	if values.has('horny'):
+		hornyinput = values.horny
+
+	if performed_actions.has(scenedict.scene.code):
+		performed_actions[scenedict.scene.code] += 1
+	else:
+		performed_actions[scenedict.scene.code] = 1
+
+	var position
+	var seek_group
+	var self_group
+	var lowestconsent = 100
+	if scenedict.givers.has(self):
+		self_group = 'giver'
+		seek_group = 'taker'
+		for i in scenedict.takers:
+			var consent = sceneref.count_action_consent(scenedict.scene, self, i)
+			if consent.giver_consent < lowestconsent:
+				lowestconsent = consent.giver_consent
+	else:
+		self_group = 'taker'
+		seek_group = 'giver'
+		for i in scenedict.givers:
+			var consent = sceneref.count_action_consent(scenedict.scene, i, self)
+			if consent.taker_consent < lowestconsent:
+				lowestconsent = consent.taker_consent
+	var forced = false
+	if lowestconsent < scenedict.scene.consent_level:
+		forced = true
+	if forced == false:
+		if consented_actions.has(scenedict.scene.code):
+			consented_actions[scenedict.scene.code] += 1
+		else:
+			consented_actions[scenedict.scene.code] = 1
+
+	for i in scenedict[seek_group+'s']:
+		if i.person.check_trait("undead") && sex_traits.has('omnisexual') == false:
+			sens_mod -= 0.5
+			horny_mod -= 0.5
+		for k in i.sex_traits:
+			var trait = Traitdata.sex_traits[k]
+			if i.checkreqs(trait.reqs, seek_group, scenedict) == false :
+				continue
+			for j in trait.effects:
+				if j.trigger == 'action_self':
+					match j.effect:
+						'sens_bonus':
+							sens_mod = input_handler.math(j.operant, sens_mod, j.value)
+						'horny_bonus':
+							horny_mod = input_handler.math(j.operant, horny_mod, j.value)
+
+	if values.has('tags'):
+		if values.tags.has('punish'):
+			if (!person.check_trait('Masochist') && !person.check_trait('Likes it rough') && !person.check_trait('Sex-crazed')):
+				for i in scenedict.givers:
+					ResourceScripts.game_party.add_relationship_value(person.id, i.person.id, -1)
+					#globals.addrelations(person, i.person, -rand_range(5,10))
+#				person.add_stat('obedience', values.obed)
+#					person.stress += values.stress
+				if effects.has("captured") && randf() >= values.obed/2:
+					effects.captured.duration -= 1
+			else:
+				if person.get_stat('asser') < 35 && randf() < 0.1:
+					actionshad.addtraits.append('Likes it rough')
+				if !person.check_trait('Masochist') && !person.check_trait('Sex-crazed'):
+					pass #leftover checks, to fill in later
+#						if values.has('stress') == false:
+#							values.stress = rand_range(2,6)
+#						person.stress += values.stress
+		if values.tags.has('group'):
+			actionshad.group += 1
+
+	for i in sex_traits:
+		var trait = Traitdata.sex_traits[i]
+		if checkreqs(trait.reqs, self_group, scenedict) == false:
+			continue
+
+		for k in trait.effects:
+			if k.trigger == 'action_partner':
+				match k.effect:
+					'sens_bonus':
+						sens_mod = input_handler.math(k.operant, sens_mod, k.value)
+					'horny_bonus':
+						horny_mod = input_handler.math(k.operant, horny_mod, k.value)
+
+	if forced:
+		sens_mod *= horny / 100.0
+	self.sens += sensinput*max(0.1, sens_mod)
+	self.horny += hornyinput*max(0.1, horny_mod)
+
+func checkreqs(reqs, group, scene):
+	var check = true
+	for i in reqs:
+		if i.has('orflag'):
+			check = check or valuecheck(i, group, scene)
+		else:
+			check = check and valuecheck(i, group, scene)
+	return check
+
+func valuecheck(dict, group, scene):
+	match dict.code:
+		'effect_exists':
+			return effects.has(dict.value)
+		'action_tag':
+			return scene.scene.get(group+'tags').has(dict.value)
+		'action_partner_tag':
+			var opposite_group
+			if group == 'giver':
+				opposite_group = 'takertags'
+			else:
+				opposite_group = 'givertags'
+			return scene.scene.get(opposite_group).has(dict.value)
+		'action_type':
+			return scene.scene.code in dict.value
+		'partner_check':
+			var partners
+			if scene.givers.has(self):
+				partners = scene.takers
+			else:
+				partners = scene.givers
+			var check = false
+			for i in partners:
+				if i.person.checkreqs(dict.value) == true:
+					check = true
+					break
+			return check
+		'or_list':#currently not in use but added for consistency
+			var or_check = false
+			for j in dict.or_list:
+				or_check = or_check or valuecheck(j, group, scene)
+			return or_check
+
+func form_action_ref_dict(id_dict):
+	return gui_controller.sex_panel.make_ref_dict(id_dict)
+
+func get_lastaction_ref_dict():
+	if lastaction_ids == null: return null
+	return form_action_ref_dict(lastaction_ids)
+
+func get_lastaction_id_dict():
+	return lastaction_ids
+
+func get_lastaction_ref_scene():
+	return globals.get_sex_action(lastaction_ids.scene_code)
+
+func set_lastaction(action_ids):
+	lastaction_ids = action_ids
+
+func get_part_id_dict(part_name):
+	return get(part_name)
+
+func get_part_ref_dict(part_name):
+	var id_dict = get_part_id_dict(part_name)
+	if id_dict != null:
+		return form_action_ref_dict(id_dict)
+	return null
+
+func get_part_ref_scene(part_name):
+	var id_dict = get_part_id_dict(part_name)
+	if id_dict != null:
+		return globals.get_sex_action(id_dict.scene_code)
+	return null
+
+func set_part(part_name, action_ids):
+	set(part_name, action_ids)

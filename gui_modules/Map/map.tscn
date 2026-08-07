@@ -1,0 +1,898 @@
+[gd_scene load_steps=52 format=2]
+
+[ext_resource path="res://assets/Textures_v2/CHAR_INFO old/Panels/body_mask.png" type="Texture" id=1]
+[ext_resource path="res://assets/images/map/location/button_place_hover.png" type="Texture" id=2]
+[ext_resource path="res://gui_modules/Map/AreaHighlight.gd" type="Script" id=3]
+[ext_resource path="res://gui_modules/Map/map.gd" type="Script" id=4]
+[ext_resource path="res://assets/Themes_v2/UNIVERSAL/PT_18.tres" type="DynamicFont" id=5]
+[ext_resource path="res://assets/Themes_v2/UNIVERSAL/PT_24.tres" type="DynamicFont" id=6]
+[ext_resource path="res://assets/Themes_v2/UNIVERSAL/PT_26.tres" type="DynamicFont" id=7]
+[ext_resource path="res://assets/Themes_v2/UNIVERSAL/Ledger_30.tres" type="DynamicFont" id=8]
+[ext_resource path="res://assets/Themes_v2/UNIVERSAL/Ledger_26.tres" type="DynamicFont" id=9]
+[ext_resource path="res://assets/images/map/information/panel_information.png" type="Texture" id=10]
+[ext_resource path="res://assets/images/map/information/bg_information.png" type="Texture" id=11]
+[ext_resource path="res://assets/images/map/information/button_send_pressed.png" type="Texture" id=12]
+[ext_resource path="res://assets/images/map/information/button_send_hover.png" type="Texture" id=13]
+[ext_resource path="res://assets/images/map/information/button_send_default.png" type="Texture" id=14]
+[ext_resource path="res://assets/images/map/button_back_pressed.png" type="Texture" id=15]
+[ext_resource path="res://assets/images/map/button_back_hover.png" type="Texture" id=16]
+[ext_resource path="res://assets/images/map/information/frame_information.png" type="Texture" id=17]
+[ext_resource path="res://assets/images/map/information/icon_character_default.png" type="Texture" id=18]
+[ext_resource path="res://assets/images/map/information/icon_resources.png" type="Texture" id=19]
+[ext_resource path="res://assets/images/map/location/button_place_pressed.png" type="Texture" id=20]
+[ext_resource path="res://assets/images/map/location/button_place_default.png" type="Texture" id=21]
+[ext_resource path="res://assets/images/map/location/bg_location.png" type="Texture" id=22]
+[ext_resource path="res://assets/images/map/015_0.png" type="Texture" id=23]
+[ext_resource path="res://assets/images/map/location/panel_location.png" type="Texture" id=24]
+[ext_resource path="res://assets/images/map/location/button_plains_pressed.png" type="Texture" id=25]
+[ext_resource path="res://assets/images/map/location/button_plains_default.png" type="Texture" id=26]
+[ext_resource path="res://assets/images/map/location/button_plains_hover.png" type="Texture" id=27]
+[ext_resource path="res://assets/Textures_v2/CHAR_INFO/button_charinfo_sqr.png" type="Texture" id=28]
+[ext_resource path="res://assets/Textures_v2/CHAR_INFO/icon_charinfo_details.png" type="Texture" id=29]
+[ext_resource path="res://assets/Textures_v2/CHAR_INFO/button_charinfo_sqr_hover.png" type="Texture" id=30]
+[ext_resource path="res://assets/Textures_v2/CHAR_INFO/button_charinfo_sqr_pressed.png" type="Texture" id=31]
+[ext_resource path="res://assets/Textures_v2/CHAR_INFO/training/family a.png" type="Texture" id=32]
+[ext_resource path="res://assets/MainTheme.tres" type="Theme" id=33]
+[ext_resource path="res://gui_modules/Universal/Scripts/ContextDropdown.gd" type="Script" id=34]
+[ext_resource path="res://assets/images/map/beaskin_tribe.png" type="Texture" id=35]
+[ext_resource path="res://assets/images/map/dwarf_capital.png" type="Texture" id=36]
+[ext_resource path="res://assets/images/map/aliron.png" type="Texture" id=37]
+[ext_resource path="res://assets/images/map/elven_capital.png" type="Texture" id=38]
+[ext_resource path="res://assets/images/map/button_back_default.png" type="Texture" id=39]
+[ext_resource path="res://gui_modules/Map/LocationHighlight.gd" type="Script" id=40]
+[ext_resource path="res://assets/Textures_v2/craft/scrollbar_horizontal_detail.png" type="Texture" id=41]
+[ext_resource path="res://assets/Textures_v2/craft/bar_item_craft.png" type="Texture" id=42]
+[ext_resource path="res://assets/Textures_v2/CHAR_CREATION/new/arrowstats_l.png" type="Texture" id=43]
+[ext_resource path="res://assets/Textures_v2/CHAR_CREATION/new/arrowstat_r.png" type="Texture" id=44]
+[ext_resource path="res://assets/Themes_v2/UNIVERSAL/VScrollBar.tres" type="Theme" id=45]
+[ext_resource path="res://assets/Fonts_v2/PT_Sans/PT_24_outline.tres" type="DynamicFont" id=46]
+[ext_resource path="res://assets/Themes_v2/UNIVERSAL/HScrollBar.tres" type="Theme" id=47]
+[ext_resource path="res://assets/images/map/empire_capital.png" type="Texture" id=48]
+[ext_resource path="res://gui_modules/Universal/Modules/teleport_menu.tscn" type="PackedScene" id=49]
+[ext_resource path="res://gui_modules/Map/map_control.gd" type="Script" id=50]
+
+[sub_resource type="StyleBoxTexture" id=7]
+texture = ExtResource( 42 )
+region_rect = Rect2( 0, 0, 460, 20 )
+
+[node name="map" type="Node2D"]
+script = ExtResource( 4 )
+
+[node name="map" type="Sprite" parent="."]
+light_mask = 512
+position = Vector2( 923, 1191 )
+texture = ExtResource( 23 )
+
+[node name="plains" type="Polygon2D" parent="map"]
+modulate = Color( 0.968627, 0.980392, 0.764706, 0.211765 )
+light_mask = 512
+position = Vector2( -3, -3 )
+polygon = PoolVector2Array( 369, -1248, 315, -1259, 206, -1240, 167, -1242, 146, -1223, 66, -1209, 31, -1185, -1, -1193, -23, -1172, -53, -1184, -79, -1167, -110, -1176, -111, -1096, -96, -1060, -122, -1027, -191, -1009, -238, -944, -227, -891, -232, -874, -218, -858, -161, -833, -150.874, -814.804, -169.752, -780.825, -159, -757, -116.895, -717.585, -113, -691, -139, -651, -106, -623, -82.9153, -593.938, -85.7469, -570.341, -60.2623, -545.8, 8.6405, -541.081, 39.7885, -517.484, 94.5331, -505.213, 147.39, -484.448, 181.455, -440.628, 258, -432, 297, -470, 330.125, -509.923, 371, -461, 423, -492, 475.016, -547.721, 496, -534, 517.854, -507.404, 562, -472, 612, -406, 621, -443, 653, -489, 645, -526, 657, -553, 641, -575, 645, -615, 639, -649, 626, -670, 610, -745, 637, -789, 641, -802, 625, -814, 593, -819, 578.33, -863.961, 573, -922, 551, -955, 535, -983, 553, -1000, 527, -1040, 503, -1043, 490, -1058, 507, -1092, 473.756, -1105.87, 440, -1132, 440, -1172, 427, -1173, 387, -1225 )
+script = ExtResource( 3 )
+HighlightColor = Color( 0.968627, 0.980392, 0.764706, 0.211765 )
+
+[node name="Area2D" type="Area2D" parent="map/plains"]
+light_mask = 0
+monitorable = false
+
+[node name="CollisionPolygon2D" type="CollisionPolygon2D" parent="map/plains/Area2D"]
+position = Vector2( 0, 2 )
+polygon = PoolVector2Array( 369, -1248, 315, -1259, 206, -1240, 167, -1242, 146, -1223, 66, -1209, 31, -1185, -1, -1193, -23, -1172, -53, -1184, -79, -1167, -110, -1176, -111, -1096, -96, -1060, -122, -1027, -191, -1009, -238, -944, -227, -891, -232, -874, -218, -858, -161, -833, -150.874, -814.804, -169.752, -780.825, -159, -757, -116.895, -717.585, -113, -691, -139, -651, -106, -623, -82.9153, -593.938, -85.7469, -570.341, -60.2623, -545.8, 8.6405, -541.081, 39.7885, -517.484, 94.5331, -505.213, 147.39, -484.448, 181.455, -440.628, 258, -432, 297, -470, 330.125, -509.923, 371, -461, 423, -492, 475.016, -547.721, 496, -534, 517.854, -507.404, 562, -472, 612, -406, 621, -443, 653, -489, 645, -526, 657, -553, 641, -575, 645, -615, 639, -649, 626, -670, 610, -745, 637, -789, 641, -802, 625, -814, 593, -819, 578.33, -863.961, 573, -922, 551, -955, 535, -983, 553, -1000, 527, -1040, 503, -1043, 490, -1058, 507, -1092, 473.756, -1105.87, 440, -1132, 440, -1172, 427, -1173, 387, -1225 )
+
+[node name="forests" type="Polygon2D" parent="map"]
+modulate = Color( 0.764706, 0.980392, 0.8, 0.211765 )
+light_mask = 512
+polygon = PoolVector2Array( -708, -392, -673, -409, -618, -450, -578, -419, -540, -402, -466.525, -425.212, -427, -443, -399, -445, -356, -417, -344, -429, -306.755, -435.303, -267, -432, -224, -450, -194, -475, -162, -460, -131, -480, -106, -511, -67.9404, -539.574, -86.4402, -574.892, -87, -599, -130, -641, -142, -661, -116.712, -695.981, -121, -720, -173, -770, -158.757, -823.797, -226, -869, -237, -916, -246, -955, -197, -1007, -129, -1033, -100, -1060, -115, -1099, -127, -1138, -113, -1179, -81, -1171, -54, -1186, -26, -1175, -4, -1198, 29, -1191, 48, -1210, 144, -1228, 164, -1245, 201, -1245, 314, -1265, 246, -1297, 212, -1334, 190, -1349, 152, -1345, 127, -1380, 113, -1388, 75, -1382, 38, -1392, -42, -1394, -224, -1372, -271, -1375, -458, -1314, -517, -1294, -551, -1254, -566, -1214, -591, -1170, -572, -1157, -606, -1092, -650, -1092, -676, -1081, -674, -1061, -660, -1052, -652, -1027, -623, -1019, -699, -961, -698, -930, -752, -916, -776, -887, -771, -856, -742, -836, -802, -796, -851, -748, -854, -723, -876, -710, -853, -699, -884, -678, -881, -653, -871, -644, -917, -611, -951, -602, -950, -586, -977, -567, -988, -553, -916, -538, -848, -523, -794, -492, -744, -426 )
+script = ExtResource( 3 )
+HighlightColor = Color( 0.764706, 0.980392, 0.8, 0.211765 )
+
+[node name="Area2D" type="Area2D" parent="map/forests"]
+light_mask = 0
+monitorable = false
+
+[node name="CollisionPolygon2D" type="CollisionPolygon2D" parent="map/forests/Area2D"]
+position = Vector2( 0, 2 )
+polygon = PoolVector2Array( -708, -392, -673, -409, -618, -450, -578, -419, -540, -402, -466.525, -425.212, -427, -443, -399, -445, -356, -417, -344, -429, -306.755, -435.303, -267, -432, -224, -450, -194, -475, -162, -460, -131, -480, -106, -511, -67.9404, -539.574, -86.4402, -574.892, -87, -599, -130, -641, -142, -661, -116.712, -695.981, -121, -720, -173, -770, -158.757, -823.797, -226, -869, -237, -916, -246, -955, -197, -1007, -129, -1033, -100, -1060, -115, -1099, -127, -1138, -113, -1179, -81, -1171, -54, -1186, -26, -1175, -4, -1198, 29, -1191, 48, -1210, 144, -1228, 164, -1245, 201, -1245, 314, -1265, 246, -1297, 212, -1334, 190, -1349, 152, -1345, 127, -1380, 113, -1388, 75, -1382, 38, -1392, -42, -1394, -224, -1372, -271, -1375, -458, -1314, -517, -1294, -551, -1254, -566, -1214, -591, -1170, -572, -1157, -606, -1092, -650, -1092, -676, -1081, -674, -1061, -660, -1052, -652, -1027, -623, -1019, -699, -961, -698, -930, -752, -916, -776, -887, -771, -856, -742, -836, -802, -796, -851, -748, -854, -723, -876, -710, -853, -699, -884, -678, -881, -653, -871, -644, -917, -611, -951, -602, -950, -586, -977, -567, -988, -553, -916, -538, -848, -523, -794, -492, -744, -426 )
+
+[node name="mountains" type="Polygon2D" parent="map"]
+modulate = Color( 0.980392, 0.788235, 0.764706, 0.211765 )
+light_mask = 512
+polygon = PoolVector2Array( 435, -509, 473, -545, 497, -538, 518.802, -508.905, 571, -463, 599, -421, 608, -400, 630, -389, 607, -356, 601, -312, 602, -291, 613, -276, 615, -250, 628, -236, 640, -237, 649, -231, 662, -209, 667, -195, 705.946, -170.573, 686, -146, 643, -134, 606, -111, 565, -93, 455.93, -64.2172, 339.256, -61.0424, 258.299, -86.4408, 203.533, -103.109, 144.8, -128.507, 69.3979, -130.094, 13.0453, -119.776, -49.6573, -95.9652, -98.0731, -107.077, -159.188, -120.57, -220, -128, -296, -93, -344, -89, -384, -126, -397, -146, -438, -168, -515, -168, -579, -178, -605, -204, -624, -220, -634, -239, -666, -246, -683.824, -271.373, -705, -281, -717, -283, -735, -294, -760, -316, -758, -343, -747, -368, -713, -389, -676, -407, -649, -431, -618, -451, -585, -427, -552, -412, -540, -402, -504, -418, -476, -423, -429, -446, -398, -445, -365, -424, -355, -416, -342, -432, -275, -431, -265, -443, -232, -445, -193, -475, -163, -460, -125.853, -487.26, -100.454, -515.833, -68, -540, 6, -542, 34, -519, 92, -507, 137, -489, 179.722, -441.225, 254, -433, 300, -473, 320, -503, 366, -461, 407, -488 )
+script = ExtResource( 3 )
+HighlightColor = Color( 0.980392, 0.788235, 0.764706, 0.211765 )
+
+[node name="Area2D" type="Area2D" parent="map/mountains"]
+light_mask = 0
+monitorable = false
+
+[node name="CollisionPolygon2D" type="CollisionPolygon2D" parent="map/mountains/Area2D"]
+position = Vector2( 0, 2 )
+polygon = PoolVector2Array( 435, -509, 473, -545, 497, -538, 518.802, -508.905, 571, -463, 599, -421, 608, -400, 630, -389, 607, -356, 601, -312, 602, -291, 613, -276, 615, -250, 628, -236, 640, -237, 649, -231, 662, -209, 667, -195, 705.946, -170.573, 686, -146, 643, -134, 606, -111, 565, -93, 455.93, -64.2172, 339.256, -61.0424, 258.299, -86.4408, 203.533, -103.109, 144.8, -128.507, 69.3979, -130.094, 13.0453, -119.776, -49.6573, -95.9652, -98.0731, -107.077, -159.188, -120.57, -220, -128, -296, -93, -344, -89, -384, -126, -397, -146, -438, -168, -515, -168, -579, -178, -605, -204, -624, -220, -634, -239, -666, -246, -683.824, -271.373, -705, -281, -717, -283, -735, -294, -760, -316, -758, -343, -747, -368, -713, -389, -676, -407, -649, -431, -618, -451, -585, -427, -552, -412, -540, -402, -504, -418, -476, -423, -429, -446, -398, -445, -365, -424, -355, -416, -342, -432, -275, -431, -265, -443, -232, -445, -193, -475, -163, -460, -125.853, -487.26, -100.454, -515.833, -68, -540, 6, -542, 34, -519, 92, -507, 137, -489, 179.722, -441.225, 254, -433, 300, -473, 320, -503, 366, -461, 407, -488 )
+
+[node name="empire" type="Polygon2D" parent="map"]
+modulate = Color( 0.764706, 0.980392, 0.784314, 0.4 )
+light_mask = 512
+polygon = PoolVector2Array( 795, -166, 780, -122, 773, -94, 750, -74, 760, -53, 754, -39, 757, -12, 780, 7, 818, 19, 839, 33, 844, 46, 827, 64, 844, 88, 838, 113, 826, 147, 797, 183, 769, 212, 753, 209, 742, 216, 739, 231, 750, 243, 771, 256, 783, 260, 776, 275, 779, 285, 804, 306, 825, 330, 833, 360, 828, 383, 861, 398, 845, 452, 844, 472, 836, 517, 827, 542, 808, 566, 803, 599, 804, 631, 776, 664, 720, 696, 661, 733, 579, 769, 514, 776, 465, 770, 419, 786, 369, 753, 313, 740, 271, 717, 258, 688, 217, 738, 149, 796, 100, 791, 57, 795, -8, 816, -46, 803, -240, 808, -342, 824, -364, 801, -414, 795, -449, 803, -483, 791, -539, 788, -607, 795, -626, 784, -641, 747, -706, 743, -724, 679, -797, 625, -850, 524, -833, 448, -875, 438, -882, 418, -877, 384, -847, 359, -854, 312, -925, 304, -993, 315, -1047, 339, -1078, 249, -1115, 207, -1102, 74, -1108, 38, -1133, 31, -1146, 16, -1140, -15, -1129, -40, -1152, -77, -1131, -107, -1040, -75, -939, -57, -860, -64, -836, -70, -835, -86, -829, -95, -812, -101, -800, -115, -802, -129, -775, -150, -787, -173, -795, -179, -792, -186, -785, -187, -793, -208, -802, -213, -796, -234, -797, -238, -795, -244, -787, -253, -779, -259, -778, -265, -784, -263, -786, -266, -783, -272, -777, -274, -782, -278, -780, -283, -782, -291, -774, -296, -765, -300, -759, -316, -737, -295, -718, -283, -707, -281, -689, -274, -675, -259, -662, -244, -636, -238, -625, -219, -581, -177, -521, -169, -436, -167, -396, -147, -384, -126, -342, -87, -292, -93, -221, -127, -159, -119, -48, -95, 11, -120, 68, -130, 146, -128, 215, -99, 340, -62, 456, -64, 564, -93, 646, -135, 685, -146, 707, -171, 672, -196, 683, -213, 694, -197, 742, -193, 766, -181 )
+script = ExtResource( 3 )
+HighlightColor = Color( 0.764706, 0.980392, 0.784314, 0.4 )
+
+[node name="Area2D" type="Area2D" parent="map/empire"]
+light_mask = 0
+monitorable = false
+
+[node name="CollisionPolygon2D" type="CollisionPolygon2D" parent="map/empire/Area2D"]
+position = Vector2( 0, 2 )
+polygon = PoolVector2Array( 795, -166, 780, -122, 773, -94, 750, -74, 760, -53, 754, -39, 757, -12, 780, 7, 818, 19, 839, 33, 844, 46, 827, 64, 844, 88, 838, 113, 826, 147, 797, 183, 769, 212, 753, 209, 742, 216, 739, 231, 750, 243, 771, 256, 783, 260, 776, 275, 779, 285, 804, 306, 825, 330, 833, 360, 828, 383, 861, 398, 845, 452, 844, 472, 836, 517, 827, 542, 808, 566, 803, 599, 804, 631, 776, 664, 720, 696, 661, 733, 579, 769, 514, 776, 465, 770, 419, 786, 369, 753, 313, 740, 271, 717, 258, 688, 217, 738, 149, 796, 100, 791, 57, 795, -8, 816, -46, 803, -240, 808, -342, 824, -364, 801, -414, 795, -449, 803, -483, 791, -539, 788, -607, 795, -626, 784, -641, 747, -706, 743, -724, 679, -797, 625, -850, 524, -833, 448, -875, 438, -882, 418, -877, 384, -847, 359, -854, 312, -925, 304, -993, 315, -1047, 339, -1078, 249, -1115, 207, -1102, 74, -1108, 38, -1133, 31, -1146, 16, -1140, -15, -1129, -40, -1152, -77, -1131, -107, -1040, -75, -939, -57, -860, -64, -836, -70, -835, -86, -829, -95, -812, -101, -800, -115, -802, -129, -775, -150, -787, -173, -795, -179, -792, -186, -785, -187, -793, -208, -802, -213, -796, -234, -797, -238, -795, -244, -787, -253, -779, -259, -778, -265, -784, -263, -786, -266, -783, -272, -777, -274, -782, -278, -780, -283, -782, -291, -774, -296, -765, -300, -759, -316, -737, -295, -718, -283, -707, -281, -689, -274, -675, -259, -662, -244, -636, -238, -625, -219, -581, -177, -521, -169, -436, -167, -396, -147, -384, -126, -342, -87, -292, -93, -221, -127, -159, -119, -48, -95, 11, -120, 68, -130, 146, -128, 215, -99, 340, -62, 456, -64, 564, -93, 646, -135, 685, -146, 707, -171, 672, -196, 683, -213, 694, -197, 742, -193, 766, -181 )
+
+[node name="aliron" type="Polygon2D" parent="map"]
+self_modulate = Color( 0.929412, 0.0745098, 0.0745098, 0.301961 )
+light_mask = 512
+position = Vector2( 130, -248 )
+scale = Vector2( 0.656029, 0.656029 )
+polygon = PoolVector2Array( 284, -755, 298, -764, 310, -773, 320, -786, 329, -798, 336, -814, 340, -831, 342, -848, 341, -865, 336, -883, 329, -899, 320, -913, 309, -926, 295, -937, 281, -945, 265, -950, 250, -952, 234, -953, 212, -951, 193, -945, 174, -934, 161, -924, 151, -910, 142, -895, 136, -879, 132, -860, 132, -840, 136, -819, 143, -802, 151, -788, 163, -775, 175, -764, 186, -757, 198, -752, 208, -748, 216, -745, 226, -744, 240, -744, 256, -745, 270, -749 )
+script = ExtResource( 40 )
+HighlightColor = Color( 0.929412, 0.0745098, 0.0745098, 0.301961 )
+area = "plains"
+
+[node name="Sprite" type="Sprite" parent="map/aliron"]
+show_behind_parent = true
+position = Vector2( 236.27, -849.048 )
+scale = Vector2( 1.00605, 1.00605 )
+texture = ExtResource( 37 )
+
+[node name="Area2D" type="Area2D" parent="map/aliron"]
+light_mask = 0
+monitorable = false
+
+[node name="CollisionPolygon2D" type="CollisionPolygon2D" parent="map/aliron/Area2D"]
+position = Vector2( 0, 2 )
+polygon = PoolVector2Array( 284, -755, 298, -764, 310, -773, 320, -786, 329, -798, 336, -814, 340, -831, 342, -848, 341, -865, 336, -883, 329, -899, 320, -913, 309, -926, 295, -937, 281, -945, 265, -950, 250, -952, 234, -953, 212, -951, 193, -945, 174, -934, 161, -924, 151, -910, 142, -895, 136, -879, 132, -860, 132, -840, 136, -819, 143, -802, 151, -788, 163, -775, 175, -764, 186, -757, 198, -752, 208, -748, 216, -745, 226, -744, 240, -744, 256, -745, 270, -749 )
+
+[node name="elf_capital" type="Polygon2D" parent="map"]
+self_modulate = Color( 0.929412, 0.0745098, 0.0745098, 0.301961 )
+light_mask = 512
+position = Vector2( -611, -563 )
+scale = Vector2( 0.658442, 0.658442 )
+polygon = PoolVector2Array( 284, -755, 298, -764, 310, -773, 320, -786, 329, -798, 336, -814, 340, -831, 342, -848, 341, -865, 336, -883, 329, -899, 320, -913, 309, -926, 295, -937, 281, -945, 265, -950, 250, -952, 234, -953, 212, -951, 193, -945, 174, -934, 161, -924, 151, -910, 142, -895, 136, -879, 132, -860, 132, -840, 136, -819, 143, -802, 151, -788, 163, -775, 175, -764, 186, -757, 198, -752, 208, -748, 216, -745, 226, -744, 240, -744, 256, -745, 270, -749 )
+script = ExtResource( 40 )
+HighlightColor = Color( 0.929412, 0.0745098, 0.0745098, 0.301961 )
+area = "forests"
+
+[node name="Sprite" type="Sprite" parent="map/elf_capital"]
+show_behind_parent = true
+position = Vector2( 238.442, -847.455 )
+scale = Vector2( 1.00237, 1.00237 )
+texture = ExtResource( 38 )
+
+[node name="Area2D" type="Area2D" parent="map/elf_capital"]
+light_mask = 0
+monitorable = false
+
+[node name="CollisionPolygon2D" type="CollisionPolygon2D" parent="map/elf_capital/Area2D"]
+position = Vector2( 0, 2 )
+polygon = PoolVector2Array( 284, -755, 298, -764, 310, -773, 320, -786, 329, -798, 336, -814, 340, -831, 342, -848, 341, -865, 336, -883, 329, -899, 320, -913, 309, -926, 295, -937, 281, -945, 265, -950, 250, -952, 234, -953, 212, -951, 193, -945, 174, -934, 161, -924, 151, -910, 142, -895, 136, -879, 132, -860, 132, -840, 136, -819, 143, -802, 151, -788, 163, -775, 175, -764, 186, -757, 198, -752, 208, -748, 216, -745, 226, -744, 240, -744, 256, -745, 270, -749 )
+
+[node name="beastkin_capital" type="Polygon2D" parent="map"]
+self_modulate = Color( 0.929412, 0.0745098, 0.0745098, 0.301961 )
+light_mask = 512
+position = Vector2( -586, -41 )
+scale = Vector2( 0.679426, 0.679426 )
+polygon = PoolVector2Array( 284, -755, 298, -764, 310, -773, 320, -786, 329, -798, 336, -814, 340, -831, 342, -848, 341, -865, 336, -883, 329, -899, 320, -913, 309, -926, 295, -937, 281, -945, 265, -950, 250, -952, 234, -953, 212, -951, 193, -945, 174, -934, 161, -924, 151, -910, 142, -895, 136, -879, 132, -860, 132, -840, 136, -819, 143, -802, 151, -788, 163, -775, 175, -764, 186, -757, 198, -752, 208, -748, 216, -745, 226, -744, 240, -744, 256, -745, 270, -749 )
+script = ExtResource( 40 )
+HighlightColor = Color( 0.929412, 0.0745098, 0.0745098, 0.301961 )
+area = "forests"
+
+[node name="Sprite" type="Sprite" parent="map/beastkin_capital"]
+show_behind_parent = true
+position = Vector2( 238.437, -847.774 )
+scale = Vector2( 0.971408, 0.971408 )
+texture = ExtResource( 35 )
+
+[node name="Area2D" type="Area2D" parent="map/beastkin_capital"]
+light_mask = 0
+monitorable = false
+
+[node name="CollisionPolygon2D" type="CollisionPolygon2D" parent="map/beastkin_capital/Area2D"]
+position = Vector2( 0, 2 )
+polygon = PoolVector2Array( 284, -755, 298, -764, 310, -773, 320, -786, 329, -798, 336, -814, 340, -831, 342, -848, 341, -865, 336, -883, 329, -899, 320, -913, 309, -926, 295, -937, 281, -945, 265, -950, 250, -952, 234, -953, 212, -951, 193, -945, 174, -934, 161, -924, 151, -910, 142, -895, 136, -879, 132, -860, 132, -840, 136, -819, 143, -802, 151, -788, 163, -775, 175, -764, 186, -757, 198, -752, 208, -748, 216, -745, 226, -744, 240, -744, 256, -745, 270, -749 )
+
+[node name="dwarf_capital" type="Polygon2D" parent="map"]
+self_modulate = Color( 0.929412, 0.0745098, 0.0745098, 0.301961 )
+light_mask = 512
+position = Vector2( 202.743, 212.409 )
+scale = Vector2( 0.67619, 0.67619 )
+polygon = PoolVector2Array( 284, -755, 298, -764, 310, -773, 320, -786, 329, -798, 336, -814, 340, -831, 342, -848, 341, -865, 336, -883, 329, -899, 320, -913, 309, -926, 295, -937, 281, -945, 265, -950, 250, -952, 234, -953, 212, -951, 193, -945, 174, -934, 161, -924, 151, -910, 142, -895, 136, -879, 132, -860, 132, -840, 136, -819, 143, -802, 151, -788, 163, -775, 175, -764, 186, -757, 198, -752, 208, -748, 216, -745, 226, -744, 240, -744, 256, -745, 270, -749 )
+script = ExtResource( 40 )
+HighlightColor = Color( 0.929412, 0.0745098, 0.0745098, 0.301961 )
+area = "mountains"
+
+[node name="Sprite" type="Sprite" parent="map/dwarf_capital"]
+show_behind_parent = true
+position = Vector2( 237, -850.958 )
+scale = Vector2( 0.976057, 0.976057 )
+texture = ExtResource( 36 )
+
+[node name="Area2D" type="Area2D" parent="map/dwarf_capital"]
+light_mask = 0
+monitorable = false
+
+[node name="CollisionPolygon2D" type="CollisionPolygon2D" parent="map/dwarf_capital/Area2D"]
+position = Vector2( 0, 2 )
+polygon = PoolVector2Array( 284, -755, 298, -764, 310, -773, 320, -786, 329, -798, 336, -814, 340, -831, 342, -848, 341, -865, 336, -883, 329, -899, 320, -913, 309, -926, 295, -937, 281, -945, 265, -950, 250, -952, 234, -953, 212, -951, 193, -945, 174, -934, 161, -924, 151, -910, 142, -895, 136, -879, 132, -860, 132, -840, 136, -819, 143, -802, 151, -788, 163, -775, 175, -764, 186, -757, 198, -752, 208, -748, 216, -745, 226, -744, 240, -744, 256, -745, 270, -749 )
+
+[node name="empire_capital" type="Polygon2D" parent="map"]
+self_modulate = Color( 0.929412, 0.215686, 0.0745098, 0.364706 )
+light_mask = 512
+position = Vector2( -344.947, 860.612 )
+scale = Vector2( 0.688995, 0.688995 )
+polygon = PoolVector2Array( 284, -755, 298, -764, 310, -773, 320, -786, 329, -798, 336, -814, 340, -831, 342, -848, 341, -865, 336, -883, 329, -899, 320, -913, 309, -926, 295, -937, 281, -945, 265, -950, 250, -952, 234, -953, 212, -951, 193, -945, 174, -934, 161, -924, 151, -910, 142, -895, 136, -879, 132, -860, 132, -840, 136, -819, 143, -802, 151, -788, 163, -775, 175, -764, 186, -757, 198, -752, 208, -748, 216, -745, 226, -744, 240, -744, 256, -745, 270, -749 )
+script = ExtResource( 40 )
+HighlightColor = Color( 0.929412, 0.215686, 0.0745098, 0.364706 )
+area = "empire"
+
+[node name="Sprite" type="Sprite" parent="map/empire_capital"]
+show_behind_parent = true
+position = Vector2( 236.5, -848.5 )
+scale = Vector2( 0.957917, 0.957917 )
+texture = ExtResource( 48 )
+
+[node name="Area2D" type="Area2D" parent="map/empire_capital"]
+light_mask = 0
+monitorable = false
+
+[node name="CollisionPolygon2D" type="CollisionPolygon2D" parent="map/empire_capital/Area2D"]
+position = Vector2( 0, 2 )
+polygon = PoolVector2Array( 284, -755, 298, -764, 310, -773, 320, -786, 329, -798, 336, -814, 340, -831, 342, -848, 341, -865, 336, -883, 329, -899, 320, -913, 309, -926, 295, -937, 281, -945, 265, -950, 250, -952, 234, -953, 212, -951, 193, -945, 174, -934, 161, -924, 151, -910, 142, -895, 136, -879, 132, -860, 132, -840, 136, -819, 143, -802, 151, -788, 163, -775, 175, -764, 186, -757, 198, -752, 208, -748, 216, -745, 226, -744, 240, -744, 256, -745, 270, -749 )
+
+[node name="map_cut" type="Light2D" parent="."]
+position = Vector2( 935.486, 544.13 )
+enabled = false
+texture = ExtResource( 1 )
+mode = 3
+range_item_cull_mask = 512
+shadow_item_cull_mask = 0
+
+[node name="map_control" type="Control" parent="."]
+anchor_right = 1.0
+anchor_bottom = 1.0
+margin_right = 1920.0
+margin_bottom = 1080.0
+script = ExtResource( 50 )
+
+[node name="InfoPanel" type="TextureRect" parent="."]
+margin_left = 696.0
+margin_top = 104.0
+margin_right = 1256.0
+margin_bottom = 849.0
+texture = ExtResource( 11 )
+
+[node name="Frame" type="TextureRect" parent="InfoPanel"]
+margin_right = 40.0
+margin_bottom = 40.0
+texture = ExtResource( 10 )
+
+[node name="Label" type="Label" parent="InfoPanel"]
+margin_right = 558.0
+margin_bottom = 83.0
+custom_colors/font_color = Color( 0.976471, 0.882353, 0.505882, 1 )
+custom_fonts/font = ExtResource( 8 )
+text = "Information"
+align = 1
+valign = 1
+
+[node name="buttons" type="HBoxContainer" parent="InfoPanel"]
+margin_left = 17.0
+margin_top = 679.0
+margin_right = 544.0
+margin_bottom = 727.0
+custom_constants/separation = 5
+alignment = 1
+
+[node name="Sendbutton" type="TextureButton" parent="InfoPanel/buttons"]
+margin_left = 67.0
+margin_right = 251.0
+margin_bottom = 48.0
+texture_normal = ExtResource( 14 )
+texture_pressed = ExtResource( 12 )
+texture_hover = ExtResource( 13 )
+texture_disabled = ExtResource( 12 )
+
+[node name="Label" type="Label" parent="InfoPanel/buttons/Sendbutton"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+margin_top = 2.0
+margin_bottom = 2.0
+custom_colors/font_color = Color( 0.976471, 0.882353, 0.505882, 1 )
+custom_fonts/font = ExtResource( 6 )
+text = "Confirm"
+align = 1
+valign = 1
+
+[node name="Teleport" type="TextureButton" parent="InfoPanel/buttons"]
+visible = false
+margin_left = 189.0
+margin_right = 339.0
+margin_bottom = 48.0
+rect_min_size = Vector2( 150, 48 )
+texture_normal = ExtResource( 14 )
+texture_pressed = ExtResource( 12 )
+texture_hover = ExtResource( 13 )
+texture_disabled = ExtResource( 12 )
+expand = true
+
+[node name="Label" type="Label" parent="InfoPanel/buttons/Teleport"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+margin_top = 2.0
+margin_bottom = 2.0
+custom_colors/font_color = Color( 0.976471, 0.882353, 0.505882, 1 )
+custom_fonts/font = ExtResource( 6 )
+text = "Teleport"
+align = 1
+valign = 1
+
+[node name="separator" type="Control" parent="InfoPanel/buttons"]
+margin_left = 256.0
+margin_right = 271.0
+margin_bottom = 48.0
+rect_min_size = Vector2( 15, 0 )
+
+[node name="Forget" type="TextureButton" parent="InfoPanel/buttons"]
+margin_left = 276.0
+margin_right = 460.0
+margin_bottom = 48.0
+texture_normal = ExtResource( 14 )
+texture_pressed = ExtResource( 12 )
+texture_hover = ExtResource( 13 )
+texture_disabled = ExtResource( 12 )
+
+[node name="Label" type="Label" parent="InfoPanel/buttons/Forget"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+margin_top = 2.0
+margin_bottom = 2.0
+custom_colors/font_color = Color( 0.976471, 0.882353, 0.505882, 1 )
+custom_fonts/font = ExtResource( 6 )
+text = "Forget"
+align = 1
+valign = 1
+
+[node name="InfoFrame" type="TextureRect" parent="InfoPanel"]
+margin_left = 18.4998
+margin_top = 98.2258
+margin_right = 542.5
+margin_bottom = 398.226
+texture = ExtResource( 17 )
+
+[node name="icon" type="TextureRect" parent="InfoPanel/InfoFrame"]
+show_behind_parent = true
+anchor_right = 1.0
+anchor_bottom = 1.0
+expand = true
+
+[node name="name" type="Label" parent="InfoPanel/InfoFrame"]
+visible = false
+anchor_right = 1.0
+margin_top = 17.0
+margin_bottom = 52.0
+custom_colors/font_color = Color( 0.870588, 0.870588, 0.870588, 1 )
+custom_fonts/font = ExtResource( 9 )
+text = "Location Name"
+align = 1
+valign = 1
+
+[node name="enemies" type="Label" parent="InfoPanel/InfoFrame"]
+anchor_right = 1.0
+margin_left = -3.51978
+margin_top = 8.4491
+margin_right = -3.51978
+margin_bottom = 45.4491
+custom_colors/font_color = Color( 0.870588, 0.870588, 0.870588, 1 )
+custom_colors/font_outline_modulate = Color( 0, 0, 0, 1 )
+custom_fonts/font = ExtResource( 46 )
+text = "Location Name"
+align = 1
+valign = 1
+
+[node name="VBoxContainer" type="VBoxContainer" parent="InfoPanel"]
+margin_left = 21.0
+margin_top = 407.0
+margin_right = 545.0
+margin_bottom = 640.0
+
+[node name="Label2" type="Label" parent="InfoPanel/VBoxContainer"]
+margin_right = 524.0
+margin_bottom = 35.0
+custom_fonts/font = ExtResource( 7 )
+text = "Characters"
+align = 1
+valign = 1
+
+[node name="CharScroll" type="ScrollContainer" parent="InfoPanel/VBoxContainer"]
+margin_top = 39.0
+margin_right = 524.0
+margin_bottom = 39.0
+theme = ExtResource( 47 )
+scroll_vertical_enabled = false
+
+[node name="Characters" type="HBoxContainer" parent="InfoPanel/VBoxContainer/CharScroll"]
+
+[node name="Button" type="TextureRect" parent="InfoPanel/VBoxContainer/CharScroll/Characters"]
+visible = false
+margin_right = 70.0
+margin_bottom = 70.0
+texture = ExtResource( 18 )
+
+[node name="Icon" type="TextureRect" parent="InfoPanel/VBoxContainer/CharScroll/Characters/Button"]
+show_behind_parent = true
+anchor_right = 1.0
+anchor_bottom = 1.0
+expand = true
+
+[node name="Label3" type="Label" parent="InfoPanel/VBoxContainer"]
+margin_top = 43.0
+margin_right = 524.0
+margin_bottom = 78.0
+custom_fonts/font = ExtResource( 7 )
+text = "Resources"
+align = 1
+valign = 1
+
+[node name="ResScroll" type="ScrollContainer" parent="InfoPanel/VBoxContainer"]
+margin_top = 82.0
+margin_right = 524.0
+margin_bottom = 82.0
+scroll_vertical_enabled = false
+
+[node name="Resources" type="HBoxContainer" parent="InfoPanel/VBoxContainer/ResScroll"]
+
+[node name="Button" type="TextureRect" parent="InfoPanel/VBoxContainer/ResScroll/Resources"]
+visible = false
+margin_right = 70.0
+margin_bottom = 70.0
+texture = ExtResource( 19 )
+
+[node name="Icon" type="TextureRect" parent="InfoPanel/VBoxContainer/ResScroll/Resources/Button"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+margin_left = 10.0
+margin_top = 10.0
+margin_right = -10.0
+margin_bottom = -10.0
+expand = true
+
+[node name="amount" type="Label" parent="InfoPanel/VBoxContainer/ResScroll/Resources/Button"]
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+margin_top = -24.0
+custom_fonts/font = ExtResource( 5 )
+text = "1/1"
+align = 2
+
+[node name="time" type="Label" parent="InfoPanel"]
+anchor_right = 1.0
+margin_left = 0.999995
+margin_top = 641.0
+margin_right = 1.0
+margin_bottom = 678.0
+custom_colors/font_color = Color( 0.870588, 0.870588, 0.870588, 1 )
+custom_colors/font_outline_modulate = Color( 0, 0, 0, 1 )
+custom_fonts/font = ExtResource( 46 )
+text = "Location Name"
+align = 1
+valign = 1
+
+[node name="teleport_menu" parent="InfoPanel" instance=ExtResource( 49 )]
+visible = false
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+margin_left = -194.5
+margin_top = -341.0
+margin_right = 194.5
+margin_bottom = -78.0
+
+[node name="FromLocList" type="TextureRect" parent="."]
+visible = false
+margin_left = 21.0
+margin_top = 18.0
+margin_right = 434.0
+margin_bottom = 1015.0
+texture = ExtResource( 22 )
+expand = true
+
+[node name="frame" type="NinePatchRect" parent="FromLocList"]
+margin_right = 413.0
+margin_bottom = 999.0
+texture = ExtResource( 24 )
+patch_margin_left = 15
+patch_margin_top = 144
+patch_margin_right = 15
+patch_margin_bottom = 44
+
+[node name="Label" type="Label" parent="FromLocList"]
+margin_right = 410.0
+margin_bottom = 83.0
+custom_colors/font_color = Color( 0.976471, 0.882353, 0.505882, 1 )
+custom_fonts/font = ExtResource( 8 )
+text = "Select Character"
+align = 1
+valign = 1
+
+[node name="LocScroll" type="ScrollContainer" parent="FromLocList"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+margin_left = 19.0
+margin_top = 97.0
+margin_right = -18.0
+margin_bottom = -77.0
+theme = ExtResource( 45 )
+scroll_horizontal_enabled = false
+
+[node name="LocCatList" type="VBoxContainer" parent="FromLocList/LocScroll"]
+
+[node name="LocCat" type="VBoxContainer" parent="FromLocList/LocScroll/LocCatList"]
+visible = false
+margin_right = 360.0
+margin_bottom = 54.0
+
+[node name="Button" type="TextureButton" parent="FromLocList/LocScroll/LocCatList/LocCat"]
+margin_right = 360.0
+margin_bottom = 50.0
+rect_pivot_offset = Vector2( -318.656, 186.314 )
+toggle_mode = true
+texture_normal = ExtResource( 26 )
+texture_pressed = ExtResource( 25 )
+texture_hover = ExtResource( 27 )
+texture_disabled = ExtResource( 26 )
+
+[node name="Label" type="Label" parent="FromLocList/LocScroll/LocCatList/LocCat/Button"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+custom_colors/font_color = Color( 0.976471, 0.882353, 0.505882, 1 )
+custom_fonts/font = ExtResource( 9 )
+text = "Location category"
+align = 1
+valign = 1
+
+[node name="offset" type="MarginContainer" parent="FromLocList/LocScroll/LocCatList/LocCat"]
+margin_top = 54.0
+margin_right = 360.0
+margin_bottom = 54.0
+custom_constants/margin_left = 15
+
+[node name="LocGroupList" type="VBoxContainer" parent="FromLocList/LocScroll/LocCatList/LocCat/offset"]
+margin_left = 15.0
+margin_right = 360.0
+
+[node name="LocGroup" type="VBoxContainer" parent="FromLocList/LocScroll/LocCatList/LocCat/offset/LocGroupList"]
+visible = false
+margin_right = 345.0
+margin_bottom = 54.0
+grow_horizontal = 0
+
+[node name="Button" type="TextureButton" parent="FromLocList/LocScroll/LocCatList/LocCat/offset/LocGroupList/LocGroup"]
+margin_right = 345.0
+margin_bottom = 50.0
+grow_horizontal = 0
+rect_min_size = Vector2( 0, 50 )
+toggle_mode = true
+texture_normal = ExtResource( 21 )
+texture_pressed = ExtResource( 2 )
+texture_hover = ExtResource( 25 )
+expand = true
+
+[node name="Label" type="Label" parent="FromLocList/LocScroll/LocCatList/LocCat/offset/LocGroupList/LocGroup/Button"]
+margin_left = 51.0
+margin_top = 7.0
+margin_right = 279.0
+margin_bottom = 44.0
+size_flags_horizontal = 3
+custom_fonts/font = ExtResource( 9 )
+text = "Location name"
+valign = 1
+
+[node name="menu" type="TextureButton" parent="FromLocList/LocScroll/LocCatList/LocCat/offset/LocGroupList/LocGroup/Button"]
+anchor_left = 1.0
+anchor_top = 0.5
+anchor_right = 1.0
+anchor_bottom = 0.5
+margin_left = -37.0
+margin_top = -15.5
+margin_right = -8.0
+margin_bottom = 15.5
+texture_normal = ExtResource( 28 )
+texture_pressed = ExtResource( 31 )
+texture_hover = ExtResource( 30 )
+texture_disabled = ExtResource( 31 )
+expand = true
+stretch_mode = 4
+
+[node name="icon" type="TextureRect" parent="FromLocList/LocScroll/LocCatList/LocCat/offset/LocGroupList/LocGroup/Button/menu"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+texture = ExtResource( 29 )
+expand = true
+stretch_mode = 5
+
+[node name="offset" type="MarginContainer" parent="FromLocList/LocScroll/LocCatList/LocCat/offset/LocGroupList/LocGroup"]
+margin_top = 54.0
+margin_right = 345.0
+margin_bottom = 54.0
+custom_constants/margin_left = 20
+
+[node name="LocList" type="VBoxContainer" parent="FromLocList/LocScroll/LocCatList/LocCat/offset/LocGroupList/LocGroup/offset"]
+margin_left = 20.0
+margin_right = 345.0
+grow_horizontal = 0
+
+[node name="Button" type="TextureButton" parent="FromLocList/LocScroll/LocCatList/LocCat/offset/LocGroupList/LocGroup/offset/LocList"]
+visible = false
+margin_right = 325.0
+margin_bottom = 50.0
+grow_horizontal = 0
+toggle_mode = true
+texture_normal = ExtResource( 20 )
+texture_pressed = ExtResource( 2 )
+texture_hover = ExtResource( 21 )
+
+[node name="group" type="TextureButton" parent="FromLocList/LocScroll/LocCatList/LocCat/offset/LocGroupList/LocGroup/offset/LocList/Button"]
+anchor_left = 1.0
+anchor_top = 0.5
+anchor_right = 1.0
+anchor_bottom = 0.5
+margin_left = -37.0
+margin_top = -15.5
+margin_right = -8.0
+margin_bottom = 15.5
+texture_normal = ExtResource( 28 )
+texture_pressed = ExtResource( 31 )
+texture_hover = ExtResource( 30 )
+texture_disabled = ExtResource( 31 )
+expand = true
+stretch_mode = 4
+
+[node name="icon" type="TextureRect" parent="FromLocList/LocScroll/LocCatList/LocCat/offset/LocGroupList/LocGroup/offset/LocList/Button/group"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+margin_left = 2.0
+margin_top = 2.0
+margin_right = -2.0
+margin_bottom = -2.0
+texture = ExtResource( 32 )
+expand = true
+stretch_mode = 5
+
+[node name="icon" type="TextureRect" parent="FromLocList/LocScroll/LocCatList/LocCat/offset/LocGroupList/LocGroup/offset/LocList/Button"]
+margin_left = 7.0
+margin_top = 5.0
+margin_right = 47.0
+margin_bottom = 46.0
+rect_min_size = Vector2( 40, 0 )
+expand = true
+
+[node name="Label" type="Label" parent="FromLocList/LocScroll/LocCatList/LocCat/offset/LocGroupList/LocGroup/offset/LocList/Button"]
+margin_left = 51.0
+margin_top = 7.0
+margin_right = 279.0
+margin_bottom = 44.0
+size_flags_horizontal = 3
+custom_fonts/font = ExtResource( 9 )
+text = "Location name"
+valign = 1
+
+[node name="Sendbutton" type="TextureButton" parent="FromLocList"]
+visible = false
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+margin_left = -95.2451
+margin_top = -63.8162
+margin_right = 88.7549
+margin_bottom = -17.8162
+texture_normal = ExtResource( 14 )
+texture_pressed = ExtResource( 12 )
+texture_hover = ExtResource( 13 )
+texture_disabled = ExtResource( 12 )
+
+[node name="Label" type="Label" parent="FromLocList/Sendbutton"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+margin_top = 2.0
+margin_bottom = 2.0
+custom_colors/font_color = Color( 0.976471, 0.882353, 0.505882, 1 )
+custom_fonts/font = ExtResource( 6 )
+text = "Send"
+align = 1
+valign = 1
+
+[node name="ContextMenu" type="PopupMenu" parent="FromLocList"]
+margin_right = 255.0
+margin_bottom = 53.0
+theme = ExtResource( 33 )
+items = [ "Item 0", null, 0, false, false, 0, 0, null, "", false ]
+script = ExtResource( 34 )
+
+[node name="ToLocList" type="TextureRect" parent="."]
+visible = false
+margin_left = 1478.0
+margin_top = 27.0
+margin_right = 1891.0
+margin_bottom = 669.0
+texture = ExtResource( 22 )
+
+[node name="frame" type="TextureRect" parent="ToLocList"]
+margin_right = 40.0
+margin_bottom = 40.0
+texture = ExtResource( 24 )
+
+[node name="Label" type="Label" parent="ToLocList"]
+margin_right = 410.0
+margin_bottom = 83.0
+custom_colors/font_color = Color( 0.976471, 0.882353, 0.505882, 1 )
+custom_fonts/font = ExtResource( 8 )
+text = "Location List"
+align = 1
+valign = 1
+
+[node name="LocScroll" type="ScrollContainer" parent="ToLocList"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+margin_left = 19.0
+margin_top = 97.0
+margin_right = -18.0
+margin_bottom = -20.0
+theme = ExtResource( 45 )
+scroll_horizontal_enabled = false
+
+[node name="LocCatList" type="VBoxContainer" parent="ToLocList/LocScroll"]
+
+[node name="LocCat" type="VBoxContainer" parent="ToLocList/LocScroll/LocCatList"]
+visible = false
+margin_right = 360.0
+margin_bottom = 54.0
+
+[node name="Button" type="TextureButton" parent="ToLocList/LocScroll/LocCatList/LocCat"]
+margin_right = 360.0
+margin_bottom = 50.0
+rect_pivot_offset = Vector2( -318.656, 186.314 )
+toggle_mode = true
+texture_normal = ExtResource( 26 )
+texture_pressed = ExtResource( 25 )
+texture_hover = ExtResource( 27 )
+
+[node name="Label" type="Label" parent="ToLocList/LocScroll/LocCatList/LocCat/Button"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+custom_colors/font_color = Color( 0.976471, 0.882353, 0.505882, 1 )
+custom_fonts/font = ExtResource( 9 )
+text = "Location category"
+align = 1
+valign = 1
+
+[node name="offset" type="HBoxContainer" parent="ToLocList/LocScroll/LocCatList/LocCat"]
+margin_top = 54.0
+margin_right = 360.0
+margin_bottom = 54.0
+alignment = 2
+
+[node name="LocList" type="VBoxContainer" parent="ToLocList/LocScroll/LocCatList/LocCat/offset"]
+margin_left = 360.0
+margin_right = 360.0
+grow_horizontal = 0
+
+[node name="Button" type="TextureButton" parent="ToLocList/LocScroll/LocCatList/LocCat/offset/LocList"]
+visible = false
+margin_right = 325.0
+margin_bottom = 50.0
+grow_horizontal = 0
+toggle_mode = true
+texture_normal = ExtResource( 20 )
+texture_pressed = ExtResource( 2 )
+texture_hover = ExtResource( 21 )
+
+[node name="icon" type="TextureRect" parent="ToLocList/LocScroll/LocCatList/LocCat/offset/LocList/Button"]
+margin_left = 7.0
+margin_top = 5.0
+margin_right = 47.0
+margin_bottom = 46.0
+rect_min_size = Vector2( 40, 0 )
+expand = true
+
+[node name="Label" type="Label" parent="ToLocList/LocScroll/LocCatList/LocCat/offset/LocList/Button"]
+margin_left = 51.0
+margin_top = 7.0
+margin_right = 271.0
+margin_bottom = 44.0
+size_flags_horizontal = 3
+custom_fonts/font = ExtResource( 9 )
+text = "Location name"
+valign = 1
+
+[node name="amount" type="Label" parent="ToLocList/LocScroll/LocCatList/LocCat/offset/LocList/Button"]
+margin_left = 275.0
+margin_top = 7.0
+margin_right = 316.0
+margin_bottom = 44.0
+size_flags_horizontal = 3
+custom_fonts/font = ExtResource( 9 )
+text = "10"
+valign = 1
+
+[node name="Back" type="TextureButton" parent="."]
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+margin_left = 1143.0
+margin_top = 987.0
+margin_right = 1363.0
+margin_bottom = 1045.0
+texture_normal = ExtResource( 39 )
+texture_pressed = ExtResource( 15 )
+texture_hover = ExtResource( 16 )
+texture_disabled = ExtResource( 15 )
+
+[node name="Label" type="Label" parent="Back"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+custom_colors/font_color = Color( 0.976471, 0.882353, 0.505882, 1 )
+custom_fonts/font = ExtResource( 6 )
+text = "Back"
+align = 1
+valign = 1
+
+[node name="mode" type="TextureButton" parent="."]
+visible = false
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+margin_left = 594.0
+margin_top = 980.0
+margin_right = 814.0
+margin_bottom = 1038.0
+texture_normal = ExtResource( 39 )
+texture_pressed = ExtResource( 15 )
+texture_hover = ExtResource( 16 )
+texture_disabled = ExtResource( 15 )
+
+[node name="Label" type="Label" parent="mode"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+custom_colors/font_color = Color( 0.976471, 0.882353, 0.505882, 1 )
+custom_fonts/font = ExtResource( 6 )
+text = "Adv. mode"
+align = 1
+valign = 1
+
+[node name="zoom" type="HSlider" parent="."]
+visible = false
+margin_left = 835.0
+margin_top = 51.0
+margin_right = 1167.0
+margin_bottom = 67.0
+custom_icons/grabber_disabled = ExtResource( 41 )
+custom_icons/grabber_highlight = ExtResource( 41 )
+custom_icons/grabber = ExtResource( 41 )
+custom_styles/slider = SubResource( 7 )
+step = 0.1
+scrollable = false
+tick_count = 5
+
+[node name="minus" type="TextureButton" parent="zoom"]
+margin_left = -36.0
+margin_top = -10.0
+margin_right = -11.0
+margin_bottom = 30.0
+texture_normal = ExtResource( 43 )
+
+[node name="plus" type="TextureButton" parent="zoom"]
+margin_left = 466.0
+margin_top = -8.0
+margin_right = 491.0
+margin_bottom = 32.0
+texture_normal = ExtResource( 44 )

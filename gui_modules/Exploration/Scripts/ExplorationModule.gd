@@ -1,0 +1,995 @@
+extends Control
+
+#var active_area
+var active_location
+onready var nav = $LocationGui/NavigationModule
+onready var cast_panel = $LocationGui/cast_panel
+onready var use_state_panel = $LocationGui/use_state_panel
+onready var return_all_btn = $LocationGui/PresentedSlavesPanel/ReturnAll
+onready var present_char_cont = $LocationGui/PresentedSlavesPanel/ScrollContainer/VBoxContainer
+
+var selected_location
+var use_state
+var sfx_is_dedicated = false
+
+
+var positiondict = {
+	1: "LocationGui/Positions/HBoxContainer/frontrow/1",
+	2: "LocationGui/Positions/HBoxContainer/frontrow/2",
+	3: "LocationGui/Positions/HBoxContainer/frontrow/3",
+	4: "LocationGui/Positions/HBoxContainer/backrow/4",
+	5: "LocationGui/Positions/HBoxContainer/backrow/5",
+	6: "LocationGui/Positions/HBoxContainer/backrow/6",
+}
+
+var animations = ResourceScripts.scriptdict.combat_animation.new()
+var planed_animations = []
+
+
+func _ready():
+	# ResourceScripts.game_world.make_world()
+	set_process_input(false)
+	for i in positiondict:
+		var pos_node = get_node(positiondict[i])
+		pos_node.metadata = i
+		pos_node.target_node = self
+		pos_node.target_function = 'slave_position_selected'
+		pos_node.connect("pressed", self, "process_cast_use", [pos_node])
+
+	$LocationGui.target_node = self
+	$LocationGui.target_function = 'slave_position_deselect'
+	$LocationGui/PresentedSlavesPanel/ScrollContainer.target_node = self
+	$LocationGui/PresentedSlavesPanel/ScrollContainer.target_function = 'slave_position_deselect'
+#	$LocationGui/ItemUsePanel/ItemsButton.connect("pressed", self, "switch_panel", ["items"])
+#	$LocationGui/ItemUsePanel/SpellsButton.connect("pressed", self, "switch_panel", ["spells"])
+	$LocationGui/ItemUsePanel/ItemsButton.pressed = true
+	$LocationGui/Resources/SelectWorkers.connect("pressed", self, "select_workers")
+	$LocationGui/Resources/Forget.connect("pressed", self, "forget_location")
+	return_all_btn.connect("pressed", self, "return_all_to_mansion")
+	$TestButton.connect("pressed", self, "test")
+	$TestButton.visible = gui_controller.mansion.in_test_mode
+	$JournalButton.connect("pressed", self, "open_journal")
+	cast_panel.connect("set_entity_use", self, "start_use_state")
+	use_state_panel.set_explorer(self)
+	
+	gui_controller.win_btn_connections_handler(true, $MansionJournalModule, $JournalButton)
+	gui_controller.windows_opened.clear()
+	globals.connect("hour_tick", self, "build_location_group")
+	globals.connect("update_clock", self, "update_gold")
+	input_handler.connect("EventFinished", self, 'build_location_group')
+	input_handler.connect("EventFinished", self, 'open_location_actions')
+	input_handler.connect("LootGathered", self, 'build_location_group')
+	input_handler.connect("LocationSlavesUpdate", self, 'build_location_group')
+	#input_handler.connect("update_itemlist", $AreaShop, 'update_sell_list')
+	input_handler.connect("clear_cashed", self, 'clear_cashed')
+	# gui_controller.win_btn_connections_handler(true, $AreaShop, closebutton)
+#	$LocationGui/ce.connect("pressed", input_handler, "interactive_message", ['celena_shrine_find', '', {}])
+	input_handler.register_btn_source('location_master', self, 'tut_get_master')
+	input_handler.register_btn_source('location_servent', self, 'tut_get_servent')
+	input_handler.register_btn_source('location_front_pos1', self, 'tut_get_front1', null, null, 'dropped')
+	input_handler.register_btn_source('location_front_pos2', self, 'tut_get_front2', null, null, 'dropped')
+	input_handler.register_btn_source('location_front_pos3', self, 'tut_get_front3', null, null, 'dropped')
+	input_handler.register_btn_source('location_front_highlight', self, null, self, "tut_get_front_highlight")
+	input_handler.register_btn_source('location_back_pos1', self, 'tut_get_back1', null, null, 'dropped')
+	input_handler.register_btn_source('location_back_pos2', self, 'tut_get_back2', null, null, 'dropped')
+	input_handler.register_btn_source('location_back_pos3', self, 'tut_get_back3', null, null, 'dropped')
+	input_handler.register_btn_source('location_back_highlight', self, null, self, "tut_get_back_highlight")
+	input_handler.register_btn_source('location_proceed', self, 'tut_get_first_info_btn')
+	input_handler.register_btn_source('location_master_pos', self, 'tut_get_master_pos')
+	input_handler.register_btn_source('location_servent_pos', self, 'tut_get_servent_pos')
+	input_handler.register_btn_source('location_reju_btn', cast_panel, 'tut_get_reju_btn')
+	$LocationGui/AvailableSlaves.tut_register_first_recruit()
+	$LocationGui/AvailableSlaves.tut_register_first_char()
+	$LocationGui/NavigationModule.tut_register_mansion_btn()
+	
+	add_child(animations)
+	animations.connect("alleffectsfinished", self, 'reset_sfx_dedicated')
+
+func tut_get_master():
+	for btn in present_char_cont.get_children():
+		if btn.get('dragdata') != null and btn.dragdata.is_master():
+			return btn
+func tut_get_servent():
+	for btn in present_char_cont.get_children():
+		if btn.get('dragdata') != null and btn.dragdata.get_stat('slave_class') == 'servant':
+			return btn
+func tut_get_front1():
+	return get_node(positiondict[1])
+func tut_get_front2():
+	return get_node(positiondict[2])
+func tut_get_front3():
+	return get_node(positiondict[3])
+func tut_get_front_highlight():
+	var rect = tut_get_front1().get_global_rect()
+	rect.end = tut_get_front3().get_global_rect().end
+	return rect
+func tut_get_back1():
+	return get_node(positiondict[4])
+func tut_get_back2():
+	return get_node(positiondict[5])
+func tut_get_back3():
+	return get_node(positiondict[6])
+func tut_get_back_highlight():
+	var rect = tut_get_back1().get_global_rect()
+	rect.end = tut_get_back3().get_global_rect().end
+	return rect
+func tut_get_first_info_btn():
+	return $LocationGui/DungeonInfo/ScrollContainer/VBoxContainer.get_children()[0]
+func tut_get_master_pos():
+	for btn_path in positiondict.values():
+		var btn = get_node(btn_path)
+		if btn.character != null and btn.character.is_master():
+			return btn
+func tut_get_servent_pos():
+	for btn_path in positiondict.values():
+		var btn = get_node(btn_path)
+		if btn.character != null and btn.character.get_stat('slave_class') == 'servant':
+			return btn
+
+
+func clear_cashed():
+	active_location = null
+	selected_location = 'aliron'
+
+
+func test():
+	for win in gui_controller.windows_opened:
+		print(win.name)
+
+
+func open_journal():
+	if !$MansionJournalModule.visible:
+		ResourceScripts.core_animations.UnfadeAnimation($MansionJournalModule, 0.5)
+		$MansionJournalModule.visible = true
+		$MansionJournalModule.open()
+	else:
+		ResourceScripts.core_animations.FadeAnimation($MansionJournalModule, 0.5)
+		yield(get_tree().create_timer(0.5), "timeout")
+		$MansionJournalModule.visible = false
+	
+	gui_controller.windows_opened.append($MansionJournalModule) if $MansionJournalModule.visible else gui_controller.windows_opened.erase($MansionJournalModule)
+
+
+func open(location):
+	selected_location = location
+	input_handler.exploration_node = self
+
+
+
+func open_location(data):
+	input_handler.ActivateTutorial("TUTORIALLIST6")
+	input_handler.StopBackgroundSound()
+	#added set_process_input() like in ExplorationDungeon.gd
+	#it seems useless now, but mind, that NavigationModule.gd switches it off,
+	#wich can cause unexpected behavioral
+	set_process_input(true)
+	gui_controller.nav_panel = $LocationGui/NavigationModule
+#	nav = $LocationGui/NavigationModule
+	selected_location = data.id
+	var gatherable_resources
+	$LocationGui/Resources/Forget.visible = false
+	gui_controller.clock.hide()
+	if data.has('gather_resources'):
+		gatherable_resources = data.gather_resources
+		$LocationGui/Resources/SelectWorkers.visible = true
+	if gatherable_resources == null:
+		$LocationGui/Resources/SelectWorkers.visible = false
+	$LocationGui.show()
+	$LocationGui/Resources/Materials.update()
+	active_location = data
+	input_handler.exploration_node = self
+	input_handler.active_area = ResourceScripts.game_world.areas[ResourceScripts.game_world.location_links[data.id].area]
+#	input_handler.active_area = active_area
+	input_handler.active_location = data
+	input_handler.emit_signal("LocationSlavesUpdate")
+#	if input_handler.active_location.has('progress'):
+#		current_level = active_location.progress.level
+#		current_stage = active_location.progress.stage
+	if active_location.has('background'):
+		$LocationGui/Image/TextureRect.texture = images.get_background(active_location.background)
+	if active_location.has('bgm'):
+		input_handler.SetMusic(active_location.bgm, true)
+
+	#check if anyone is present
+	build_location_group()
+	var presented_characters = []
+	for id in ResourceScripts.game_party.character_order:
+		var i = ResourceScripts.game_party.characters[id]
+		if i.check_location(active_location.id, true):
+			presented_characters.append(i)
+	if presented_characters.size() > 0 || variables.allow_remote_intereaction == true:
+		open_location_actions()
+	build_location_description()
+#	if data.type in ["quest_location", "encounter"]:
+	if input_handler.active_area.questlocations.has(selected_location):#or active_area.encounters.has(selected_location):
+		$LocationGui/Resources/Forget.visible = false
+#		$LocationGui/Resources/SelectWorkers.visible = false
+#		$LocationGui/Resources/Label.visible = false
+	else:
+		$LocationGui/Resources/Label.visible = true
+	if data.has("locked"):
+		if data.locked:
+			$LocationGui/Resources/Forget.visible = false
+			$LocationGui/Resources/SelectWorkers.visible = false
+			$LocationGui/Resources/Label.visible = true
+	gui_controller.nav_panel.build_accessible_locations()
+	#input_handler.interactive_message("spring", '',{})
+
+
+func build_location_description():
+#	var active_location = active_location
+	var text = ''
+	match active_location.type:
+		'settlement':
+			text = tr(active_location.classname) + ": " + tr(active_location.name)
+		'skirmish':
+			pass
+		'quest_location':
+			text = tr(active_location.name) #+ "\n" + active_location.descript
+	$LocationGui/DungeonInfo/RichTextLabel.bbcode_text = (
+		'[center]'
+		+ globals.TextEncoder(text)
+		+ "[/center]"
+	)
+
+
+func slave_position_selected(pos, character):
+	var str_pos = 'pos' + str(pos)
+	if character == null:
+		active_location.group.erase(str_pos)
+		build_location_group()
+		return
+	if character.has_status('no_combat'):
+		input_handler.SystemMessage(character.translate(tr("CHAR_NO_COMBAT")))
+		return
+	elif !character.is_combatant():
+		input_handler.SystemMessage(character.get_noncombatant_report())
+		return
+	var ch_id = character.id
+	if active_location.group.has(str_pos):
+		var oldchar =  ResourceScripts.game_party.characters[active_location.group[str_pos]]
+		if oldchar.check_location(active_location.id, true): #should always be
+			if character.combat_position != pos:
+				oldchar.combat_position = character.combat_position
+			else:
+				oldchar.combat_position = 0
+	character.combat_position = pos
+	build_location_group()
+
+
+func slave_position_deselect(character):
+	for i in active_location.group:
+		if active_location.group[i] == character.id:
+			active_location.group.erase(i)
+			character.combat_position = 0
+			break
+	build_location_group()
+
+
+func use_item_on_character(character, item):
+	item.use_explore(character, self)  #item.use_explore(state.characters[active_location.group['pos'+str(position)]])
+	item.amount -= 1
+	#show_heal_items(position)
+	call_deferred('build_location_group')
+
+
+func use_e_combat_skill(caster, target, skill, silent = false):
+	caster.pay_cost(skill.cost)
+	caster.combatgroup = 'ally'
+	if !caster.has_status('ignore_catalysts_for_%s' % skill.code):
+		for i in skill.catalysts:
+			ResourceScripts.game_res.materials[i] -= skill.catalysts[i]
+	if skill.charges > 0:
+		if caster.skills.combat_skill_charges.has(skill.code):
+			caster.skills.combat_skill_charges[skill.code] += 1
+		else:
+			caster.skills.combat_skill_charges[skill.code] = 1
+		caster.skills.daily_cooldowns[skill.code] = skill.cooldown
+	var s_skill1 = ResourceScripts.scriptdict.class_sskill.new()
+	s_skill1.createfromskill(skill)
+	s_skill1.setup_caster(caster)
+	#s_skill1.setup_target(target)
+	s_skill1.process_event(variables.TR_CAST, {skill = s_skill1, caster = caster, target = target})
+	caster.process_event(variables.TR_CAST, {skill = s_skill1, caster = caster, target = target})
+	var targets
+	for n in range(s_skill1.repeat):
+		match skill.target_number:
+			'single':
+				targets = [target]
+			'all':
+				targets = input_handler.get_active_party()
+			'line':
+				targets = []
+				var tpos = target.combat_position
+				for line in variables.lines.values():
+					if !line.has(tpos): continue
+					for pos in line:
+						if active_location.group.has('pos' + str(pos)):
+							targets.push_back(ResourceScripts.game_party.characters[active_location.group[('pos' + str(pos))]])
+					break
+			'row':
+				targets = []
+				var tpos = target.combat_position
+				for line in variables.rows.values():
+					if !line.has(tpos): continue
+					for pos in line:
+						if active_location.group.has('pos' + str(pos)):
+							targets.push_back(ResourceScripts.game_party.characters[active_location.group[('pos' + str(pos))]])
+					break
+		var s_skill2_list = []
+		for i in targets:
+			if skill.has('damage_type') and skill.damage_type == 'resurrect':
+				i.resurrect(
+					input_handler.calculate_number_from_string_array(skill.value[0], caster, target)
+				)
+			else:
+				target.combatgroup = 'ally'
+				var s_skill2 = s_skill1.clone()
+				s_skill2.setup_target(i)
+				s_skill2.setup_final()
+				s_skill2.hit_roll()
+				s_skill2.resolve_value(true)
+				s_skill2_list.push_back(s_skill2)
+		for s_skill2 in s_skill2_list:
+			s_skill2.process_event(variables.TR_HIT, {skill = s_skill2, caster = caster, target = target})
+			s_skill2.caster.process_event(variables.TR_HIT, {skill = s_skill2, caster = caster, target = target})
+			s_skill2.target.process_event(variables.TR_DEF, {skill = s_skill2, caster = caster, target = target})
+			s_skill2.setup_effects_final()
+		for s_skill2 in s_skill2_list:
+			if s_skill2.hit_res == variables.RES_MISS:
+				pass
+			else:
+				execute_skill(s_skill2)
+		for s_skill2 in s_skill2_list:
+			s_skill2.process_event(variables.TR_EXPLORE_POSTDAMAGE, {skill = s_skill2, caster = caster, target = target})
+			s_skill2.caster.process_event(variables.TR_EXPLORE_POSTDAMAGE, {skill = s_skill2, caster = caster, target = target})
+			if s_skill2.target.hp <= 0:
+				s_skill2.process_event(variables.TR_KILL, {skill = s_skill2, caster = caster, target = target})
+				s_skill2.caster.process_event(variables.TR_KILL, {skill = s_skill2, caster = caster, target = target})
+			s_skill2.remove_effects()
+	s_skill1.process_event(variables.TR_SKILL_FINISH)
+	caster.process_event(variables.TR_SKILL_FINISH, {skill = s_skill1, caster = caster, target = target})
+	s_skill1.remove_effects()
+	if !silent:
+		for i in skill.sounddata.values():
+			if i != null:
+				input_handler.PlaySound(i)
+	if skill.has('follow_up'):
+		active_skill = skill.followup
+		use_e_combat_skill(caster, target, skill)
+	build_location_group()
+
+
+func execute_skill(s_skill2):  #to update to exploration version
+	var text = ''
+	if s_skill2.hit_res == variables.RES_CRIT:
+		text += tr("LOG_COMBAT_CRITICAL")
+		#s_skill2.target.displaynode.process_critical()
+	for i in s_skill2.value:
+		if !i.check_conditions(): continue
+		if i.damagestat == 'no_stat':
+			continue  #for skill values that directly process into effects
+		if i.damagestat == 'damage_hp' and i.dmgf == 0:  #drain, damage, damage no log, drain no log
+			if i.is_drain > 0.0 && s_skill2.tags.has('no_log'):
+				var rval = s_skill2.target.deal_damage(i.value, i.damage_type)
+				var rval2 = s_skill2.caster.heal(rval * i.is_drain)
+			elif i.is_drain > 0.0:
+				var rval = s_skill2.target.deal_damage(i.value, i.damage_type)
+				var rval2 = s_skill2.caster.heal(rval * i.is_drain)
+				text += tr("LOG_COMBAT_DRAIN_HEALTH") % [
+					s_skill2.caster.get_short_name(),
+					rval,
+					s_skill2.target.get_short_name(),
+					rval2
+				]
+			elif s_skill2.tags.has('no_log') &&  i.is_drain <= 0.0:
+				var rval = s_skill2.target.deal_damage(i.value, i.damage_type)
+			else:
+				var rval = s_skill2.target.deal_damage(i.value, i.damage_type)
+				text += tr("LOG_COMBAT_HIT_DAMAGE_SIMPLE") % [s_skill2.target.get_short_name(), rval]  #, s_skill2.value[i]]
+		elif i.damagestat == 'damage_hp' and i.dmgf == 1:  #heal, heal no log
+			if s_skill2.tags.has('no_log'):
+				var rval = s_skill2.target.heal(i.value)
+			else:
+				var rval = s_skill2.target.heal(i.value)
+				text += tr("LOG_COMBAT_HEAL_HEALTH") % [s_skill2.target.get_short_name(), rval]
+		elif i.damagestat == 'restore_mana' and i.dmgf == 0:  #heal, heal no log
+			if ! s_skill2.tags.has('no log'):
+				var rval = s_skill2.target.mana_update(i.value)
+				text += tr("LOG_COMBAT_RESTORE_MANA") % [s_skill2.target.get_short_name(), rval]
+			else:
+				s_skill2.target.mana_update(i.value)
+		elif i.damagestat == 'restore_mana' and i.dmgf == 1:  #drain, damage, damage no log, drain no log
+			var rval = s_skill2.target.mana_update(-i.value)
+			if i.is_drain > 0.0:
+				var rval2 = s_skill2.caster.mana_update(rval * i.is_drain)
+				if ! s_skill2.tags.has('no log'):
+					text += tr("LOG_COMBAT_DRAIN_MANA") % [s_skill2.caster.get_short_name(), rval, s_skill2.target.name, rval2]
+			if ! s_skill2.tags.has('no log'):
+				text += tr("LOG_COMBAT_LOSE_MANA") % [s_skill2.target.get_short_name(), rval]
+		else:
+			var mod = i.dmgf
+			var stat = i.damagestat
+			if mod == 0:
+				var rval = s_skill2.target.stat_update(stat, i.value)
+				if ! s_skill2.tags.has('no log'):
+					text += tr("LOG_COMBAT_RESTORE_STAT") % [s_skill2.target.get_short_name(), rval, tr(stat)]
+			elif mod == 1:
+				var rval = s_skill2.target.stat_update(stat, -i.value)
+				if i.is_drain > 0.0:
+					var rval2 = s_skill2.caster.stat_update(stat, -rval * i.is_drain)
+					if ! s_skill2.tags.has('no log'):
+						text += tr("LOG_COMBAT_DRAIN_STAT") % [
+							s_skill2.caster.get_short_name(),
+							i.value,
+							tr(stat),
+							s_skill2.target.get_short_name()
+						]
+				elif ! s_skill2.tags.has('no log'):
+					text += tr("LOG_COMBAT_LOSE_STAT") % [s_skill2.target.get_short_name(), -rval, tr(stat)]
+			elif mod == 2:
+				var rval = s_skill2.target.stat_update(stat, i.value, true)
+				if i.is_drain > 0.0:  # use this on your own risk
+					var rval2 = s_skill2.caster.stat_update(stat, -rval * i.is_drain)
+					if ! s_skill2.tags.has('no log'):
+						text += tr("LOG_COMBAT_DRAIN_STAT") % [
+							s_skill2.caster.get_short_name(),
+							i.value,
+							tr(stat),
+							s_skill2.target.get_short_name()
+						]
+				elif ! s_skill2.tags.has('no log'):
+					text += tr("LOG_COMBAT_SET_STAT") % [s_skill2.target.get_short_name(), tr(stat), i.value]
+			else:
+				print('error in damagestat %s' % i.damagestat)  #obsolete in new format
+
+
+func StartCombat():
+	input_handler.play_animation("fight")
+	yield(get_tree().create_timer(1), "timeout")
+	ResourceScripts.core_animations.BlackScreenTransition(0.5)
+	yield(get_tree().create_timer(0.5), "timeout")
+#	globals.current_level = current_level
+#	globals.current_stage = current_stage
+	globals.StartCombat()
+
+
+var action_type
+var active_skill
+
+
+func forget_location():
+	input_handler.get_spec_node(
+		input_handler.NODE_YESNOPANEL,
+		[
+			self,
+			'clear_dungeon_confirm',
+			tr("FORGETLOCATIONQUESTION")
+		]
+	)
+
+
+func clear_dungeon_confirm():
+	globals.remove_location(active_location.id)
+	action_type = 'location_finish'
+
+
+func build_location_group():
+	if globals.gameover_process:
+		return
+	#clear_groups()
+	if active_location == null || !active_location.has("group"):
+		return
+	active_location.group.clear()
+	for ch in ResourceScripts.game_party.characters.values():
+		if !ch.is_combatant():
+			continue
+		if ch.check_location(active_location.id, true) and ch.combat_position != 0 and !ch.has_status('no_combat') and ch.is_combatant():
+			if !active_location.group.has(['pos' + str(ch.combat_position)]):
+				active_location.group['pos' + str(ch.combat_position)] = ch.id
+	for i in positiondict:
+#		if (active_location.group.has('pos' + str(i)) && ((ResourceScripts.game_party.characters.has(active_location.group['pos' + str(i)]) == false) || ResourceScripts.game_party.characters[active_location.group['pos' + str(i)]].has_status('no_combat'))):
+#			active_location.group.erase('pos' + str(i))
+		if !active_location.group.has('pos' + str(i)):
+			get_node(positiondict[i] + "/Image").dragdata = null
+			get_node(positiondict[i] + "/Image").texture = null
+			get_node(positiondict[i] + "/Image").hide()
+			get_node(positiondict[i]).self_modulate.a = 1
+			get_node(positiondict[i]).character = null
+			continue
+#		if (active_location.group.has('pos' + str(i)) && ResourceScripts.game_party.characters[active_location.group['pos' + str(i)]] != null && ResourceScripts.game_party.characters[active_location.group['pos' + str(i)]].check_location(active_location.id, true)):
+		else:
+			var character = ResourceScripts.game_party.characters[active_location.group[('pos' + str(i))]]
+			get_node(positiondict[i] + "/Image").texture = character.get_icon()
+#			if get_node(positiondict[i] + "/Image").texture == null:
+#				if character.has_profession('master'):
+#					get_node(positiondict[i] + "/Image").texture = images.icons.class_master
+#				elif character.get_stat('slave_class') == 'servant':
+#					get_node(positiondict[i] + "/Image").texture = images.icons.class_servant
+#				else:
+#					get_node(positiondict[i] + "/Image").texture = images.icons.class_slave
+#			get_node(positiondict[i] + "/Image").texture = character.get_class_icon()
+			get_node(positiondict[i] + "/Image").show()
+			get_node(positiondict[i] + "/Image/caster").visible = cast_panel.can_cast(character.id)
+			get_node(positiondict[i] + "/Image/TextureRect").hint_tooltip = (
+				tr("STATHP") + ": "
+				+ str(floor(character.hp))
+				+ '/'
+				+ str(floor(character.get_stat('hpmax')))
+				+ "\n" + tr("STATMP") + ": "
+				+ str(floor(character.mp))
+				+ '/'
+				+ str(floor(character.get_stat('mpmax')))
+			)
+			get_node(positiondict[i] + "/Image/TextureRect/hp").max_value = character.get_stat(
+				'hpmax'
+			)
+			get_node(positiondict[i] + "/Image/TextureRect/hp").value = character.hp
+			get_node(positiondict[i] + "/Image/TextureRect/hp/Labelhp").text = (
+				str(round(character.hp))
+				+ "/"
+				+ str(round(character.get_stat('hpmax')))
+			)
+			get_node(positiondict[i] + "/Image/TextureRect/mp").max_value = character.get_stat(
+				'mpmax'
+			)
+			get_node(positiondict[i] + "/Image/TextureRect/mp").value = character.mp
+			get_node(positiondict[i] + "/Image/TextureRect/mp/Labelmp").text = (
+				str(round(character.mp))
+				+ "/"
+				+ str(round(character.get_stat('mpmax')))
+			)
+			get_node(positiondict[i] + "/Image").dragdata = character
+			get_node(positiondict[i] + "/Image/Label").text = character.get_short_name()
+			# get_node(positiondict[i]).self_modulate.a = 0
+			get_node(positiondict[i]).character = character
+#		else:
+#			get_node(positiondict[i] + "/Image").dragdata = null
+#			get_node(positiondict[i] + "/Image").texture = null
+#			get_node(positiondict[i] + "/Image").hide()
+#			get_node(positiondict[i]).self_modulate.a = 1
+#			get_node(positiondict[i]).character = null
+
+	var newbutton
+	var counter = 0
+	input_handler.ClearContainer(present_char_cont)
+	var char_array = input_handler.get_location_characters_by_id(active_location.id)
+	for i in char_array:
+		counter += 1
+		newbutton = input_handler.DuplicateContainerTemplate(present_char_cont)
+		newbutton.dragdata = i
+		newbutton.get_node("icon").texture = i.get_icon_small()
+		if newbutton.get_node('icon').texture == null:
+			if i.has_profession('master'):
+				newbutton.get_node('icon').texture = images.get_icon('class_master')
+			elif i.get_stat('slave_class') == 'servant':
+				newbutton.get_node('icon').texture = images.get_icon('class_servant')
+			else:
+				newbutton.get_node('icon').texture = images.get_icon('class_slave')
+		newbutton.get_node("Label").text = i.get_short_name()
+#		newbutton.connect("pressed", self, "return_character", [i])
+		newbutton.get_node("caster").visible = cast_panel.can_cast(i.id)
+		if is_in_use_state():
+			newbutton.get_node("mark").show()
+		#return_all_btn is always visible here, but I'm still using this for unification reasons
+		newbutton.connect("pressed", self, "process_cast_use", [newbutton, return_all_btn.visible, true])
+		if active_location.group.values().has(i.id):
+			newbutton.get_node("icon").modulate = Color(0.3, 0.3, 0.3)
+		globals.connectslavetooltip(newbutton, i)
+		for anim_num in range(planed_animations.size()-1, -1, -1):
+			var animation = planed_animations[anim_num]
+			if animation.person_id == i.id:
+				animate(newbutton, animation.skill)
+				planed_animations.remove(anim_num)
+	if (counter == 0
+		&& input_handler.active_location.id == active_location.id
+		&& is_visible()):#$LocationGui.is_visible()
+		nav.return_to_mansion()
+		return
+	build_item_panel()
+#	build_spell_panel()
+
+
+func add_rolled_chars(tarr):
+	if active_location != null:
+		if !active_location.has('captured_characters'):
+			active_location.captured_characters = []
+	else:
+		return
+	for id in tarr:
+		active_location.captured_characters.push_back(id)
+	input_handler.emit_signal("LocationSlavesUpdate")
+
+
+var selectedperson
+func return_character(character):
+	selectedperson = character
+	var teleport_base = $teleport_base
+	teleport_base.set_loc_id(active_location.id)
+	teleport_base.set_confirm_func(self, "return_character_confirm")
+	input_handler.get_spec_node(input_handler.NODE_YESNOPANEL, [teleport_base, 'teleport_check', character.translate(tr("SENDCHARBACKQUESTION"))])
+
+func return_character_confirm(by_teleport = false):
+	selectedperson.return_to_mansion(by_teleport)
+	build_location_group()
+
+func return_all_to_mansion():
+	var teleport_base = $teleport_base
+	teleport_base.set_loc_id(active_location.id)
+	teleport_base.set_confirm_func(self, "return_all_to_mansion_confirm")
+	input_handler.get_spec_node(input_handler.NODE_YESNOPANEL, [teleport_base, 'teleport_check', tr("RETURN_ALL_MANSION_QUESTION")])
+
+
+func return_all_to_mansion_confirm(by_teleport = false):
+	var presented_characters = []
+	for id in ResourceScripts.game_party.character_order:
+		var i = ResourceScripts.game_party.characters[id]
+		if i.check_location(active_location.id, true):
+			presented_characters.append(i)
+	for person in presented_characters:
+		person.return_to_mansion(by_teleport)
+	nav.return_to_mansion("default")
+
+
+
+func build_item_panel():
+	input_handler.ClearContainer($LocationGui/ItemUsePanel/ScrollContainer/VBoxContainer)
+#	var tutorial_items = false
+	for i in ResourceScripts.game_res.items.values():
+		if Items.itemlist[i.itembase].has('explor_effect') == false:
+			continue
+		var newnode = input_handler.DuplicateContainerTemplate(
+			$LocationGui/ItemUsePanel/ScrollContainer/VBoxContainer
+		)
+		i.set_icon(newnode.get_node("Icon"))
+		#newnode.get_node("Label").text = i.name
+		newnode.get_node("amount").text = str(i.amount)
+		newnode.get_node("Name").text = tr("ITEM" + str(i.code).to_upper())
+		newnode.connect("pressed", self, "start_use_state", [cast_panel.ENTITY_ITEM, null, null, i])
+		globals.connectitemtooltip_v2(newnode, i)
+#		tutorial_items = true
+	# if tutorial_items == true:
+	# 	if !ResourceScripts.game_progress.active_tutorials.has("exploration_items"):
+	# 		input_handler.ActivateTutorial("exploration_items")
+#	switch_panel(panelmode)
+
+
+#var panelmode = 'items'
+#
+#
+#func switch_panel(mode):
+#	panelmode = mode
+#	match mode:
+#		'items':
+#			$LocationGui/ItemUsePanel/ScrollContainer.show()
+#			$LocationGui/ItemUsePanel/SpellContainer.hide()
+#			$LocationGui/ItemUsePanel/SpellsButton.pressed = false
+#			$LocationGui/ItemUsePanel/ItemsButton.pressed = true
+#		'spells':
+#			$LocationGui/ItemUsePanel/ScrollContainer.hide()
+#			$LocationGui/ItemUsePanel/SpellContainer.show()
+#			$LocationGui/ItemUsePanel/SpellsButton.pressed = true
+#			$LocationGui/ItemUsePanel/ItemsButton.pressed = false
+#
+#
+#func build_spell_panel():
+#	input_handler.ClearContainer($LocationGui/ItemUsePanel/SpellContainer/VBoxContainer)
+#	for id in ResourceScripts.game_party.character_order:
+#		var person = ResourceScripts.game_party.characters[id]
+#		if person.check_location(active_location.id, true):
+#			for i in person.get_combat_skills() + person.get_explore_skills():
+#				if i == "teleport":#hardcoded separately
+#					continue
+#				var skill = Skilldata.get_template(i, person)
+#				if skill.tags.has('exploration') == false:
+#					continue
+#				var newnode = input_handler.DuplicateContainerTemplate(
+#					$LocationGui/ItemUsePanel/SpellContainer/VBoxContainer
+#				)
+#				newnode.get_node('Icon').texture = skill.icon
+#				if skill.tags.has('aura_active'):
+#					newnode.get_node("Icon").material = load("res://assets/book_shader.tres")
+#				newnode.get_node("name").text = skill.name
+#				newnode.get_node("castername").text = person.get_short_name()
+#				var text = skill.descript
+#				var disabled = false
+#				for st in skill.cost:
+#					text += (
+#						"\n\n"
+#						+ statdata.statdata[st].name
+#						+ " cost: "
+#						+ str(skill.cost[st])
+#						+ " ("
+#						+ str(floor(person.get_stat(st)))
+#						+ ")"
+#					)
+#				if !skill.catalysts.empty() and !person.has_status('ignore_catalysts_for_%s' % i):
+#					text += '\n\nRequired Catalysts: '
+#					for k in skill.catalysts:
+#						text += (
+#							"\n"
+#							+ Items.materiallist[k].name
+#							+ ": "
+#							+ str(skill.catalysts[k])
+#							+ " ("
+#							+ str(ResourceScripts.game_res.materials[k])
+#							+ ")"
+#						)
+#						if ResourceScripts.game_res.materials[k] < skill.catalysts[k]:
+#							disabled = true
+#				globals.connecttexttooltip(newnode, text)
+#				if skill.target == 'self':
+#					newnode.set_script(null)
+#					newnode.connect('pressed', self, 'use_e_combat_skill', [person, person, skill])
+#				else:
+#					newnode.dragdata = {skill = skill, caster = person}
+#				if !person.check_cost(skill.cost):
+#					disabled = true
+#				if person.has_status('no_obed_gain'):
+#					disabled = true
+#				if skill.charges > 0:
+#					var leftcharges = skill.charges
+#					if person.skills.combat_skill_charges.has(skill.code):
+#						leftcharges -= person.skills.combat_skill_charges[skill.code]
+##						newbutton.get_node("charge").visible = true
+##						newbutton.get_node("charge").text = str(leftcharges)+"/"+str(skill.charges)
+#					if leftcharges <= 0:
+#						disabled = true
+#				if disabled == true:
+#					newnode.get_node("name").set("custom_colors/font_color", Color(1, 0.5, 0.5))
+#					newnode.script = null
+
+
+func open_location_actions():
+	if globals.gameover_process:
+		return
+	if active_location == null:
+		return
+	input_handler.ClearContainer($LocationGui/DungeonInfo/ScrollContainer/VBoxContainer)
+	var newbutton
+	var option_list = []
+	if active_location.has("locked"):
+		if active_location.locked:
+			# do options
+			if worlddata.fixed_location_options.has(active_location.code):
+				option_list = worlddata.fixed_location_options[active_location.code]
+			elif active_location.has("options"):
+				option_list = active_location.options
+			for i in option_list:
+				if globals.checkreqs(i.reqs) == true:
+					newbutton = input_handler.DuplicateContainerTemplate(
+						$LocationGui/DungeonInfo/ScrollContainer/VBoxContainer
+					)
+					newbutton.toggle_mode = false
+					newbutton.text = tr(i.text)
+					newbutton.connect("pressed", globals, 'common_effects', [i.args])
+			return
+	match active_location.type:
+		'settlement':
+			for i in active_location.actions:
+				newbutton = input_handler.DuplicateContainerTemplate(
+					$LocationGui/DungeonInfo/ScrollContainer/VBoxContainer
+				)
+				newbutton.toggle_mode = true
+				newbutton.text = tr(i.to_upper())
+				newbutton.connect("toggled", self, i, [newbutton])
+	
+	if worlddata.fixed_location_options.has(active_location.code):
+		option_list = worlddata.fixed_location_options[active_location.code]
+	elif active_location.has("options"):
+		option_list = active_location.options
+	for i in option_list:
+		if globals.checkreqs(i.reqs) == true:
+			newbutton = input_handler.DuplicateContainerTemplate(
+				$LocationGui/DungeonInfo/ScrollContainer/VBoxContainer
+			)
+			newbutton.toggle_mode = false
+			newbutton.text = tr(i.text)
+			newbutton.connect("pressed", globals, 'common_effects', [i.args])
+
+
+func check_events(action):
+	return globals.check_events(action)
+
+
+func open_shop(pressed, pressed_button, shop):
+	var shop_data = {}
+	match shop:
+		'area':
+			if input_handler.active_area and input_handler.active_area.has('shop'):
+				shop_data = input_handler.active_area.shop
+		'location':
+			if pressed and active_location and active_location.has('shop'):
+				shop_data = active_location.shop
+		_:
+			shop_data = shop
+	$AreaShop.open_shop(pressed, pressed_button, shop_data)
+
+
+func local_shop(pressed, button):
+	if active_location and active_location.has('shop'):
+		$AreaShop.open_shop(pressed, button, active_location.shop)
+
+func update_gold():
+	$AreaShop.update_gold()
+
+var current_pressed_area_btn setget set_area_btn_pressed
+
+
+func set_area_btn_pressed(value):
+	if !is_instance_valid(current_pressed_area_btn):
+		current_pressed_area_btn = value
+		return
+	if value != current_pressed_area_btn:
+		current_pressed_area_btn.pressed = false
+		current_pressed_area_btn = value
+
+
+func select_workers():
+	var MANSION = gui_controller.mansion
+	MANSION.SlaveListModule.selected_location = selected_location
+	MANSION.SlaveListModule.show_location_characters()
+	nav.return_to_mansion()
+	yield(get_tree().create_timer(0.6), 'timeout')
+	MANSION.get_node("MansionJobModule2").selected_location = selected_location
+	MANSION.SlaveListModule.OpenJobModule()
+
+func reset_active_location(arg = null):
+	if input_handler.active_location.id != selected_location:
+		input_handler.active_location = ResourceScripts.world_gen.get_location_from_code(selected_location)
+
+
+func process_cast_use(port_node, with_return = false, bottom = false):
+	if !is_in_use_state():#open_cast_panel
+		var person = port_node.get("dragdata")
+		if !person:
+			person = port_node.get("character")
+		if !person: return
+		
+		if !cast_panel.can_cast(person.id):
+			if with_return:
+				return_character(person)
+			return
+		
+		cast_panel.build_for_person(person.id, port_node, with_return)
+		if !bottom:
+			cast_panel.rect_global_position = Vector2(
+				port_node.get_global_rect().end.x,
+				port_node.rect_global_position.y)
+		else:
+			cast_panel.rect_global_position = Vector2(
+				port_node.rect_global_position.x,
+				port_node.get_global_rect().end.y)
+		cast_panel.show()
+		
+	else:
+		var person = port_node.get("dragdata")
+		var delayed_animation = true
+		if !person:
+			person = port_node.get("character")
+			delayed_animation = false
+		if !person:
+			return
+		
+		use_state_panel.last_input_is_handled()
+		if is_in_dedicated_animation():
+			return
+#		if !use_state.multiuse:
+#			use_state_panel.hide()
+		var multiuse = false
+		if use_state.type == cast_panel.ENTITY_SKILL:
+			if use_state.dedicated_sfx:
+				animate(port_node, use_state.entity, true)
+				yield(animations, 'alleffectsfinished')
+			elif delayed_animation:
+				plan_animation(person.id, use_state.entity)
+			else:
+				animate(port_node, use_state.entity)
+			use_e_combat_skill(use_state.caster, person, use_state.entity, true)
+			multiuse = (use_state.multiuse
+				and !cast_panel.is_skill_disabled(use_state.caster, use_state.entity))
+		else:# use_state.type == cast_panel.ENTITY_ITEM: (ENTITY_RETURN can't come here)
+			var anim_entity = {sfx = [{code = 'heal', duration = 1.0}]}
+			if delayed_animation:
+				plan_animation(person.id, anim_entity)
+			else:
+				animate(port_node, anim_entity)
+			use_item_on_character(person, use_state.entity)
+			multiuse = use_state.multiuse and use_state.entity.amount > 0
+		if !multiuse:
+			try_stop_use_state()
+
+func start_use_state(type, caster, caster_node, entity):
+	if is_in_dedicated_animation():
+		return
+	var use_state_panel_icon = use_state_panel.get_node("Button/Icon")
+	var use_state_panel_name = use_state_panel.get_node("Button/name")
+	var multiuse = false
+	var dedicated_sfx = false
+	if type == cast_panel.ENTITY_RETURN:
+		return_character(caster)
+		return
+	elif type == cast_panel.ENTITY_ITEM:
+		entity.set_icon(use_state_panel_icon)
+		use_state_panel_name.text = tr("ITEM" + str(entity.code).to_upper())
+		multiuse = true
+	else:# type == cast_panel.ENTITY_SKILL:
+		dedicated_sfx = entity.tags.has('dedicated_sfx')
+		if entity.target == 'self':
+			if dedicated_sfx:
+				animate(caster_node, entity, true)
+				yield(animations, 'alleffectsfinished')
+			elif caster_node.get("dragdata"):
+				plan_animation(caster.id, entity)
+			else:
+				animate(caster_node, entity)
+			use_e_combat_skill(caster, caster, entity, true)
+			return
+		use_state_panel_icon.texture = entity.icon
+		use_state_panel_name.text = entity.name
+		multiuse = entity.tags.has('multiuse')
+	
+	use_state = {
+		type = type,
+		caster = caster,
+		entity = entity,
+		multiuse = multiuse,
+		dedicated_sfx = dedicated_sfx
+	}
+	use_state_panel.show()
+	highlight_spelltar_chars()
+
+func try_stop_use_state():
+	if !is_in_use_state(): return
+	unhighlight_spelltar_chars()
+	use_state = null
+	use_state_panel.hide()
+
+func is_in_use_state():
+	return (use_state != null)
+
+func highlight_spelltar_chars(char_id = null):
+	highlight_spelltar_chars_true(true, char_id)
+func unhighlight_spelltar_chars():
+	highlight_spelltar_chars_true(false)
+
+func highlight_spelltar_chars_true(value, char_id = null):
+	for i in positiondict:
+		var node = get_node(positiondict[i])
+		if !value or char_id == null or (node.character != null and node.character.id == char_id):
+			if !value or node.character != null:
+				node.get_node("mark").visible = value
+	for node in present_char_cont.get_children():
+		if !node.visible or !is_instance_valid(node):
+			continue
+		if !value or char_id == null or (node.dragdata != null and node.dragdata.id == char_id):
+			node.get_node("mark").visible = value
+
+func animate(target_node, skill, dedicated_sfx = false):
+	sfx_is_dedicated = sfx_is_dedicated or dedicated_sfx
+	for sfx_dict in skill.sfx:
+		#ignore sfx_dict.period for now
+		if sfx_dict.has("target") and sfx_dict.target == "full_screen":
+			target_node = globals.make_full_screen_sfx_node()
+		animations.add_new_data({
+			node = target_node,
+			time = 0,
+			type = sfx_dict.code,
+			slot = 'SFX',
+			params = globals.make_sfx_params(sfx_dict)})
+	animations.check_start()
+	if skill.has('sounddata'):
+		for i in skill.sounddata.values():
+			if i != null:
+				input_handler.PlaySound(i)
+
+func is_in_dedicated_animation():
+	return (sfx_is_dedicated
+		and (animations.is_busy or !planed_animations.empty()))
+
+#plan_animation can't be dedicated_sfx, as such sfx playes befor screen updates
+func plan_animation(person_id, skill):
+	planed_animations.append({person_id = person_id, skill = skill})
+
+func reset_sfx_dedicated():
+	sfx_is_dedicated = false
