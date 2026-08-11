@@ -14,11 +14,11 @@ dest_files=[ "res://.import/dwarf_gates.png-2d6d189c124425a07b6d35c7a5c5ca33.ste
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/lossy_quality=0.7
 compress/hdr_mode=0
 compress/bptc_ldr=0
-compress/normal_map=0
+compress/normal_map=2
 flags/repeat=0
 flags/filter=true
 flags/mipmaps=false

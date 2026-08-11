@@ -14,11 +14,11 @@ dest_files=[ "res://.import/kuro_5.png-0d3eb038c91dba9134db7758f98a74fb.stex" ]
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/lossy_quality=0.7
 compress/hdr_mode=0
 compress/bptc_ldr=0
-compress/normal_map=0
+compress/normal_map=2
 flags/repeat=0
 flags/filter=true
 flags/mipmaps=false

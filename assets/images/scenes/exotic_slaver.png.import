@@ -14,11 +14,11 @@ dest_files=[ "res://.import/exotic_slaver.png-b048cb5e7af8ed44ba577592b5d77e79.s
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/lossy_quality=0.7
 compress/hdr_mode=0
 compress/bptc_ldr=0
-compress/normal_map=0
+compress/normal_map=2
 flags/repeat=0
 flags/filter=true
 flags/mipmaps=false

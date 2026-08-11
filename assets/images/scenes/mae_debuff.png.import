@@ -14,11 +14,11 @@ dest_files=[ "res://.import/mae_debuff.png-b32829b36774060f764a9ab3d1176fc6.stex
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/lossy_quality=0.7
 compress/hdr_mode=0
 compress/bptc_ldr=0
-compress/normal_map=0
+compress/normal_map=2
 flags/repeat=0
 flags/filter=true
 flags/mipmaps=false

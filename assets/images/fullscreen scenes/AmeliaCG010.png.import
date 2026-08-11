@@ -14,11 +14,11 @@ dest_files=[ "res://.import/AmeliaCG010.png-97a0334e3c75b2070f73cb00ed1c97c5.ste
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/lossy_quality=0.7
 compress/hdr_mode=0
 compress/bptc_ldr=0
-compress/normal_map=0
+compress/normal_map=2
 flags/repeat=0
 flags/filter=true
 flags/mipmaps=false

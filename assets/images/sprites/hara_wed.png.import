@@ -14,11 +14,11 @@ dest_files=[ "res://.import/hara_wed.png-931e6237a76208e8f12d542dd2d4557c.stex" 
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/lossy_quality=0.7
 compress/hdr_mode=0
 compress/bptc_ldr=0
-compress/normal_map=0
+compress/normal_map=2
 flags/repeat=0
 flags/filter=true
 flags/mipmaps=false

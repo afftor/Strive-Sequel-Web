@@ -14,11 +14,11 @@ dest_files=[ "res://.import/lilith_angry.png-22db1c33f0075d2a7e1b71cd0a53ce1a.st
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/lossy_quality=0.7
 compress/hdr_mode=0
 compress/bptc_ldr=0
-compress/normal_map=0
+compress/normal_map=2
 flags/repeat=0
 flags/filter=true
 flags/mipmaps=false

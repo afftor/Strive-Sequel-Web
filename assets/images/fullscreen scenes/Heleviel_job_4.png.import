@@ -14,11 +14,11 @@ dest_files=[ "res://.import/Heleviel_job_4.png-e5e5841b4f100fb3049c6638ee7619dd.
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/lossy_quality=0.7
 compress/hdr_mode=0
 compress/bptc_ldr=0
-compress/normal_map=0
+compress/normal_map=2
 flags/repeat=0
 flags/filter=true
 flags/mipmaps=false

@@ -14,11 +14,11 @@ dest_files=[ "res://.import/temple_source.png-3fb6f347085a6e37b15b107d84bc0609.s
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/lossy_quality=0.7
 compress/hdr_mode=0
 compress/bptc_ldr=0
-compress/normal_map=0
+compress/normal_map=2
 flags/repeat=0
 flags/filter=true
 flags/mipmaps=false

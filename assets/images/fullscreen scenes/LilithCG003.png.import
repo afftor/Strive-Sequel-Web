@@ -14,11 +14,11 @@ dest_files=[ "res://.import/LilithCG003.png-3c4ed5d419c3fa356f5d728c2d4ef556.ste
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/lossy_quality=0.7
 compress/hdr_mode=0
 compress/bptc_ldr=0
-compress/normal_map=0
+compress/normal_map=2
 flags/repeat=0
 flags/filter=true
 flags/mipmaps=false

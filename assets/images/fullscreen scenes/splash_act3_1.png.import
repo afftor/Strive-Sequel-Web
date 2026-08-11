@@ -14,11 +14,11 @@ dest_files=[ "res://.import/splash_act3_1.png-49c0e8809292bc6d1afa611d5efb9e4d.s
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/lossy_quality=0.7
 compress/hdr_mode=0
 compress/bptc_ldr=0
-compress/normal_map=0
+compress/normal_map=2
 flags/repeat=0
 flags/filter=true
 flags/mipmaps=false

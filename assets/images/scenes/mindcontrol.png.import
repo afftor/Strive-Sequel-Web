@@ -14,11 +14,11 @@ dest_files=[ "res://.import/mindcontrol.png-3e0d2a0cd3d7c37e39e85675177a4031.ste
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/lossy_quality=0.7
 compress/hdr_mode=0
 compress/bptc_ldr=0
-compress/normal_map=0
+compress/normal_map=2
 flags/repeat=0
 flags/filter=true
 flags/mipmaps=false

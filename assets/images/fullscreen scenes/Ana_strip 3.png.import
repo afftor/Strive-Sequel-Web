@@ -14,11 +14,11 @@ dest_files=[ "res://.import/Ana_strip 3.png-1f0f2d684182056472d7edb8ef2e3a8c.ste
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/lossy_quality=0.7
 compress/hdr_mode=0
 compress/bptc_ldr=0
-compress/normal_map=0
+compress/normal_map=2
 flags/repeat=0
 flags/filter=true
 flags/mipmaps=false

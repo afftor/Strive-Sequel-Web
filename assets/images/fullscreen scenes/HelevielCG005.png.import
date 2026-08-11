@@ -14,11 +14,11 @@ dest_files=[ "res://.import/HelevielCG005.png-e232bf1e3d5d3eeb1a9e93ea6a7543e1.s
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/lossy_quality=0.7
 compress/hdr_mode=0
 compress/bptc_ldr=0
-compress/normal_map=0
+compress/normal_map=2
 flags/repeat=0
 flags/filter=true
 flags/mipmaps=false

@@ -14,11 +14,11 @@ dest_files=[ "res://.import/senerus.png-35f07e4a9baf3207c074a221b85f2169.stex" ]
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/lossy_quality=0.7
 compress/hdr_mode=0
 compress/bptc_ldr=0
-compress/normal_map=0
+compress/normal_map=2
 flags/repeat=0
 flags/filter=true
 flags/mipmaps=false

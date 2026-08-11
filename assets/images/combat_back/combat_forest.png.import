@@ -14,11 +14,11 @@ dest_files=[ "res://.import/combat_forest.png-1b109150aea9d346b12a407f6c4f9f27.s
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/lossy_quality=0.7
 compress/hdr_mode=0
 compress/bptc_ldr=0
-compress/normal_map=0
+compress/normal_map=2
 flags/repeat=0
 flags/filter=true
 flags/mipmaps=false

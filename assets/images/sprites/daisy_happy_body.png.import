@@ -14,11 +14,11 @@ dest_files=[ "res://.import/daisy_happy_body.png-d2b0e667324b07c8418809c4e77f2e7
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/lossy_quality=0.7
 compress/hdr_mode=0
 compress/bptc_ldr=0
-compress/normal_map=0
+compress/normal_map=2
 flags/repeat=0
 flags/filter=true
 flags/mipmaps=false

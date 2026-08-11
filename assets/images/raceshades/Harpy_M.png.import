@@ -14,11 +14,11 @@ dest_files=[ "res://.import/Harpy_M.png-63c69b6669e3cb98a6fe9fe677a7dbb6.stex" ]
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/lossy_quality=0.7
 compress/hdr_mode=0
 compress/bptc_ldr=0
-compress/normal_map=0
+compress/normal_map=2
 flags/repeat=0
 flags/filter=true
 flags/mipmaps=true

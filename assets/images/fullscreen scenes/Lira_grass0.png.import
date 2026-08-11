@@ -14,11 +14,11 @@ dest_files=[ "res://.import/Lira_grass0.png-7c7831f0f6e30e33a46c97e2199b87e1.ste
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/lossy_quality=0.7
 compress/hdr_mode=0
 compress/bptc_ldr=0
-compress/normal_map=0
+compress/normal_map=2
 flags/repeat=0
 flags/filter=true
 flags/mipmaps=false

@@ -14,11 +14,11 @@ dest_files=[ "res://.import/cave5.png-1c86df1f7c132e925659df4f765c8b92.stex" ]
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/lossy_quality=0.7
 compress/hdr_mode=0
 compress/bptc_ldr=0
-compress/normal_map=0
+compress/normal_map=2
 flags/repeat=0
 flags/filter=true
 flags/mipmaps=false

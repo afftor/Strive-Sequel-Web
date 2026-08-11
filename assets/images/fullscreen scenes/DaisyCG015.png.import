@@ -14,11 +14,11 @@ dest_files=[ "res://.import/DaisyCG015.png-8cb09337408c1cbe17f2e7a84b8bb8ee.stex
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/lossy_quality=0.7
 compress/hdr_mode=0
 compress/bptc_ldr=0
-compress/normal_map=0
+compress/normal_map=2
 flags/repeat=0
 flags/filter=true
 flags/mipmaps=false

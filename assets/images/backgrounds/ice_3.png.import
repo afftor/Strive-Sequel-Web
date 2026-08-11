@@ -14,11 +14,11 @@ dest_files=[ "res://.import/ice_3.png-bc4858ef5c6aa2dbaa32a9d44e7638d1.stex" ]
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/lossy_quality=0.7
 compress/hdr_mode=0
 compress/bptc_ldr=0
-compress/normal_map=0
+compress/normal_map=2
 flags/repeat=0
 flags/filter=true
 flags/mipmaps=false

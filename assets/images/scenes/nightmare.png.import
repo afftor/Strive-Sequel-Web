@@ -14,11 +14,11 @@ dest_files=[ "res://.import/nightmare.png-6b86e16e3df3fcc80e42f11593ddcaf9.stex"
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/lossy_quality=0.7
 compress/hdr_mode=0
 compress/bptc_ldr=0
-compress/normal_map=0
+compress/normal_map=2
 flags/repeat=0
 flags/filter=true
 flags/mipmaps=false
