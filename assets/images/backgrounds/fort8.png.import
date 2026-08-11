@@ -14,11 +14,11 @@ dest_files=[ "res://.import/fort8.png-e31e063cd7ed9899d22cb886a7bc63e6.stex" ]
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/lossy_quality=0.7
 compress/hdr_mode=0
 compress/bptc_ldr=0
-compress/normal_map=0
+compress/normal_map=2
 flags/repeat=0
 flags/filter=true
 flags/mipmaps=false

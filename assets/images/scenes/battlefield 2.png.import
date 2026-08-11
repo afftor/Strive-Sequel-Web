@@ -14,11 +14,11 @@ dest_files=[ "res://.import/battlefield 2.png-fc62fd4501c5bfc25256a4039e58d603.s
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/lossy_quality=0.7
 compress/hdr_mode=0
 compress/bptc_ldr=0
-compress/normal_map=0
+compress/normal_map=2
 flags/repeat=0
 flags/filter=true
 flags/mipmaps=false

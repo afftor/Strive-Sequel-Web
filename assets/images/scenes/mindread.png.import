@@ -14,11 +14,11 @@ dest_files=[ "res://.import/mindread.png-51b8d465a5c881517e0e4e91c0d0c3fa.stex" 
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/lossy_quality=0.7
 compress/hdr_mode=0
 compress/bptc_ldr=0
-compress/normal_map=0
+compress/normal_map=2
 flags/repeat=0
 flags/filter=true
 flags/mipmaps=false

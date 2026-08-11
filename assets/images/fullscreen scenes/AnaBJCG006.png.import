@@ -14,11 +14,11 @@ dest_files=[ "res://.import/AnaBJCG006.png-5a0c4374e4b013d8318f38d1bd5a20c5.stex
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/lossy_quality=0.7
 compress/hdr_mode=0
 compress/bptc_ldr=0
-compress/normal_map=0
+compress/normal_map=2
 flags/repeat=0
 flags/filter=true
 flags/mipmaps=false

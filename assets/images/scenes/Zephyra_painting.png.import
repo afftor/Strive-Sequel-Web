@@ -14,11 +14,11 @@ dest_files=[ "res://.import/Zephyra_painting.png-06aaa02e9a2ca215df415a0eb0a11fe
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/lossy_quality=0.7
 compress/hdr_mode=0
 compress/bptc_ldr=0
-compress/normal_map=0
+compress/normal_map=2
 flags/repeat=0
 flags/filter=true
 flags/mipmaps=false

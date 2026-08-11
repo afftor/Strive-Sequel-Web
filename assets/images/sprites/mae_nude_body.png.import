@@ -14,11 +14,11 @@ dest_files=[ "res://.import/mae_nude_body.png-d4bebf0e7dff291c797a490bf1c5dbb7.s
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/lossy_quality=0.7
 compress/hdr_mode=0
 compress/bptc_ldr=0
-compress/normal_map=0
+compress/normal_map=2
 flags/repeat=0
 flags/filter=true
 flags/mipmaps=false

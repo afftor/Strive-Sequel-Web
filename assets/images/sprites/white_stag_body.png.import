@@ -14,11 +14,11 @@ dest_files=[ "res://.import/white_stag_body.png-9fb8f617f7901f9c7f8c42060d8d68f4
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/lossy_quality=0.7
 compress/hdr_mode=0
 compress/bptc_ldr=0
-compress/normal_map=0
+compress/normal_map=2
 flags/repeat=0
 flags/filter=true
 flags/mipmaps=false

@@ -14,11 +14,11 @@ dest_files=[ "res://.import/Erdyna_campfire002.png-c94512ecb0d6523390610626d30c5
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/lossy_quality=0.7
 compress/hdr_mode=0
 compress/bptc_ldr=0
-compress/normal_map=0
+compress/normal_map=2
 flags/repeat=0
 flags/filter=true
 flags/mipmaps=false

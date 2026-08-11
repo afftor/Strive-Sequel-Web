@@ -14,11 +14,11 @@ dest_files=[ "res://.import/mines_quest.png-4e4d8b1deddf84aecf892b1939b3f447.ste
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/lossy_quality=0.7
 compress/hdr_mode=0
 compress/bptc_ldr=0
-compress/normal_map=0
+compress/normal_map=2
 flags/repeat=0
 flags/filter=true
 flags/mipmaps=false

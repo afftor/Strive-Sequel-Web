@@ -14,11 +14,11 @@ dest_files=[ "res://.import/dungeon_enemies.png-2ef75c868b961ea25db28e42351dde98
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/lossy_quality=0.7
 compress/hdr_mode=0
 compress/bptc_ldr=0
-compress/normal_map=0
+compress/normal_map=2
 flags/repeat=0
 flags/filter=true
 flags/mipmaps=false

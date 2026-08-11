@@ -14,11 +14,11 @@ dest_files=[ "res://.import/Scylla_M.png-7cbb68a7e6634c0bb2b04c80f15f83cd.stex" 
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/lossy_quality=0.7
 compress/hdr_mode=0
 compress/bptc_ldr=0
-compress/normal_map=0
+compress/normal_map=2
 flags/repeat=0
 flags/filter=true
 flags/mipmaps=true

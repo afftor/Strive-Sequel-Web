@@ -14,11 +14,11 @@ dest_files=[ "res://.import/CaliCG033.png-47bb16d7b0614c6906d77ce911f5b298.stex"
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/lossy_quality=0.7
 compress/hdr_mode=0
 compress/bptc_ldr=0
-compress/normal_map=0
+compress/normal_map=2
 flags/repeat=0
 flags/filter=true
 flags/mipmaps=false

@@ -14,11 +14,11 @@ dest_files=[ "res://.import/lira_shopping.png-7dd90d864c7f646c0cf91915da2e6eb2.s
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/lossy_quality=0.7
 compress/hdr_mode=0
 compress/bptc_ldr=0
-compress/normal_map=0
+compress/normal_map=2
 flags/repeat=0
 flags/filter=true
 flags/mipmaps=false

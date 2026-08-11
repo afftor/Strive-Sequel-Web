@@ -14,11 +14,11 @@ dest_files=[ "res://.import/lira_forest patrol.png-086da3efdc258cf9fff6c9f4a2d00
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/lossy_quality=0.7
 compress/hdr_mode=0
 compress/bptc_ldr=0
-compress/normal_map=0
+compress/normal_map=2
 flags/repeat=0
 flags/filter=true
 flags/mipmaps=false

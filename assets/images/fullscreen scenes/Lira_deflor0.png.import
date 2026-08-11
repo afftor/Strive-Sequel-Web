@@ -14,11 +14,11 @@ dest_files=[ "res://.import/Lira_deflor0.png-9c73e0fd1a094c4abef081309f4e24cc.st
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/lossy_quality=0.7
 compress/hdr_mode=0
 compress/bptc_ldr=0
-compress/normal_map=0
+compress/normal_map=2
 flags/repeat=0
 flags/filter=true
 flags/mipmaps=false

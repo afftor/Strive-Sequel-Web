@@ -14,11 +14,11 @@ dest_files=[ "res://.import/erdyna_gate.png-9d2ff523df49797e0d013e76225f6be2.ste
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/lossy_quality=0.7
 compress/hdr_mode=0
 compress/bptc_ldr=0
-compress/normal_map=0
+compress/normal_map=2
 flags/repeat=0
 flags/filter=true
 flags/mipmaps=false

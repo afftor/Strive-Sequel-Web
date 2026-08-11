@@ -14,11 +14,11 @@ dest_files=[ "res://.import/celena_shrine.png-cfa20ff7bda0bcaadf0bc86193642cec.s
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/lossy_quality=0.7
 compress/hdr_mode=0
 compress/bptc_ldr=0
-compress/normal_map=0
+compress/normal_map=2
 flags/repeat=0
 flags/filter=true
 flags/mipmaps=false

@@ -14,11 +14,11 @@ dest_files=[ "res://.import/spider_lair4.png-f48abf42a6f6af8534ee0cf95c6fb16d.st
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/lossy_quality=0.7
 compress/hdr_mode=0
 compress/bptc_ldr=0
-compress/normal_map=0
+compress/normal_map=2
 flags/repeat=0
 flags/filter=true
 flags/mipmaps=false

@@ -14,11 +14,11 @@ dest_files=[ "res://.import/mae gr 1.png-4c8cbb1f3ce0680a2448e02dd8a4e5ae.stex" 
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/lossy_quality=0.7
 compress/hdr_mode=0
 compress/bptc_ldr=0
-compress/normal_map=0
+compress/normal_map=2
 flags/repeat=0
 flags/filter=true
 flags/mipmaps=false

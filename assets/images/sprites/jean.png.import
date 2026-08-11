@@ -14,11 +14,11 @@ dest_files=[ "res://.import/jean.png-90ac6e68401da2c36f374d0b4d8cfb60.stex" ]
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/lossy_quality=0.7
 compress/hdr_mode=0
 compress/bptc_ldr=0
-compress/normal_map=0
+compress/normal_map=2
 flags/repeat=0
 flags/filter=true
 flags/mipmaps=false

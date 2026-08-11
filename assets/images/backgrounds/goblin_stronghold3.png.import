@@ -14,11 +14,11 @@ dest_files=[ "res://.import/goblin_stronghold3.png-f224fef21344ee973c77d5671df9d
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/lossy_quality=0.7
 compress/hdr_mode=0
 compress/bptc_ldr=0
-compress/normal_map=0
+compress/normal_map=2
 flags/repeat=0
 flags/filter=true
 flags/mipmaps=false

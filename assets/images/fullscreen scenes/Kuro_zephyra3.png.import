@@ -14,11 +14,11 @@ dest_files=[ "res://.import/Kuro_zephyra3.png-1a109e3b44e61c441c6c9b5f4f173884.s
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/lossy_quality=0.7
 compress/hdr_mode=0
 compress/bptc_ldr=0
-compress/normal_map=0
+compress/normal_map=2
 flags/repeat=0
 flags/filter=true
 flags/mipmaps=false
