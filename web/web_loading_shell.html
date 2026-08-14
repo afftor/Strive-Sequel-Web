@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html xmlns='http://www.w3.org/1999/xhtml' lang='' xml:lang=''>
+<head>
+	<meta charset='utf-8' />
+	<meta name='viewport' content='width=device-width, user-scalable=no' />
+	<title>$GODOT_PROJECT_NAME</title>
+	<style type='text/css'>
+		:root {
+			background: #2b1d2b;
+		}
+
+		body {
+			touch-action: none;
+			margin: 0;
+			border: 0 none;
+			padding: 0;
+			text-align: center;
+			background: radial-gradient(ellipse at 50% 35%, #60415b 0%, #392637 48%, #1d1520 100%);
+		}
+
+		#canvas {
+			display: block;
+			margin: 0;
+			color: white;
+		}
+
+		#canvas:focus {
+			outline: none;
+		}
+
+		/* Shown immediately, while the browser downloads the Godot runtime and PCK. */
+		#web-loading {
+			position: fixed;
+			inset: 0;
+			z-index: 10;
+			display: grid;
+			place-items: center;
+			overflow: hidden;
+			background: #1d1520;
+			opacity: 1;
+			transition: opacity 300ms ease;
+		}
+
+		#web-loading::before {
+			content: '';
+			position: absolute;
+			inset: 0;
+			background: url('web-loading-art.png') center / cover no-repeat;
+		}
+
+		#web-loading::after {
+			content: '';
+			position: absolute;
+			inset: 0;
+			background: rgba(24, 11, 20, 0.2);
+		}
+
+		#web-loading.web-loading--hidden {
+			opacity: 0;
+			pointer-events: none;
+		}
+
+		#web-loading-indicator {
+			width: min(62vw, 360px);
+			display: grid;
+			gap: 18px;
+			position: relative;
+			z-index: 1;
+			align-self: end;
+			margin-bottom: 8vh;
+		}
+
+		#web-loading-spinner {
+			width: 38px;
+			height: 38px;
+			margin: 0 auto;
+			border: 3px solid rgba(255, 255, 255, 0.22);
+			border-top-color: #f2d7cf;
+			border-radius: 50%;
+			animation: web-loading-spin 900ms linear infinite;
+		}
+
+		#web-loading-progress {
+			height: 6px;
+			overflow: hidden;
+			background: rgba(20, 11, 21, 0.58);
+			border: 1px solid rgba(255, 255, 255, 0.18);
+			border-radius: 999px;
+			box-shadow: 0 1px 8px rgba(0, 0, 0, 0.28);
+		}
+
+		#web-loading-progress-inner {
+			height: 100%;
+			width: 100%;
+			transform: scaleX(0.04);
+			transform-origin: left center;
+			background: linear-gradient(90deg, #d78d9a, #f2d7cf);
+			transition: transform 160ms linear;
+		}
+
+		#web-loading-progress.web-loading-progress--finalizing #web-loading-progress-inner {
+			animation: web-loading-finalizing 1200ms ease-in-out infinite alternate;
+		}
+
+		@keyframes web-loading-spin {
+			to { transform: rotate(360deg); }
+		}
+
+		@keyframes web-loading-finalizing {
+			from { transform: scaleX(0.87); }
+			to { transform: scaleX(0.96); }
+		}
+
+		/* The engine error message stays usable above the loading overlay. */
+		#status {
+			position: fixed;
+			inset: 0;
+			z-index: 20;
+			display: none;
+			justify-content: center;
+			align-items: center;
+			pointer-events: none;
+		}
+
+		#status-notice {
+			max-width: min(80vw, 640px);
+			padding: 12px 16px;
+			font-family: Arial, sans-serif;
+			line-height: 1.35;
+			color: #f7eeee;
+			background: rgba(35, 18, 33, 0.92);
+			border: 1px solid rgba(255, 255, 255, 0.22);
+			border-radius: 8px;
+			box-shadow: 0 3px 16px rgba(0, 0, 0, 0.4);
+		}
+	</style>
+$GODOT_HEAD_INCLUDE
+</head>
+<body>
+	<canvas id='canvas'>
+		HTML5 canvas appears to be unsupported in the current browser.<br />
+		Please try updating or use a different browser.
+	</canvas>
+
+	<div id='web-loading' aria-hidden='true'>
+		<div id='web-loading-indicator'>
+			<div id='web-loading-spinner'></div>
+			<div id='web-loading-progress'><div id='web-loading-progress-inner'></div></div>
+		</div>
+	</div>
+
+	<div id='status'><div id='status-notice' style='display: none;'></div></div>
+
+	<script type='text/javascript' src='$GODOT_URL'></script>
+	<script type='text/javascript'>//<![CDATA[
+		const GODOT_CONFIG = $GODOT_CONFIG;
+		var engine = new Engine(GODOT_CONFIG);
+
+		(function() {
+			var loadingOverlay = document.getElementById('web-loading');
+			var loadingProgressTrack = document.getElementById('web-loading-progress');
+			var loadingProgress = document.getElementById('web-loading-progress-inner');
+			var status = document.getElementById('status');
+			var statusNotice = document.getElementById('status-notice');
+
+			function setLoadingProgress(current, total) {
+				if (total > 0) {
+					var progress = Math.max(0, Math.min(1, current / total));
+					if (progress >= 1) {
+						// Downloading is complete, but Godot can still be compiling and initializing.
+						loadingProgressTrack.classList.add('web-loading-progress--finalizing');
+						loadingProgress.style.transform = '';
+					} else {
+						loadingProgressTrack.classList.remove('web-loading-progress--finalizing');
+						loadingProgress.style.transform = 'scaleX(' + (0.04 + progress * 0.88) + ')';
+					}
+				}
+			}
+
+			function finishLoading() {
+				// Wait for two browser frames, so the game canvas has had a chance to paint.
+				requestAnimationFrame(function() {
+					requestAnimationFrame(function() {
+						loadingOverlay.classList.add('web-loading--hidden');
+					});
+				});
+			}
+
+			function displayFailureNotice(err) {
+				var msg = err.message || err;
+				console.error(msg);
+				statusNotice.textContent = msg;
+				statusNotice.style.display = 'block';
+				status.style.display = 'flex';
+			}
+
+			if (!Engine.isWebGLAvailable()) {
+				displayFailureNotice('WebGL not available');
+			} else {
+				engine.startGame({
+					'onProgress': setLoadingProgress,
+				}).then(finishLoading, displayFailureNotice);
+			}
+		})();
+	//]]></script>
+</body>
+</html>

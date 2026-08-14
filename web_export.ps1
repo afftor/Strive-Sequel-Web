@@ -38,6 +38,10 @@ if (-not (Test-Path -LiteralPath $webEntryPoint -PathType Leaf) -or -not (Test-P
 	throw "Godot web export did not produce index.html and index.pck."
 }
 
+$loadingArtSource = Join-Path $projectRoot "loadart.png"
+$loadingArtDestination = Join-Path $outputPath "web-loading-art.png"
+Copy-Item -LiteralPath $loadingArtSource -Destination $loadingArtDestination -Force
+
 $imageRoot = Join-Path $projectRoot "assets\images"
 $streamRoot = Join-Path $outputPath "cg-assets\assets\images"
 New-Item -ItemType Directory -Force -Path $streamRoot | Out-Null
