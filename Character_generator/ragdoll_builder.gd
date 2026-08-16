@@ -1,5 +1,7 @@
 extends Node2D
 
+#this file is mostly a stub. keep for now as used api interface reference
+
 export var clothes = true
 export var test_mode = false
 
@@ -255,7 +257,7 @@ func rebuild_cloth(value):
 	_root.render_target_update_mode = Viewport.UPDATE_ONCE
 
 
-func rebuild_underwear():
+func rebuild_underwear(): #was not used () before web build
 	if !is_visible_in_tree():
 		return
 	#first pass - textures
@@ -331,7 +333,7 @@ func rebuild_underwear():
 	_root.render_target_update_mode = Viewport.UPDATE_ONCE
 
 
-func apply_transform(transform):
+func apply_transform(transform): #the only method without sense outside of current implementation. 
 	match transform.type:
 		'texture':
 			var nd = _root.get_node(transform.node)

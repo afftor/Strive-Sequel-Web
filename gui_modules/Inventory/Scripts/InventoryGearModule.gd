@@ -126,12 +126,13 @@ func build_gear_panel():
 			$BodyImage.visible = true
 			$ragdoll.visible = false
 			editable = false
-		elif !input_handler.globalsettings.disable_paperdoll:
-			$BodyImage.visible = false
-			$ragdoll.visible = true
-			$ragdoll.test_mode = false
-			$ragdoll.rebuild(selectedhero)
-			$ragdoll.rebuild_cloth(true)
+		#ragdoll part commented
+#		elif !input_handler.globalsettings.disable_paperdoll:
+#			$BodyImage.visible = false
+#			$ragdoll.visible = true
+#			$ragdoll.test_mode = false
+#			$ragdoll.rebuild(selectedhero)
+#			$ragdoll.rebuild_cloth(true)
 		else:
 			$BodyImage.texture = selectedhero.get_body_image()
 			$BodyImage.visible = true

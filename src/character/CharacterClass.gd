@@ -193,52 +193,6 @@ func get_stat(statname, nobonus = false, desc_ready = false):
 			return 0
 		else:
 			return input_handler.combat_node.get_downed_opponent_amount(combatgroup)
-	if statname.begins_with('armor_'):
-		match statname:
-			'armor_base':
-#				return ('servant') #temporal, until correct recolor of armor
-				var res =  equipment.get_gear_type('chest')
-				if res == 'hector_armor':
-					res = 'chest_base_metal'
-				elif res == 'garb_of_forest':
-					res = 'chest_base_leather'
-				if res == null and !has_work_rule('nudity'):
-					res = 'underwear'
-				if !GeneratorData.transforms[statname].has(res):
-					res = 'servant'
-				return res
-			'armor_lower':
-#				return ('servant') #temporal, until correct recolor of armor
-				var res = equipment.get_gear_type('legs')
-				if res == 'garb_of_forest':
-					res = 'legs_base_leather'
-				if res == null and !has_work_rule('nudity'):
-					res = 'underwear'
-				if !GeneratorData.transforms[statname].has(res):
-					res = 'servant'
-				return res
-			'armor_base_underwear', 'armor_lower_underwear':
-				var res = equipment.get_gear_type('underwear')
-				if res == null and !has_work_rule('nudity'):
-					res = 'underwear'
-				if res != null and has_work_rule('nudity'):
-					res = null
-				return res
-			'armor_collar':
-				var res = equipment.get_gear_type('neck')
-				if !GeneratorData.transforms[statname].has(res):
-					res = null
-				return res
-			'armor_weapon':
-				var res = equipment.get_gear_type('rhand')
-				if !GeneratorData.transforms[statname].has(res):
-					res = null
-				return res
-			'armor_head':
-				var res = equipment.get_gear_type('head')
-				if !GeneratorData.transforms[statname].has(res):
-					res = null
-				return res
 	var st_data = statdata.statdata[statname]
 	if st_data.direct:
 		return statlist.get_stat(statname)
@@ -2793,7 +2747,9 @@ func get_explore_skills():
 func fix_skillpanels(list_soc_add, list_combat_add, list_soc_remove, list_combat_remove):
 	skills.fix_skillpanels(list_soc_add, list_combat_add, list_soc_remove, list_combat_remove)
 
-func update_portrait(ragdoll): # for ragdolls
+
+func update_portrait(ragdoll): # for ragdolls, obsolete for now
+#rewrite it later in case of different ragdoll implementation
 	if !get_stat('dynamic_portrait'):
 		return
 	if !get_stat('portrait_update'):

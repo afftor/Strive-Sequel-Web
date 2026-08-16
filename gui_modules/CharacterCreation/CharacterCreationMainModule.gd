@@ -615,24 +615,25 @@ func build_node_for_stat(stat):
 	node.get_node('button/Label').text = text
 
 
-func rebuild_ragdoll(stat = null):
+func rebuild_ragdoll(stat = null): #ragdoll part commented
 	var stored_image = person.get_stored_body_image()
-	if input_handler.globalsettings.disable_paperdoll and stored_image == null:
+#	if input_handler.globalsettings.disable_paperdoll and stored_image == null:
+	if stored_image == null:
 		stored_image = person.get_body_image()
-	if stored_image != null:
+	if stored_image != null: #a;ways true, kept for formatting preserving
 		$RagdollPanel/TextureRect.texture = stored_image
 		$RagdollPanel/TextureRect.visible = true
 		ragdoll.visible = false
 		return
-	else:
-		$RagdollPanel/TextureRect.visible = false
-		ragdoll.visible = true
-	#temp
-	if stat == null:
-		ragdoll.rebuild(person)
-		ragdoll.rebuild_cloth(true)
-	else:
-		ragdoll.rebuild_stat(stat)
+#	else:
+#		$RagdollPanel/TextureRect.visible = false
+#		ragdoll.visible = true
+#	#temp
+#	if stat == null:
+#		ragdoll.rebuild(person)
+#		ragdoll.rebuild_cloth(true)
+#	else:
+#		ragdoll.rebuild_stat(stat)
 
 
 func change_value_node(stat, value): #for scrollable nodes

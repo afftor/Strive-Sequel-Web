@@ -1,6 +1,5 @@
-[gd_resource type="ShaderMaterial" load_steps=3 format=2]
+[gd_resource type="ShaderMaterial" load_steps=2 format=2]
 
-[ext_resource path="res://Character_generator/images/98_masks/mask_kobold.png" type="Texture" id=1]
 [ext_resource path="res://Character_generator/new_complex_shader.shader" type="Shader" id=2]
 
 [resource]
@@ -31,4 +30,3 @@ shader_param/part1color = Color( 0.654902, 0.380392, 0.266667, 1 )
 shader_param/part2color = Color( 0.172549, 0.184314, 0.345098, 1 )
 shader_param/part3color = Color( 0.203922, 0.270588, 0.388235, 1 )
 shader_param/overlay = 0.999
-shader_param/part3 = ExtResource( 1 )
