@@ -170,12 +170,13 @@ func initiate(tempperson):
 		$fullbody.texture = stored_image
 		$fullbody.visible = true
 		$ragdoll.visible = false
-	elif !input_handler.globalsettings.disable_paperdoll:
-		$fullbody.visible = false
-		$ragdoll.visible = true
-		$ragdoll.test_mode = false
-		$ragdoll.rebuild(person)
-		$ragdoll.rebuild_cloth(true)
+	#ragdoll part commented
+#	elif !input_handler.globalsettings.disable_paperdoll:
+#		$fullbody.visible = false
+#		$ragdoll.visible = true
+#		$ragdoll.test_mode = false
+#		$ragdoll.rebuild(person)
+#		$ragdoll.rebuild_cloth(true)
 	else:
 		$fullbody.texture = person.get_body_image()
 		$fullbody.visible = true

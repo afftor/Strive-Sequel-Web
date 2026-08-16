@@ -38,18 +38,19 @@ func update(person = null):
 		):
 			person = gui_controller.exploration.person_to_hire
 	# if person != null:
-	var stored_image = person.get_stored_body_image()
-	if stored_image != null:
+	var stored_image = person.get_stored_body_image() 
+	if stored_image != null: 
 		$Body.texture = stored_image
 		$Body.visible = body_visible
 		$ragdoll.visible = false
-	elif !input_handler.globalsettings.disable_paperdoll:
-		$Body.visible = false
-		$ragdoll.visible = body_visible
-		$ragdoll.test_mode = false
-		$ragdoll.rebuild(person)
-		$ragdoll.rebuild_cloth(!person.has_work_rule('nudity'))
-#		$ragdoll.rebuild_underwear()
+		#ragdoll part commented for now
+#	elif !input_handler.globalsettings.disable_paperdoll:
+#		$Body.visible = false
+#		$ragdoll.visible = body_visible
+#		$ragdoll.test_mode = false
+#		$ragdoll.rebuild(person)
+#		$ragdoll.rebuild_cloth(!person.has_work_rule('nudity'))
+##		$ragdoll.rebuild_underwear()
 	else:
 		$Body.texture = person.get_body_image()
 		$Body.visible = body_visible

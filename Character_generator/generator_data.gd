@@ -1,5 +1,6 @@
 extends Node
-
+#this file have no proper use in web version due to removal of current ragdoll
+#still it is kept for now as reference and for proper work of character visual editor - as it is not totally removed from web 
 var stats_to_look = [
 'pose',
 'sex', 'race',

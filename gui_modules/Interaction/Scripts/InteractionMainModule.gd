@@ -1713,13 +1713,14 @@ func showbody(i):
 		$Panel/bodyimage.texture = stored_image
 		$Panel/bodyimage.visible = true
 		$Panel/BodyDisplay.visible = false
-	elif !input_handler.globalsettings.disable_paperdoll:
-		$Panel/bodyimage.visible = false
-		$Panel/BodyDisplay.visible = true
-		$Panel/BodyDisplay/ragdoll.test_mode = false
-		$Panel/BodyDisplay/ragdoll.rebuild(i.person)
-		$Panel/BodyDisplay/ragdoll.rebuild_cloth(false)
-#		$Panel/BodyDisplay/ragdoll.rebuild_underwear()
+	#ragdoll part commented
+#	elif !input_handler.globalsettings.disable_paperdoll:
+#		$Panel/bodyimage.visible = false
+#		$Panel/BodyDisplay.visible = true
+#		$Panel/BodyDisplay/ragdoll.test_mode = false
+#		$Panel/BodyDisplay/ragdoll.rebuild(i.person)
+#		$Panel/BodyDisplay/ragdoll.rebuild_cloth(false)
+##		$Panel/BodyDisplay/ragdoll.rebuild_underwear()
 	else:
 		$Panel/bodyimage.texture = i.person.get_body_image()
 		$Panel/bodyimage.visible = true
