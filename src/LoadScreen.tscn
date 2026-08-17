@@ -55,25 +55,28 @@ margin_left = -1.0
 margin_right = 1921.0
 margin_bottom = 1082.0
 texture = ExtResource( 7 )
+expand = true
 
 [node name="TextureRect" type="TextureRect" parent="loading"]
-margin_right = 40.0
-margin_bottom = 40.0
+anchor_right = 1.0
+anchor_bottom = 1.0
 texture = ExtResource( 6 )
+expand = true
 __meta__ = {
 "_edit_use_anchors_": false
 }
 
 [node name="TextureRect2" type="TextureRect" parent="loading"]
-visible = false
-margin_right = 40.0
-margin_bottom = 40.0
+anchor_right = 1.0
+anchor_bottom = 1.0
 texture = ExtResource( 4 )
+expand = true
 __meta__ = {
 "_edit_use_anchors_": false
 }
 
 [node name="Sprite" type="TextureRect" parent="loading"]
+visible = false
 material = ExtResource( 10 )
 margin_left = 1224.0
 margin_top = 40.0
@@ -90,13 +93,17 @@ __meta__ = {
 margin_right = 1922.0
 margin_bottom = 1082.0
 texture = ExtResource( 13 )
+expand = true
 __meta__ = {
 "_edit_use_anchors_": false
 }
 
 [node name="ProgressTexture" type="TextureRect" parent="loading"]
-margin_right = 40.0
-margin_bottom = 40.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+margin_right = -643.0
+margin_bottom = -362.0
+rect_scale = Vector2( 1.5, 1.5 )
 texture = ExtResource( 9 )
 
 [node name="ProgressBar" type="TextureProgress" parent="loading/ProgressTexture"]
