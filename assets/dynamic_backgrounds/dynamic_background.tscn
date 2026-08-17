@@ -1,15 +1,10 @@
-[gd_scene load_steps=3 format=2]
+[gd_scene load_steps=2 format=2]
 
-[ext_resource path="res://assets/dynamic_backgrounds/aliron.ogv" type="VideoStream" id=2]
 [ext_resource path="res://assets/dynamic_backgrounds/videoplayer.gd" type="Script" id=3]
 
 [node name="VideoPlayer" type="VideoPlayer"]
 margin_right = 1920.0
 margin_bottom = 1088.0
-stream = ExtResource( 2 )
 autoplay = true
 bus = "Sound"
 script = ExtResource( 3 )
-__meta__ = {
-"_edit_use_anchors_": false
-}
