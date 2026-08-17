@@ -75,26 +75,31 @@ anchor_bottom = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
 texture = ExtResource( 38 )
+expand = true
 
 [node name="BG1" type="TextureRect" parent="BGHolder"]
 anchor_right = 1.0
 anchor_bottom = 1.0
 texture = ExtResource( 24 )
+expand = true
 
 [node name="BG2" type="TextureRect" parent="BGHolder"]
 anchor_right = 1.0
 anchor_bottom = 1.0
 texture = ExtResource( 37 )
+expand = true
 
 [node name="BG3" type="TextureRect" parent="BGHolder"]
 anchor_right = 1.0
 anchor_bottom = 1.0
 texture = ExtResource( 39 )
+expand = true
 
 [node name="BG4" type="TextureRect" parent="BGHolder"]
 anchor_right = 1.0
 anchor_bottom = 1.0
 texture = ExtResource( 38 )
+expand = true
 
 [node name="MansionBottomLeftModule" parent="." instance=ExtResource( 9 )]
 material = SubResource( 1 )
