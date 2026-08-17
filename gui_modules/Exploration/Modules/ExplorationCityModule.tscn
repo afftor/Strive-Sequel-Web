@@ -156,6 +156,7 @@ anchor_bottom = 1.0
 expand = true
 
 [node name="VideoPlayer" parent="." instance=ExtResource( 96 )]
+visible = false
 autoplay = false
 
 [node name="GuildBG" type="TextureRect" parent="."]
