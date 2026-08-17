@@ -990,13 +990,13 @@ func get_sprite(id):
 	return res
 
 
-var dynamic_backgrounds = {
-	aliron = load("res://assets/dynamic_backgrounds/aliron.ogv"),
-	elf_capital = load("res://assets/dynamic_backgrounds/elf_capital.ogv"),
-	beastkin_capital = load("res://assets/dynamic_backgrounds/furry_camp.ogv"),
-	dwarfs_city = load("res://assets/dynamic_backgrounds/dwarfs_city.ogv"),
-	empire = load("res://assets/dynamic_backgrounds/empire_capital.ogv"),
-}
+#var dynamic_backgrounds = {
+#	aliron = load("res://assets/dynamic_backgrounds/aliron.ogv"),
+#	elf_capital = load("res://assets/dynamic_backgrounds/elf_capital.ogv"),
+#	beastkin_capital = load("res://assets/dynamic_backgrounds/furry_camp.ogv"),
+#	dwarfs_city = load("res://assets/dynamic_backgrounds/dwarfs_city.ogv"),
+#	empire = load("res://assets/dynamic_backgrounds/empire_capital.ogv"),
+#}
 
 var portraits = {
 	daisy = 'res://assets/images/portraits/daisy_prt.png',
