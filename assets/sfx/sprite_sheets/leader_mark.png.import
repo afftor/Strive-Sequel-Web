@@ -14,11 +14,11 @@ dest_files=[ "res://.import/leader_mark.png-6eee00201db3674b9885d3b5c36c80c0.ste
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/lossy_quality=0.7
 compress/hdr_mode=0
 compress/bptc_ldr=0
-compress/normal_map=0
+compress/normal_map=2
 flags/repeat=0
 flags/filter=true
 flags/mipmaps=false

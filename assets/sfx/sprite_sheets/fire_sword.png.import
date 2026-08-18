@@ -14,11 +14,11 @@ dest_files=[ "res://.import/fire_sword.png-1fea7607ea03b7750d56d0f604df3c35.stex
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/lossy_quality=0.7
 compress/hdr_mode=0
 compress/bptc_ldr=0
-compress/normal_map=0
+compress/normal_map=2
 flags/repeat=0
 flags/filter=true
 flags/mipmaps=false
