@@ -14,11 +14,11 @@ dest_files=[ "res://.import/meteor_3.png-eb96136ef5662f23d7c0b9cea4ed99e7.stex" 
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/lossy_quality=0.7
 compress/hdr_mode=0
 compress/bptc_ldr=0
-compress/normal_map=0
+compress/normal_map=2
 flags/repeat=0
 flags/filter=true
 flags/mipmaps=false

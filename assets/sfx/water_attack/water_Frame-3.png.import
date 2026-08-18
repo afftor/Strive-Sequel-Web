@@ -14,11 +14,11 @@ dest_files=[ "res://.import/water_Frame-3.png-7a126d50c91fde6d3143e5592b59797a.s
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/lossy_quality=0.7
 compress/hdr_mode=0
 compress/bptc_ldr=0
-compress/normal_map=0
+compress/normal_map=2
 flags/repeat=0
 flags/filter=true
 flags/mipmaps=false

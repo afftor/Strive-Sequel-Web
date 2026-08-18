@@ -14,11 +14,11 @@ dest_files=[ "res://.import/plague6.png-b91e581bb13cd86e9c6c5f0799d53155.stex" ]
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/lossy_quality=0.7
 compress/hdr_mode=0
 compress/bptc_ldr=0
-compress/normal_map=0
+compress/normal_map=2
 flags/repeat=0
 flags/filter=true
 flags/mipmaps=false

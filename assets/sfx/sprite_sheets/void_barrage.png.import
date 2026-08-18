@@ -14,11 +14,11 @@ dest_files=[ "res://.import/void_barrage.png-f5aaa4b41de6ba1ea954fb06bb7f3761.st
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/lossy_quality=0.7
 compress/hdr_mode=0
 compress/bptc_ldr=0
-compress/normal_map=0
+compress/normal_map=2
 flags/repeat=0
 flags/filter=true
 flags/mipmaps=false
