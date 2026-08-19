@@ -14,11 +14,11 @@ dest_files=[ "res://.import/jean_wed_prt_bold.png-7d4aca859b698e9c6c24865abc0a77
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/lossy_quality=0.7
 compress/hdr_mode=0
 compress/bptc_ldr=0
-compress/normal_map=0
+compress/normal_map=2
 flags/repeat=0
 flags/filter=true
 flags/mipmaps=false

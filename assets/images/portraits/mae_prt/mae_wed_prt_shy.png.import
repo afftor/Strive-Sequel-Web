@@ -14,11 +14,11 @@ dest_files=[ "res://.import/mae_wed_prt_shy.png-83b5276bcbb7a268463e3e20d337859f
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/lossy_quality=0.7
 compress/hdr_mode=0
 compress/bptc_ldr=0
-compress/normal_map=0
+compress/normal_map=2
 flags/repeat=0
 flags/filter=true
 flags/mipmaps=false

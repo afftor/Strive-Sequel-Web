@@ -14,11 +14,11 @@ dest_files=[ "res://.import/lilia_nude_prt.png-4a2236b4daf26f4e658d0a30727a4ee9.
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/lossy_quality=0.7
 compress/hdr_mode=0
 compress/bptc_ldr=0
-compress/normal_map=0
+compress/normal_map=2
 flags/repeat=0
 flags/filter=true
 flags/mipmaps=false

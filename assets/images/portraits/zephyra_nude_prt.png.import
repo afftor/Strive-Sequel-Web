@@ -14,11 +14,11 @@ dest_files=[ "res://.import/zephyra_nude_prt.png-1c46919d75fa146b56ae0befa3e6185
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/lossy_quality=0.7
 compress/hdr_mode=0
 compress/bptc_ldr=0
-compress/normal_map=0
+compress/normal_map=2
 flags/repeat=0
 flags/filter=true
 flags/mipmaps=false

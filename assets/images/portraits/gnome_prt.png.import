@@ -14,11 +14,11 @@ dest_files=[ "res://.import/gnome_prt.png-1b0f4c73c6f3a4e0875a378fa7f12fc2.stex"
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/lossy_quality=0.7
 compress/hdr_mode=0
 compress/bptc_ldr=0
-compress/normal_map=0
+compress/normal_map=2
 flags/repeat=0
 flags/filter=true
 flags/mipmaps=false
