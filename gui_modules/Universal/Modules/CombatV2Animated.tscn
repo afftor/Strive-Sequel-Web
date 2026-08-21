@@ -332,6 +332,7 @@ margin_top = -0.847595
 margin_right = 1920.0
 margin_bottom = 1079.15
 texture = ExtResource( 12 )
+expand = true
 __meta__ = {
 "_edit_use_anchors_": false
 }
