@@ -2,6 +2,8 @@ extends Node
 
 var version = '4.0'
 
+#modding part not used
+
 var modconfig_path = "user://mods.ini"
 var modfolder_path = "user://mods"
 const MOD_CONFIG_VERSION_KEY = "game_version"
@@ -170,28 +172,29 @@ func process_node_extensions_mods():
 	emit_signal("node_extensions_loaded")
 
 func get_mods_list():
-	var f := File.new()
-	if !f.file_exists(modconfig_path) : 
-		mods_list.clear()
-		save_mod_config([])
-		return
-	f.open(modconfig_path, File.READ)
-	var tres = f.get_as_text()
-	f.close()
-	var parsed_config = parse_json(tres)
-	mods_list = get_mods_from_config(parsed_config)
-	if mod_list_safety_message != "":
-		return
-	var new_mods_list = []
-	check_avail()
-	for mod in mods_list:
-		var mconf := ConfigFile.new()
-		mconf.load(mod.path)
-		#rereading data from config file in case some of it changed
-		var temp = fill_mod_data(mconf, mod.path)
-		new_mods_list.push_back(temp)
-		print(mod.name)
-	mods_list = new_mods_list
+#	var f := File.new()
+#	if !f.file_exists(modconfig_path) : 
+#		mods_list.clear()
+#		save_mod_config([])
+#		return
+#	f.open(modconfig_path, File.READ)
+#	var tres = f.get_as_text()
+#	f.close()
+#	var parsed_config = parse_json(tres)
+#	mods_list = get_mods_from_config(parsed_config)
+#	if mod_list_safety_message != "":
+#		return
+#	var new_mods_list = []
+#	check_avail()
+#	for mod in mods_list:
+#		var mconf := ConfigFile.new()
+#		mconf.load(mod.path)
+#		#rereading data from config file in case some of it changed
+#		var temp = fill_mod_data(mconf, mod.path)
+#		new_mods_list.push_back(temp)
+#		print(mod.name)
+#	mods_list = new_mods_list
+	mods_list = []
 
 func save_mod_list():
 	check_avail()
@@ -270,8 +273,11 @@ func backup_old_mod_config(config_version):
 func check_avail():
 	var to_del = []
 	for i in range(mods_list.size()):
-		if !File.new().file_exists(mods_list[i].path) : to_del.push_front(i)
-	for i in to_del: mods_list.remove(i)
+#		if !File.new().file_exists(mods_list[i].path) : 
+		if true : 
+			to_del.push_front(i)
+	for i in to_del: 
+		mods_list.remove(i)
 
 func get_avail_mods():
 	var res = []
