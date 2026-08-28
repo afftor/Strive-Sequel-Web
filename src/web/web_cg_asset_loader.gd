@@ -7,7 +7,7 @@ extends Node
 signal texture_loaded(path, texture)
 signal texture_failed(path, error)
 
-const EXTERNAL_ASSET_ROOT = "cg-assets/"
+const EXTERNAL_ASSET_ROOT = "http://localhost:8000/cg-assets/"
 const STREAMED_ROOTS = [
 	"res://assets/images/fullscreen scenes/",
 	"res://assets/images/scenes/",
@@ -52,7 +52,8 @@ func _start_request(path):
 	add_child(request)
 	pending_requests[path] = request
 	request.connect("request_completed", self, "_on_request_completed", [path, request])
-	var error = request.request(EXTERNAL_ASSET_ROOT + path.substr(6).http_escape())
+	var error = request.request(EXTERNAL_ASSET_ROOT + path.trim_prefix('res://').http_escape())
+#	var error = request.request(EXTERNAL_ASSET_ROOT + path.substr(6).http_escape())
 	if error != OK:
 		pending_requests.erase(path)
 		request.queue_free()

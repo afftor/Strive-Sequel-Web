@@ -1470,6 +1470,9 @@ func dir_contents(target):
 		var file_name = dir.get_next()
 		while file_name != "":
 			if !dir.current_is_dir():
+				if file_name.ends_with('.remap'):
+					file_name = dir.get_next()
+					continue
 				array.append(target + "/" + file_name)
 			elif !file_name in ['.','..', null] && dir.current_is_dir():
 				array += dir_contents(target + "/" + file_name)

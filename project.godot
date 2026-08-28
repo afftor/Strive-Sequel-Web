@@ -344,6 +344,7 @@ file_logging/enable_file_logging=true
 
 [rendering]
 
+quality/driver/driver_name="GLES2"
 quality/driver/fallback_to_gles2=true
 quality/intended_usage/framebuffer_allocation=0
 vram_compression/import_etc=true
