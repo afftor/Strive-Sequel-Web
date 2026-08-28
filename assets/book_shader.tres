@@ -60,7 +60,8 @@ uniform vec4 target_color : hint_color;
 uniform vec4 outline_color : hint_color;
 uniform float value;
 uniform int posterize = 5;
-uniform int outline = 1;
+//gles2 compat
+//uniform int outline = 1;
 uniform float outline_opacity = 1.0;
 
 void fragment(){
@@ -80,7 +81,7 @@ void fragment(){
 	float maxa = col.a;
 	float mina = col.a;
 	
-	for (float outline_width = 1.0; outline_width <= float(outline); outline_width += 0.5) {
+	for (float outline_width = 1.0; outline_width <= 3.0; outline_width += 0.5) { //outline was here
 		a = texture(TEXTURE, UV + vec2(0.0, -outline_width) * ps).a;
 		maxa = max(a, maxa);
 		mina = min(a, mina);
@@ -130,5 +131,4 @@ shader_param/target_color = Color( 0.443137, 0.376471, 0.309804, 1 )
 shader_param/outline_color = Color( 0.156863, 0.0941176, 0.0196078, 1 )
 shader_param/value = 1.0
 shader_param/posterize = 15
-shader_param/outline = 3
 shader_param/outline_opacity = 1.0
