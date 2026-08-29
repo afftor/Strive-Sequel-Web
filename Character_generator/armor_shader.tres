@@ -31,3 +31,5 @@ shader_param/part2color = Color( 1, 0, 0, 1 )
 shader_param/part3color = Color( 1, 0, 0, 1 )
 shader_param/range = 0.1
 shader_param/lmod = 0.6
+shader_param/midpoint = 0.5
+shader_param/steepness = 2.0

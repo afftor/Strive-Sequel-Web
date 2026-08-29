@@ -12,13 +12,3 @@ margin_right = 1920.0
 margin_bottom = 1080.0
 rect_min_size = Vector2( 10, 10 )
 mouse_filter = 2
-
-[node name="VP" type="Viewport" parent="VPC"]
-size = Vector2( 1920, 1500 )
-transparent_bg = true
-handle_input_locally = false
-debanding = true
-hdr = false
-usage = 1
-render_target_update_mode = 3
-gui_disable_input = true

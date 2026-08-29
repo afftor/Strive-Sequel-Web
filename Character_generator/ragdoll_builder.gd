@@ -5,7 +5,7 @@ extends Node2D
 export var clothes = true
 export var test_mode = false
 
-onready var _root = $VPC/VP
+onready var _root = null #$VPC/VP
 
 var _scale_x
 var _scale_y

@@ -533,9 +533,11 @@ func build_selectable_node(stat):
 		for transform in transform_data:
 			if !(transform.type in ['import_recolor', 'import_recolor_group']):
 				continue
-			var sh = load(transform.material)
-			newbutton.get_node('ColorRect').material.set_shader_param('target1color', sh.get_shader_param('target2color'))
-			newbutton.get_node('ColorRect').material.set_shader_param('part1color', sh.get_shader_param('part2color'))
+#			var sh = load(transform.material)
+#			newbutton.get_node('ColorRect').material.set_shader_param('target1color', sh.get_shader_param('target2color'))
+#			newbutton.get_node('ColorRect').material.set_shader_param('part1color', sh.get_shader_param('part2color'))
+			newbutton.get_node('ColorRect').material.set_shader_param('target1color', transform.fallback_1)
+			newbutton.get_node('ColorRect').material.set_shader_param('part1color', transform.fallback_2)
 			break
 
 
