@@ -7,7 +7,10 @@ extends Node
 signal texture_loaded(path, texture)
 signal texture_failed(path, error)
 
-const EXTERNAL_ASSET_ROOT = "http://localhost:8000/cg-assets/"
+# Keep streamed assets on the same origin as the web build without tying the
+# build to the visitor's localhost. HTTPRequest needs an absolute URL, so the
+# browser origin is prepended at request time.
+const EXTERNAL_ASSET_PATH = "/cg-assets/"
 const STREAMED_ROOTS = [
 	"res://assets/images/fullscreen scenes/",
 	"res://assets/images/scenes/",
@@ -52,13 +55,19 @@ func _start_request(path):
 	add_child(request)
 	pending_requests[path] = request
 	request.connect("request_completed", self, "_on_request_completed", [path, request])
-	var error = request.request(EXTERNAL_ASSET_ROOT + path.trim_prefix('res://').http_escape())
-#	var error = request.request(EXTERNAL_ASSET_ROOT + path.substr(6).http_escape())
+	var error = request.request(_external_asset_url(path))
 	if error != OK:
 		pending_requests.erase(path)
 		request.queue_free()
 		emit_signal("texture_failed", path, error)
 		emit_signal("texture_loaded", path, null)
+
+func _external_asset_url(path):
+	var encoded_segments = PoolStringArray()
+	for segment in path.trim_prefix("res://").split("/"):
+		encoded_segments.append(segment.http_escape())
+	var origin = str(JavaScript.eval("window.location.origin", true))
+	return origin + EXTERNAL_ASSET_PATH + "/".join(encoded_segments)
 
 func _on_request_completed(result, response_code, _headers, body, path, request):
 	pending_requests.erase(path)

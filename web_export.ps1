@@ -18,6 +18,16 @@ if (-not (Test-Path -LiteralPath $Godot -PathType Leaf)) {
 }
 
 New-Item -ItemType Directory -Force -Path $outputPath | Out-Null
+$resolvedOutputPath = (Resolve-Path -LiteralPath $outputPath).Path.TrimEnd([IO.Path]::DirectorySeparatorChar)
+Get-ChildItem -LiteralPath $resolvedOutputPath -File | Where-Object {
+	$_.Name -match '^index\.[0-9a-f]{12}\.(?:js|wasm|pck|audio\.worklet\.js)$'
+} | ForEach-Object {
+	$resolvedRuntimeFile = $_.FullName
+	if (-not $resolvedRuntimeFile.StartsWith($resolvedOutputPath + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {
+		throw "Refusing to remove a runtime file outside the web export: $resolvedRuntimeFile"
+	}
+	Remove-Item -LiteralPath $resolvedRuntimeFile -Force
+}
 if (-not (Test-Path -LiteralPath $templateSource -PathType Container)) {
 	throw "Godot web templates not found: $templateSource"
 }
@@ -29,10 +39,17 @@ foreach ($template in @("webassembly_debug.zip", "webassembly_release.zip", "ver
 $env:APPDATA = $godotUserCache
 $env:LOCALAPPDATA = $godotUserCache
 $webEntryPoint = Join-Path $outputPath "index.html"
-& $Godot --path $projectRoot --export "Web" $webEntryPoint
-$exportExitCode = $LASTEXITCODE
-if ($null -ne $exportExitCode -and $exportExitCode -ne 0) {
-	throw "Godot web export failed with exit code $exportExitCode."
+
+# Godot 3 can otherwise export stale compiled scripts from its project cache
+# when a source file changed outside the editor.
+$importProcess = Start-Process -FilePath $Godot -ArgumentList @("--path", $projectRoot, "--editor", "--quit") -WindowStyle Hidden -Wait -PassThru
+if ($importProcess.ExitCode -ne 0) {
+	throw "Godot import refresh failed with exit code $($importProcess.ExitCode)."
+}
+
+$exportProcess = Start-Process -FilePath $Godot -ArgumentList @("--path", $projectRoot, "--export", "Web", $webEntryPoint) -WindowStyle Hidden -Wait -PassThru
+if ($exportProcess.ExitCode -ne 0) {
+	throw "Godot web export failed with exit code $($exportProcess.ExitCode)."
 }
 if (-not (Test-Path -LiteralPath $webEntryPoint -PathType Leaf) -or -not (Test-Path -LiteralPath (Join-Path $outputPath "index.pck") -PathType Leaf)) {
 	throw "Godot web export did not produce index.html and index.pck."
@@ -55,5 +72,50 @@ foreach ($folder in @("fullscreen scenes", "scenes")) {
 	}
 }
 
+# Give the monolithic runtime files a release-specific name. Their contents are
+# unchanged by this step; the shared fingerprint only makes browser caching
+# safe across deployments. A new export gets a new URL when any runtime file
+# changes, while an ordinary page reload keeps using the cached files.
+$runtimeSuffixes = @("js", "wasm", "pck", "audio.worklet.js")
+$runtimeHashes = foreach ($suffix in $runtimeSuffixes) {
+	$runtimeFile = Join-Path $outputPath "index.$suffix"
+	if (-not (Test-Path -LiteralPath $runtimeFile -PathType Leaf)) {
+		throw "Godot web runtime file not found: $runtimeFile"
+	}
+	(Get-FileHash -LiteralPath $runtimeFile -Algorithm SHA256).Hash
+}
+$hashInput = [Text.Encoding]::UTF8.GetBytes(($runtimeHashes -join ""))
+$hashAlgorithm = [Security.Cryptography.SHA256]::Create()
+try {
+	$releaseId = ([BitConverter]::ToString($hashAlgorithm.ComputeHash($hashInput))).Replace("-", "").Substring(0, 12).ToLowerInvariant()
+}
+finally {
+	$hashAlgorithm.Dispose()
+}
+$versionedBase = "index.$releaseId"
+
+foreach ($suffix in $runtimeSuffixes) {
+	Move-Item -LiteralPath (Join-Path $outputPath "index.$suffix") -Destination (Join-Path $outputPath "$versionedBase.$suffix") -Force
+}
+
+$html = Get-Content -LiteralPath $webEntryPoint -Raw
+$expectedRuntimeReferences = @("src='index.js'", '"executable":"index"', '"index.pck":', '"index.wasm":')
+foreach ($reference in $expectedRuntimeReferences) {
+	if (-not $html.Contains($reference)) {
+		throw "Godot export HTML is missing the expected runtime reference: $reference"
+	}
+}
+$html = $html.Replace("src='index.js'", "src='$versionedBase.js'")
+$html = $html.Replace('"executable":"index"', '"executable":"' + $versionedBase + '"')
+$html = $html.Replace('"index.pck":', '"' + $versionedBase + '.pck":')
+$html = $html.Replace('"index.wasm":', '"' + $versionedBase + '.wasm":')
+foreach ($reference in $expectedRuntimeReferences) {
+	if ($html.Contains($reference)) {
+		throw "Failed to version the runtime reference in Godot export HTML: $reference"
+	}
+}
+Set-Content -LiteralPath $webEntryPoint -Value $html -NoNewline
+
 Write-Host "Web export ready: $outputPath"
 Write-Host "CG assets are served from: $(Join-Path $outputPath 'cg-assets')"
+Write-Host "Runtime cache version: $releaseId"

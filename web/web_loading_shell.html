@@ -89,6 +89,11 @@
 			box-shadow: 0 1px 8px rgba(0, 0, 0, 0.28);
 		}
 
+		#web-loading-progress-group {
+			display: grid;
+			gap: 8px;
+		}
+
 		#web-loading-progress-inner {
 			height: 100%;
 			width: 100%;
@@ -100,6 +105,16 @@
 
 		#web-loading-progress.web-loading-progress--finalizing #web-loading-progress-inner {
 			animation: web-loading-finalizing 1200ms ease-in-out infinite alternate;
+		}
+
+		#web-loading-stats {
+			display: flex;
+			justify-content: space-between;
+			gap: 12px;
+			font: 13px/1.2 Arial, sans-serif;
+			font-variant-numeric: tabular-nums;
+			color: #f7eeee;
+			text-shadow: 0 1px 4px rgba(0, 0, 0, 0.85);
 		}
 
 		@keyframes web-loading-spin {
@@ -145,7 +160,13 @@ $GODOT_HEAD_INCLUDE
 	<div id='web-loading' aria-hidden='true'>
 		<div id='web-loading-indicator'>
 			<div id='web-loading-spinner'></div>
-			<div id='web-loading-progress'><div id='web-loading-progress-inner'></div></div>
+			<div id='web-loading-progress-group'>
+				<div id='web-loading-progress'><div id='web-loading-progress-inner'></div></div>
+				<div id='web-loading-stats'>
+					<span id='web-loading-bytes'>0 B / —</span>
+					<span id='web-loading-speed'>—/s</span>
+				</div>
+			</div>
 		</div>
 	</div>
 
@@ -154,16 +175,125 @@ $GODOT_HEAD_INCLUDE
 	<script type='text/javascript' src='$GODOT_URL'></script>
 	<script type='text/javascript'>//<![CDATA[
 		const GODOT_CONFIG = $GODOT_CONFIG;
+		var nativeFetch = window.fetch.bind(window);
+		var runtimeFiles = GODOT_CONFIG.fileSizes ? Object.keys(GODOT_CONFIG.fileSizes) : [];
+		var runtimeCacheName = 'strive-runtime-' + GODOT_CONFIG.executable;
+
+		// Chromium's normal HTTP cache may decline very large individual files even
+		// when they are immutable. Keep the monolithic Godot runtime in Cache
+		// Storage as well, so an ordinary reload can reuse it without another
+		// network transfer. Gallery images continue to use the normal HTTP cache.
+		if ('caches' in window && runtimeFiles.length > 0) {
+			window.fetch = function(input, init) {
+				var request;
+				try {
+					request = input instanceof Request ? input : new Request(input, init);
+				} catch (_requestError) {
+					return nativeFetch(input, init);
+				}
+
+				var url = new URL(request.url, window.location.href);
+				var filename = decodeURIComponent(url.pathname.substring(url.pathname.lastIndexOf('/') + 1));
+				var cacheableRuntime = request.method === 'GET' &&
+					url.origin === window.location.origin && runtimeFiles.indexOf(filename) !== -1;
+				if (!cacheableRuntime) {
+					return nativeFetch(input, init);
+				}
+
+				return caches.open(runtimeCacheName).then(function(cache) {
+					return cache.match(request, { ignoreSearch: true }).then(function(cached) {
+						if (cached) {
+							return cached;
+						}
+						return nativeFetch(input, init).then(function(response) {
+							if (response.ok) {
+								cache.put(request, response.clone()).catch(function(error) {
+									console.warn('Unable to persist the web runtime cache:', error);
+								});
+							}
+							return response;
+						});
+					});
+				}).catch(function(error) {
+					console.warn('Unable to read the web runtime cache:', error);
+					return nativeFetch(input, init);
+				});
+			};
+
+			caches.keys().then(function(cacheNames) {
+				cacheNames.forEach(function(cacheName) {
+					if (cacheName.indexOf('strive-runtime-') === 0 && cacheName !== runtimeCacheName) {
+						caches.delete(cacheName);
+					}
+				});
+			}).catch(function(error) {
+				console.warn('Unable to clean old web runtime caches:', error);
+			});
+		}
 		var engine = new Engine(GODOT_CONFIG);
 
 		(function() {
 			var loadingOverlay = document.getElementById('web-loading');
 			var loadingProgressTrack = document.getElementById('web-loading-progress');
 			var loadingProgress = document.getElementById('web-loading-progress-inner');
+			var loadingBytes = document.getElementById('web-loading-bytes');
+			var loadingSpeed = document.getElementById('web-loading-speed');
 			var status = document.getElementById('status');
 			var statusNotice = document.getElementById('status-notice');
+			var configuredTotal = 0;
+			var downloadSamples = [];
+			var lastDownloaded = 0;
+			var lastProgressAt = 0;
+			var speedTimer = null;
+
+			if (GODOT_CONFIG.fileSizes) {
+				Object.keys(GODOT_CONFIG.fileSizes).forEach(function(file) {
+					configuredTotal += GODOT_CONFIG.fileSizes[file] || 0;
+				});
+			}
+
+			function formatBytes(bytes) {
+				var units = ['B', 'KB', 'MB', 'GB'];
+				var value = Math.max(0, bytes || 0);
+				var unit = 0;
+
+				while (value >= 1000 && unit < units.length - 1) {
+					value /= 1000;
+					unit += 1;
+				}
+
+				var decimals = unit === 0 || value >= 100 ? 0 : (value >= 10 ? 1 : 2);
+				return value.toFixed(decimals) + ' ' + units[unit];
+			}
+
+			if (configuredTotal > 0) {
+				loadingBytes.textContent = '0 B / ' + formatBytes(configuredTotal);
+			}
 
 			function setLoadingProgress(current, total) {
+				var now = performance.now();
+				var knownTotal = total > 0 ? total : configuredTotal;
+
+				if (current < lastDownloaded) {
+					downloadSamples = [];
+				}
+				lastDownloaded = current;
+				lastProgressAt = now;
+				downloadSamples.push({ time: now, bytes: current });
+				while (downloadSamples.length > 2 && downloadSamples[1].time < now - 2000) {
+					downloadSamples.shift();
+				}
+
+				var firstSample = downloadSamples[0];
+				var elapsed = (now - firstSample.time) / 1000;
+				var bytesPerSecond = elapsed >= 0.25 ?
+					Math.max(0, (current - firstSample.bytes) / elapsed) : 0;
+
+				loadingBytes.textContent = formatBytes(current) + ' / ' +
+					(knownTotal > 0 ? formatBytes(knownTotal) : '—');
+				loadingSpeed.textContent = bytesPerSecond > 0 ?
+					formatBytes(bytesPerSecond) + '/s' : '—/s';
+
 				if (total > 0) {
 					var progress = Math.max(0, Math.min(1, current / total));
 					if (progress >= 1) {
@@ -178,6 +308,7 @@ $GODOT_HEAD_INCLUDE
 			}
 
 			function finishLoading() {
+				clearInterval(speedTimer);
 				// Wait for two browser frames, so the game canvas has had a chance to paint.
 				requestAnimationFrame(function() {
 					requestAnimationFrame(function() {
@@ -187,12 +318,21 @@ $GODOT_HEAD_INCLUDE
 			}
 
 			function displayFailureNotice(err) {
+				clearInterval(speedTimer);
 				var msg = err.message || err;
 				console.error(msg);
 				statusNotice.textContent = msg;
 				statusNotice.style.display = 'block';
 				status.style.display = 'flex';
 			}
+
+			speedTimer = setInterval(function() {
+				var now = performance.now();
+				if (lastProgressAt > 0 && now - lastProgressAt > 1500) {
+					loadingSpeed.textContent = '0 B/s';
+					downloadSamples = [{ time: now, bytes: lastDownloaded }];
+				}
+			}, 500);
 
 			if (!Engine.isWebGLAvailable()) {
 				displayFailureNotice('WebGL not available');

@@ -14,3 +14,8 @@ AGENTS.md
 
 # Local development tooling. Never commit or import this directory.
 tools/
+
+# Firebase local deployment state.
+.firebase/
+firebase-debug.log
+firebase-debug.*.log
