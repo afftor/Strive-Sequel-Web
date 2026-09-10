@@ -18,12 +18,12 @@ func _ready():
 	gui_controller.add_close_button($Options)
 	gui_controller.add_close_button($Credits)
 	gui_controller.add_close_button($NewOrTutorial)
-	var buttonlist = ['continueb', 'export_progress', 'import_progress', 'newgame', 'loadwindow','options', 'credits']
+	var buttonlist = ['continueb', 'export_progress', 'import_progress', 'newgame', 'loadwindow', 'import_save', 'options', 'credits']
 	$version.text = "ver. " + globals.gameversion
 	input_handler.CurrentScene = self
 	#input_handler.StopMusic()
 	check_last_save()
-	for i in range(0, 7):
+	for i in range(0, 8):
 		$VBoxContainer.get_child(i).connect("toggled", self, buttonlist[i], [$VBoxContainer.get_child(i)])
 		#input_handler.ConnectSound($VBoxContainer.get_child(i), 'button_click', 'button_up')
 	$VBoxContainer/gallery.connect("pressed", self, "gallery")
@@ -410,9 +410,17 @@ func _load_changelog():
 	changelog_file.close()
 
 func export_progress(pressed, pressed_button):
-	pressed_button.pressed = false
-	input_handler.Download_File(variables.userfolder + 'progress_data', 'progress_data')
+	if pressed:
+		pressed_button.pressed = false
+		input_handler.Download_File(variables.userfolder + 'progress_data', 'progress_data')
 
 func import_progress(pressed, pressed_button):
-	pressed_button.pressed = false
-	input_handler.load_external_progress()
+	if pressed:
+		pressed_button.pressed = false
+		input_handler.load_external_progress()
+
+
+func import_save(pressed, pressed_button):
+	if pressed:
+		pressed_button.pressed = false
+		input_handler.load_external_save()
