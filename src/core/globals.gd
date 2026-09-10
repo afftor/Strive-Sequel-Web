@@ -1174,11 +1174,12 @@ func _serialize_party_chunked(chunk):
 	return res
 
 
-func LoadGame(filename):
+func LoadGame(filename, direct = false):
 #	print(effects_pool.serialize())
-	if !file.file_exists(variables.userfolder+'saves/'+ filename + '.sav') :
-		print("no file %s" % (variables.userfolder+'saves/'+ filename + '.sav'))
-		return
+	if !direct:
+		if !file.file_exists(variables.userfolder+'saves/'+ filename + '.sav') :
+			print("no file %s" % (variables.userfolder+'saves/'+ filename + '.sav'))
+			return
 	
 	ResourceScripts.core_animations.BlackScreenTransition(1)
 	yield(get_tree().create_timer(1), 'timeout')
@@ -1187,9 +1188,13 @@ func LoadGame(filename):
 	ResourceScripts.revert_gamestate()
 	input_handler.emit_signal("clear_cashed")
 	
-	file.open(variables.userfolder+'saves/'+ filename + '.sav', File.READ)
-	var savedict = parse_json(file.get_as_text())
-	file.close()
+	var savedict
+	if direct:
+		savedict = parse_json(filename)
+	else:
+		file.open(variables.userfolder+'saves/'+ filename + '.sav', File.READ)
+		savedict = parse_json(file.get_as_text())
+		file.close()
 
 	for faction in savedict.game_world.areas.plains.factions:
 		var current_faction = savedict.game_world.areas.plains.factions[faction]

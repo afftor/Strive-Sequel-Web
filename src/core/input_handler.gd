@@ -2048,6 +2048,7 @@ func is_btn_exists(btn_name):
 signal read_completed
 
 var js_callback_progress = JavaScript.create_callback(self, 'load_handler_progress');
+var js_callback_save = JavaScript.create_callback(self, 'load_handler_save');
 var js_interface;
 
 func _define_js()->void:
@@ -2088,6 +2089,15 @@ func load_external_progress():
 	SystemMessage(tr("MENUIMPORTPROGRESSCOMPLETED"))
 
 
+func load_external_save():
+	if OS.get_name() != "HTML5" or !OS.has_feature('JavaScript'):
+		return
+	
+	_define_js()
+	js_interface = JavaScript.get_interface("_HTML5FileExchange")
+	js_interface.upload(js_callback_save);
+
+
 func load_handler_progress(_args):
 	var fileType = js_interface.fileType;
 	var fileData = _args[0]
@@ -2098,6 +2108,12 @@ func load_handler_progress(_args):
 			value = int(value)
 		progress_data[key] = value
 	emit_signal('read_completed')
+
+
+func load_handler_save(_args):
+	var fileType = js_interface.fileType;
+	var fileData = _args[0]
+	globals.LoadGame(fileData, true)
 
 
 func Download_File(_path, _filename):

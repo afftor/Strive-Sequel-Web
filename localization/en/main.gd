@@ -8,6 +8,7 @@ var TranslationDict = {
 	MENUCONTINUE = "Continue",
 	MENUEXPORTPROGRESS = "Export Progress",
 	MENUIMPORTPROGRESS = "Import Progress",
+	MENUIMPORTSAVE = "Import Save",
 	MENUIMPORTPROGRESSCOMPLETED = "Progress Import Finished",
 	MENUNEWGAME = "New game",
 	MENUTUTORIAL = "Tutorial",
