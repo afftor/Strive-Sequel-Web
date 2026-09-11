@@ -2100,8 +2100,11 @@ func load_external_save():
 
 func load_handler_progress(_args):
 	var fileType = js_interface.fileType;
-	var fileData = _args[0]
-	var parse_result = JSON.parse(fileData).result
+	var fileData = JSON.parse(_args[0])
+	if fileData.error != OK:
+		print ("wrong file format")
+		return
+	var parse_result = fileData.result
 	for key in parse_result:
 		var value = parse_result[key]
 		if progress_data.has(key) and progress_data[key] is int:
