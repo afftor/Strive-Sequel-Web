@@ -1,4 +1,4 @@
-[gd_scene load_steps=15 format=2]
+[gd_scene load_steps=16 format=2]
 
 [ext_resource path="res://assets/Themes_v2/MAIN_MENU/Menu_SaveLoad.tres" type="Theme" id=1]
 [ext_resource path="res://assets/Themes_v2/EmptyTexture.tres" type="StyleBox" id=2]
@@ -14,6 +14,7 @@
 [ext_resource path="res://assets/Themes_v2/UNIVERSAL/PT_20_normal.tres" type="DynamicFont" id=12]
 [ext_resource path="res://assets/Themes_v2/UNIVERSAL/VScrollBar.tres" type="Theme" id=13]
 [ext_resource path="res://assets/Themes_v2/UNIVERSAL/NonDecorButtons.tres" type="Theme" id=14]
+[ext_resource path="res://assets/Textures_v2/CHAR_CREATION/Buttons/icon_download.png" type="Texture" id=15]
 
 [node name="saveloadpanel" type="Panel"]
 margin_right = 650.0
@@ -38,8 +39,6 @@ custom_constants/separation = 3
 
 [node name="Button" type="TextureButton" parent="ScrollContainer/VBoxContainer"]
 visible = false
-margin_left = 5.0
-margin_top = 5.0
 margin_right = 590.0
 margin_bottom = 51.0
 texture_normal = ExtResource( 3 )
@@ -56,10 +55,10 @@ custom_fonts/font = ExtResource( 10 )
 text = "LSPSAVENAME"
 
 [node name="Date" type="Label" parent="ScrollContainer/VBoxContainer/Button"]
-margin_left = 340.0
+margin_left = 292.0
 margin_top = 8.0
-margin_right = 522.0
-margin_bottom = 40.0
+margin_right = 474.0
+margin_bottom = 41.0
 custom_colors/font_color = Color( 0.976471, 0.882353, 0.505882, 1 )
 custom_fonts/font = ExtResource( 10 )
 text = "LSPSAVENAME"
@@ -75,6 +74,18 @@ hint_tooltip = "Delete"
 texture_normal = ExtResource( 9 )
 texture_pressed = ExtResource( 8 )
 texture_hover = ExtResource( 7 )
+
+[node name="Download" type="TextureButton" parent="ScrollContainer/VBoxContainer/Button"]
+margin_left = 497.0
+margin_top = 5.0
+margin_right = 537.0
+margin_bottom = 46.2509
+rect_min_size = Vector2( 30, 30 )
+hint_tooltip = "Delete"
+texture_normal = ExtResource( 15 )
+texture_pressed = ExtResource( 15 )
+texture_hover = ExtResource( 15 )
+expand = true
 
 [node name="LineEdit" type="LineEdit" parent="."]
 margin_left = 52.0

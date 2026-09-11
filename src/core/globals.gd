@@ -1176,7 +1176,14 @@ func _serialize_party_chunked(chunk):
 
 func LoadGame(filename, direct = false):
 #	print(effects_pool.serialize())
-	if !direct:
+	var savedict
+	if direct:
+		if JSON.parse(filename).error != OK:
+			print ("wrong file format")
+			return
+		else:
+			savedict = parse_json(filename)
+	else:
 		if !file.file_exists(variables.userfolder+'saves/'+ filename + '.sav') :
 			print("no file %s" % (variables.userfolder+'saves/'+ filename + '.sav'))
 			return
@@ -1188,10 +1195,8 @@ func LoadGame(filename, direct = false):
 	ResourceScripts.revert_gamestate()
 	input_handler.emit_signal("clear_cashed")
 	
-	var savedict
-	if direct:
-		savedict = parse_json(filename)
-	else:
+	
+	if !direct:
 		file.open(variables.userfolder+'saves/'+ filename + '.sav', File.READ)
 		savedict = parse_json(file.get_as_text())
 		file.close()
