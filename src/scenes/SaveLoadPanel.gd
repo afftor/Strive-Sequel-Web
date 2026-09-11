@@ -104,6 +104,10 @@ func SavePanelOpen():
 			continue
 		var newbutton = input_handler.DuplicateContainerTemplate($ScrollContainer/VBoxContainer)
 		newbutton.get_node("Delete").connect("pressed", self, 'DeleteSaveGame', [savename])
+		if OS.get_name() != "HTML5" or !OS.has_feature('JavaScript'):
+			newbutton.get_node("Download").visible = false
+		else:
+			newbutton.get_node("Download").connect("pressed", self, 'DownloadSaveGame', [savename])
 		newbutton.get_node("Label").text = savename
 		newbutton.connect('pressed', self, 'PressSaveGame', [savename])
 		newbutton.connect("mouse_entered", self, "show_save_details", [savename])
@@ -138,6 +142,10 @@ func LoadPanelOpen():
 			continue
 		var newbutton = input_handler.DuplicateContainerTemplate($ScrollContainer/VBoxContainer)
 		newbutton.get_node("Delete").connect("pressed", self, 'DeleteSaveGame', [savename])
+		if OS.get_name() != "HTML5" or !OS.has_feature('JavaScript'):
+			newbutton.get_node("Download").visible = false
+		else:
+			newbutton.get_node("Download").connect("pressed", self, 'DownloadSaveGame', [savename])
 		newbutton.get_node("Label").text = savename
 		newbutton.connect('pressed', self, 'PressLoadGame', [savename])
 		newbutton.connect("mouse_entered", self, "show_save_details", [savename])
@@ -190,6 +198,12 @@ func PressSaveGame(savename):
 		#input_handler.ShowConfirmPanel(self, 'SaveGame',tr("OVERWRITECONFIRM"))
 	else:
 		SaveGame()
+
+
+func DownloadSaveGame(savename):
+	input_handler.Download_File(variables.userfolder + 'saves/' + savename + '.sav', savename + '.sav')
+
+
 
 func DeleteSaveGame(savename):
 	$LineEdit.text = savename
