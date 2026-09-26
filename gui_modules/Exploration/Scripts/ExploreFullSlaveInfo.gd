@@ -21,7 +21,7 @@ func _ready():
 		globals.connecttexttooltip(i, statdata.statdata[i.name].descript)
 	globals.connecttexttooltip(SummaryModule.get_node("VBoxContainer2/TextureRect2/Exp"), statdata.statdata["base_exp"].descript)
 	SummaryModule.get_node("VBoxContainer2/TextureRect4/NextClassExp").hint_tooltip = tr("NEXTCLASSEXP")# + str(person.get_next_class_exp())
-#	input_handler.connect('PortraitUpdate', self, 'show_summary')
+	input_handler.connect('PortraitUpdate', self, 'refresh_portrait')
 
 	for i in base_stats_container.get_children():
 		if i.name == "Exp":
@@ -34,7 +34,10 @@ func tut_get_close_button():
 
 
 func update_purchase_btn():
-	$PurchaseButton/Label.text = tr(gui_controller.exploration_city.hiremode.to_upper() + "_LABEL")
+	var city = gui_controller.exploration_city
+	$PurchaseButton/Label.text = tr(city.hiremode.to_upper() + "_LABEL")
+	if city.hiremode == "sell" and city.person_to_hire != null and city.is_subordinate(city.person_to_hire):
+		$PurchaseButton/Label.text = tr("SLAVE_MARKET_RELINQUISH")
 	if gui_controller.exploration_city.hiremode == "sell":
 		$PurchaseButton.disabled = false
 	else:
@@ -48,6 +51,12 @@ func hire_sell():
 		sell_slave()
 
 
+func refresh_portrait(): #see CharInfoMainModule - swap the picture, do not redraw the screen
+	if !is_visible_in_tree() or selected_char == null:
+		return
+	SummaryModule.get_node('Portrait').texture = selected_char.get_icon()
+
+
 func show_summary(person = selected_char):
 	if !is_visible_in_tree():
 		return
@@ -57,7 +66,7 @@ func show_summary(person = selected_char):
 		$Price.visible = true
 		$TextureRect.visible = true
 		if gui_controller.exploration_city.hiremode == "sell":
-			$Price.text = str(round(person.calculate_price(true) / 2))
+			$Price.text = str(gui_controller.exploration_city.market_sale_price(person))
 			$ExploreSlaveInfoModule/Panel/obedlabel.visible = true
 		else:
 			$Price.text = str(round(person.calculate_price(true)))
@@ -94,16 +103,10 @@ func show_summary(person = selected_char):
 			i.get_node("Label").set("custom_colors/font_color", Color(1,1,1))
 	
 	for i in ['physics','wits','charm','sexuals']:
-		if i != 'sexuals':
-			var color = set_color(person.get_stat(i+'_bonus'))
-			SummaryModule.get_node("VBoxContainer2/TextureRect3/" + i).set("custom_colors/font_color", color)
-			SummaryModule.get_node("VBoxContainer2/TextureRect3/" + i).text = str(floor(person.get_stat(i)))
-			SummaryModule.get_node("VBoxContainer2/TextureRect4/" + i + '2').text = str(person.get_stat(i+'_cap') + person.get_stat(i+"_bonus"))
-		else:
-			var color = set_color(person.get_stat(i+'_bonus'))
-			SummaryModule.get_node("VBoxContainer2/TextureRect3/" + i).set("custom_colors/font_color", color)
-			SummaryModule.get_node("VBoxContainer2/TextureRect3/" + i).text = str(floor(person.get_stat(i)))
-			SummaryModule.get_node("VBoxContainer2/TextureRect4/"+ i + '2').text = '100'
+		var color = set_color(person.get_stat(i+'_bonus'))
+		SummaryModule.get_node("VBoxContainer2/TextureRect3/" + i).set("custom_colors/font_color", color)
+		SummaryModule.get_node("VBoxContainer2/TextureRect3/" + i).text = globals.base_stat_value_text(person, i)
+		SummaryModule.get_node("VBoxContainer2/TextureRect4/" + i + '2').text = globals.base_stat_cap_text(person, i)
 	
 	# $factors/base_exp/Label.hint_tooltip = tr("NEXTCLASSEXP") + str(person.get_next_class_exp())
 	# for i in person.xp_module.professions:
@@ -145,17 +148,15 @@ func _on_Button_pressed():
 func hire_character():
 	input_handler.active_location = ResourceScripts.world_gen.get_location_from_code(gui_controller.exploration_city.selected_location)
 	var person = gui_controller.exploration_city.person_to_hire
-	if ResourceScripts.game_party.characters.size() >= ResourceScripts.game_res.get_pop_cap():
-		if ResourceScripts.game_res.get_pop_cap() < ResourceScripts.game_res.get_pop_cap_limit():
-			input_handler.SystemMessage("You don't have enough rooms")
-		else:
-			input_handler.SystemMessage("Population limit reached")
-		return
+	#Running out of beds no longer refuses the purchase - the bed count is what the household
+	#pays for later, not a gate on acquiring somebody. Whoever has nowhere to sleep is housed
+	#by autohouse_character when a bed frees up, and until then pays the slept_rough penalty.
 	if ResourceScripts.game_res.money < person.calculate_price(true):
 		input_handler.SystemMessage("Not enough money")
 		return
 	ResourceScripts.game_res.money -= person.calculate_price(true)
 	input_handler.PlaySound("money_spend")
+	ResourceScripts.slave_quests.mark_bought(person)
 	person.set_stat('is_hirable', false)
 	person.recruit() #ResourceScripts.game_party.add_slave(person)
 	person.travel.location = gui_controller.exploration_city.selected_location
@@ -186,19 +187,27 @@ func sell_slave():
 	var text = ''
 	if selectedperson.get_stat('unique') != null:
 		text += "This is a unique character. "
-	text += tr("SELL") + " [name]?"
+	var verb = tr("SLAVE_MARKET_RELINQUISH") if gui_controller.exploration_city.is_subordinate(selectedperson) else tr("SELL")
+	text += verb + " [name]?"
 	input_handler.get_spec_node(input_handler.NODE_YESNOPANEL, [self, 'sell_slave_confirm', selectedperson.translate(text)])
 
 
 func sell_slave_confirm():
 	var selectedperson = gui_controller.exploration_city.person_to_hire
-	ResourceScripts.game_res.money += int(round(selectedperson.calculate_price(true)/2))
+	var price = gui_controller.exploration_city.market_sale_price(selectedperson)
+	var relinquished = gui_controller.exploration_city.is_subordinate(selectedperson)
+	ResourceScripts.game_res.money += price
 	ResourceScripts.game_party.add_fate(selectedperson.id, tr("SIBLINGMODULEFATEREMOVED"))
 	ResourceScripts.game_party.remove_slave(selectedperson)
 	gui_controller.exploration_city.active_faction.slaves.append(selectedperson.id)
 #	selectedperson.is_players_character = false
 	input_handler.PlaySound("money_spend")
 #	input_handler.slave_list_node.rebuild()
-	gui_controller.exploration_city.sell_slave() #2test 
+	gui_controller.exploration_city.sell_slave() #2test
 	self.hide()
+	var slave_quests = ResourceScripts.slave_quests
+	var bought = 1 if slave_quests.was_bought(selectedperson) else 0
+	slave_quests.forget_bought(selectedperson)
+	if !relinquished:
+		slave_quests.on_slave_sold(1, price, bought)
 

@@ -2,8 +2,8 @@ extends Control
 
 # VARIABLES
 # Modules
-onready var UpgradesModule_ = $upgrades
 onready var SlaveListModule = $MansionSlaveListModule
+onready var RoomsModule = $MansionRoomsModule
 onready var SkillModule = $MansionSkillsModule
 onready var SlaveModule = $MansionSlaveModule
 onready var TaskModule = $MansionTaskInfoModule
@@ -14,12 +14,26 @@ onready var CraftModule = $MansionCraftModule
 onready var JobModule = $MansionJobModule2
 onready var SexSelect = $SexSelectMenu
 onready var Journal = $MansionJournalModule
+onready var TurnProductionOverlay = $TurnProductionOverlay
+onready var ViewModes = $ViewModes
+onready var LocalTasksButton = $ViewModes/Scope/LocalTasksButton
+onready var LocalTasksShimmer = $ViewModes/Scope/LocalTasksButton/QuestAttentionShimmer
+#How fast the sheen sweeps and how long it rests between passes live in the shader itself -
+#see quest_attention_shimmer.shader. Nothing here drives it; this only turns it on and off.
+#Assigned in code rather than left to the scene: an open scene in the Godot editor is written
+#back from memory when it saves, which quietly undoes edits made to the .tscn on disk. The
+#shader lives in its own file, so tuning the sheen always takes.
+const SHIMMER_SHADER = preload("res://gui_modules/Mansion/Modules/quest_attention_shimmer.shader")
+#what the doll has art for, which is the list test mode stocks the wardrobe from
+const DOLL_GEAR = preload("res://Character_generator/Doll2Spine/universal/doll_gear_map.gd")
 onready var submodules = []
 
 export var test_mode = false
+export(bool) var show_legacy_character_panels = false
 
 
 signal tut_option_selected
+signal initialization_finished
 
 #Skills
 var skill_source
@@ -59,6 +73,11 @@ var prev_selected_travel
 
 var always_show = [
 	"BGHolder",
+	#the floorplan is the mansion's floor, not a panel opened over it - it lies under
+	#everything else and stays there. Its own input asks whether anything is drawn on top of
+	#the cursor before it claims the wheel, so it cannot steal scrolling from the panels above.
+	"MansionRoomsModule",
+	"ViewModes",
 	"TestButton",
 	"MansionTaskInfoModule",
 	"MansionClockModule",
@@ -67,20 +86,63 @@ var always_show = [
 	"MansionSlaveListModule",
 	"MansionLogModule",
 	"NavigationModule",
+	"TurnProductionOverlay",
 	"map_test"
 ]
+
+const LEGACY_CHARACTER_PANELS = [
+	"MansionSkillsModule",
+	"MansionSlaveModule",
+]
+
+const TURN_PRODUCT_FLY_TIME = 0.46
+const TURN_PRODUCT_STAGGER = 0.035
+const TURN_PRODUCT_MAX_STAGGER = 0.35
 
 var newgame_bonuses
 
 var in_test_mode = false
+var loading_progress_node
+var loading_progress_range = [70.0, 90.0]
+var local_tasks_attention = false
+
+#These are local players rather than input_handler's shared SFX player. Night ambience should
+#not cut off a button or an in-world effect, and it is only audible while this screen is open.
+var night_cricket_player
+var night_owl_player
+var night_sound_delay = 0.0
+var night_sounds_active = false
+var morning_rooster_player
+var morning_rooster_variants = []
+var morning_rooster_delay = 0.0
+var morning_rooster_active = false
+var day_bird_player
+var day_bird_variants = []
+var day_bird_delay = 0.0
+var day_birds_active = false
+var evening_crow_player
+var evening_crow_variants = []
+var evening_crow_delay = 0.0
+var evening_crows_active = false
+const MORNING_HOUR = 1
+const DAY_HOUR = 2
+const EVENING_HOUR = 3
+const NIGHT_HOUR = 4
 
 func _ready():
+	setup_night_sound_players()
+	if !show_legacy_character_panels:
+		$MansionSkillsModule.hide()
+		$MansionSlaveModule.hide()
 #	input_handler.CurrentScene = self
 	if test_mode && OS.has_feature('editor'):
+		#this builds a world from _ready, and the world answers in system messages
+		input_handler.defer_spec_node_mount = true
 		modding_core.handle_test_mode()
 		test_mode()
 		in_test_mode = true
 		mansion_state_set("default")
+		input_handler.defer_spec_node_mount = false
 	add_season_events()
 	var is_new_game = false
 #	globals.connect('slave_arrived', $NavigationModule, "build_accessible_locations")
@@ -113,6 +175,11 @@ func _ready():
 		#the onready init ran before the starting sequence, when the party was still empty
 		active_person = ResourceScripts.game_party.get_master()
 		SlaveListModule.rebuild()
+		#The floorplan's own _ready ran before any of this, against an empty party - and the
+		#starting preset seats nobody, because it does not add its people through add_slave.
+		#This is the first moment the household is final, so it is where everyone gets a bed.
+		ResourceScripts.game_res.ensure_mansion_layout()
+		RoomsModule.refresh()
 #		SlaveListModule.build_locations_list()
 		#a window closing during the starting sequence can already have pushed the mansion
 		#into 'default' (gui_controller.close_window does), and the setter bails out on an
@@ -128,23 +195,248 @@ func _ready():
 	gui_controller.current_screen = self
 	yield(get_tree(),'idle_frame')
 	gui_controller.clock = input_handler.get_spec_node(input_handler.NODE_CLOCK)
-	gui_controller.clock.show()
+	if is_instance_valid(loading_progress_node):
+		gui_controller.clock.hide()
+	else:
+		gui_controller.clock.show()
 	gui_controller.clock.update_labels()
 	$TutorialButton.connect('pressed', self, 'show_tutorial')
+	#the old tutorial is retired: the panel stays reachable by hotkey, the button does not show
+	$TutorialButton.hide()
+	var sheen = ShaderMaterial.new()
+	sheen.shader = SHIMMER_SHADER
+	LocalTasksShimmer.material = sheen
+	LocalTasksButton.text = tr("MANSIONVIEW_LOCALTASKS")
+	LocalTasksButton.connect('pressed', self, 'set_local_tasks_scope', [true])
+	ViewModes.get_node("Scope/MansionButton").text = tr("MANSIONVIEW_SCOPEMANSION")
+	ViewModes.get_node("Scope/MansionButton").connect('pressed', self, 'set_local_tasks_scope', [false])
+	#Named rather than drawn: they are tabs now, and a tab says what it is in words - the same way
+	#the scope pair beside them does. The tooltip goes with the picture it was standing in for: a
+	#hint that repeats the label already on the button is a panel opened over the screen to say
+	#nothing.
+	mode_tab("ModeWork").text = tr("MANSIONVIEW_MODEWORK")
+	mode_tab("ModeBeds").text = tr("MANSIONVIEW_MODEBEDS")
+	mode_tab("ModeWork").connect('pressed', self, 'set_rooms_mode', ['work'])
+	mode_tab("ModeBeds").connect('pressed', self, 'set_rooms_mode', ['sleep'])
+	RoomsModule.connect('mode_changed', self, 'sync_view_mode_buttons')
+	RoomsModule.connect('place_changed', self, 'on_place_changed')
+	SlaveListModule.connect('fold_changed', self, 'on_list_fold_changed')
+	sync_view_mode_buttons(RoomsModule.mode)
+	sync_local_tasks_button(RoomsModule.place)
+	globals.connecttexttooltip(LocalTasksButton, tr("MANSIONVIEW_LOCALTASKSHINT"))
+	input_handler.register_btn_source('mansion_local_tasks_btn', self, 'tut_get_local_tasks_btn')
+	input_handler.register_btn_source('mansion_scope_btn', self, 'tut_get_mansion_scope_btn')
+	input_handler.register_btn_source('mansion_mode_beds_btn', self, 'tut_get_mode_beds_btn')
+	input_handler.register_btn_source('mansion_mode_work_btn', self, 'tut_get_mode_work_btn')
+	hotkeys.connect("bindings_changed", self, "build_tutorial_tooltip")
+	build_tutorial_tooltip()
 #	$tutorialpanel/Button.connect('pressed',$tutorialpanel,'hide')
 	slave_list_manager()
-	globals.log_node = $MansionLogModule
+	globals.mansion_activity_log_node = $MansionLogModule
 	input_handler.SetMusicRandom("mansion")
 	SlaveListModule.update_dislocations()
-	SlaveListModule.rebuild()
+	if is_instance_valid(loading_progress_node):
+		yield(SlaveListModule.rebuild_for_loading(
+			loading_progress_node,
+			loading_progress_range[0],
+			loading_progress_range[1]
+		), "completed")
+		loading_progress_node = null
+	else:
+		SlaveListModule.rebuild()
+	#same reason on both paths: this screen is built once per session, so its floorplan was
+	#laid out against whatever the layout looked like before the save was applied
+	ResourceScripts.game_res.ensure_mansion_layout()
+	RoomsModule.refresh()
 #	SlaveListModule.build_locations_list()
-	if !ResourceScripts.game_progress.intro_tutorial_seen:
-		$TutorialIntro.show()
 	set_active_person(ResourceScripts.game_party.get_master())
 	$NavigationModule.tut_register_aliron_btn()
 	Journal.tut_register_minor()
 	Journal.tut_register_first_quest()
 	Journal.tut_register_complete()
+	emit_signal("initialization_finished")
+
+
+#Work assignment has no global changed signal: the embedded task view refreshes itself after
+#a drop. This tiny fallback only walks the short quest-id array, while normal mansion refreshes
+#also call the same edge-triggered update directly.
+func _process(delta):
+	refresh_local_tasks_attention()
+	update_night_sounds(delta)
+	update_time_of_day_sounds(delta)
+	if !local_tasks_attention:
+		return
+	#the sweep keeps its own time inside the shader now, so there is nothing to advance here
+
+
+func setup_night_sound_players():
+	night_cricket_player = AudioStreamPlayer.new()
+	night_cricket_player.name = "NightCrickets"
+	night_cricket_player.bus = "Sound"
+	night_cricket_player.volume_db = -14.0
+	night_cricket_player.stream = audio.sounds.mansion_night_crickets
+	add_child(night_cricket_player)
+
+	night_owl_player = AudioStreamPlayer.new()
+	night_owl_player.name = "NightOwl"
+	night_owl_player.bus = "Sound"
+	night_owl_player.volume_db = -8.0
+	night_owl_player.stream = audio.sounds.mansion_night_owl
+	add_child(night_owl_player)
+
+	morning_rooster_player = AudioStreamPlayer.new()
+	morning_rooster_player.name = "MorningRooster"
+	morning_rooster_player.bus = "Sound"
+	morning_rooster_player.volume_db = -9.0
+	morning_rooster_variants = [audio.sounds.mansion_morning_rooster,
+		audio.sounds.mansion_morning_rooster_alt]
+	morning_rooster_player.stream = morning_rooster_variants[0]
+	add_child(morning_rooster_player)
+
+	day_bird_player = AudioStreamPlayer.new()
+	day_bird_player.name = "DayBirds"
+	day_bird_player.bus = "Sound"
+	day_bird_player.volume_db = -12.0
+	day_bird_variants = [audio.sounds.mansion_day_birds, audio.sounds.mansion_day_birds_alt]
+	day_bird_player.stream = day_bird_variants[0]
+	add_child(day_bird_player)
+
+	evening_crow_player = AudioStreamPlayer.new()
+	evening_crow_player.name = "EveningCrow"
+	evening_crow_player.bus = "Sound"
+	evening_crow_player.volume_db = -10.0
+	evening_crow_variants = [audio.sounds.mansion_evening_crow_01,
+		audio.sounds.mansion_evening_crow_02]
+	evening_crow_player.stream = evening_crow_variants[0]
+	add_child(evening_crow_player)
+
+
+func mansion_is_active_at_hour(hour):
+	return visible and gui_controller.current_screen == self \
+		and ResourceScripts.game_globals.hour == hour
+
+
+#Fair weather only: the rooster and the day birds keep quiet through the rain.
+func mansion_is_dry_at_hour(hour):
+	return mansion_is_active_at_hour(hour) and !ResourceScripts.game_globals.raining()
+
+
+func play_mansion_sound_variant(player, variants):
+	if variants.empty():
+		return
+	player.stream = variants[randi() % variants.size()]
+	player.play()
+
+
+func update_night_sounds(delta):
+	var is_night_in_mansion = mansion_is_active_at_hour(NIGHT_HOUR)
+	if !is_night_in_mansion:
+		if night_sounds_active:
+			night_cricket_player.stop()
+			night_owl_player.stop()
+			night_sounds_active = false
+		return
+	if !night_sounds_active:
+		night_sounds_active = true
+		night_sound_delay = rand_range(1.0, 3.0)
+		return
+
+	night_sound_delay -= delta
+	if night_sound_delay > 0.0:
+		return
+	#crickets do not sing through rain; the owl still calls over it
+	if !ResourceScripts.game_globals.raining() and randf() < 0.75:
+		night_cricket_player.play()
+		night_sound_delay = rand_range(7.5, 12.0)
+	else:
+		night_owl_player.play()
+		night_sound_delay = rand_range(14.0, 24.0)
+
+
+func update_time_of_day_sounds(delta):
+	update_morning_rooster(delta)
+	update_day_birds(delta)
+	update_evening_crows(delta)
+
+
+func update_morning_rooster(delta):
+	if !mansion_is_dry_at_hour(MORNING_HOUR):
+		if morning_rooster_active:
+			morning_rooster_player.stop()
+			morning_rooster_active = false
+		return
+	if !morning_rooster_active:
+		morning_rooster_active = true
+		morning_rooster_delay = rand_range(2.0, 5.0)
+		return
+
+	morning_rooster_delay -= delta
+	if morning_rooster_delay > 0.0:
+		return
+	play_mansion_sound_variant(morning_rooster_player, morning_rooster_variants)
+	morning_rooster_delay = rand_range(50.0, 60.0)
+
+
+func update_day_birds(delta):
+	if !mansion_is_dry_at_hour(DAY_HOUR):
+		if day_birds_active:
+			day_bird_player.stop()
+			day_birds_active = false
+		return
+	if !day_birds_active:
+		day_birds_active = true
+		day_bird_delay = rand_range(2.0, 5.0)
+		return
+
+	day_bird_delay -= delta
+	if day_bird_delay > 0.0:
+		return
+	play_mansion_sound_variant(day_bird_player, day_bird_variants)
+	day_bird_delay = rand_range(12.0, 20.0)
+
+
+func update_evening_crows(delta):
+	if !mansion_is_active_at_hour(EVENING_HOUR):
+		if evening_crows_active:
+			evening_crow_player.stop()
+			evening_crows_active = false
+		return
+	if !evening_crows_active:
+		evening_crows_active = true
+		evening_crow_delay = rand_range(2.0, 5.0)
+		return
+
+	evening_crow_delay -= delta
+	if evening_crow_delay > 0.0:
+		return
+	play_mansion_sound_variant(evening_crow_player, evening_crow_variants)
+	evening_crow_delay = rand_range(16.0, 30.0)
+
+
+#Only quests waiting at the estate. The button opens the estate and nothing else - it calls
+#RoomsModule.set_local_tasks(true), which pins the screen to the mansion - and that screen
+#lists a special task only when its location matches. A quest in some other town is reachable
+#from the bar along the top once the screen is open, but lighting the button for it would
+#promise something the first click does not deliver.
+func has_unstaffed_quest_task():
+	return ResourceScripts.game_res.unstaffed_quest_locations().has(
+		RoomsModule.LocationTasks.MANSION_CODE)
+
+
+func refresh_local_tasks_attention():
+	var needs_attention = has_unstaffed_quest_task()
+	#The flag alone is not enough to skip on: it starts false, and if the sweep is showing for
+	#any other reason - the scene opening with it on, a screen rebuilt around it - nothing here
+	#would ever turn it off, and the button would call for attention with no quest behind it.
+	if needs_attention == local_tasks_attention 			and LocalTasksShimmer.visible == needs_attention:
+		return
+	local_tasks_attention = needs_attention
+	LocalTasksShimmer.visible = needs_attention
+
+
+func loading_screen_finished():
+	if is_instance_valid(gui_controller.clock):
+		gui_controller.clock.show()
 
 
 
@@ -169,6 +461,10 @@ func add_season_events():
 		
 		if !ResourceScripts.game_progress.seen_events.has(i.event) && date >= i.start[0] + i.start[1]*30 && date <= i.end[0] + i.end[1]*30:
 			globals.common_effects([{code = 'add_timed_event', value = i.event, args = [{type = 'add_to_date', date = [1,1], hour = 1}]}])
+
+func build_tutorial_tooltip():
+	globals.connecttexttooltip($TutorialButton, hotkeys.get_tooltip_text("TUTORIALS", 'mansion_tutorial'))
+
 
 func show_tutorial():
 	if gui_controller.mansion_tutorial_panel == null:
@@ -205,9 +501,13 @@ func mansion_state_set(state):
 	if mansion_state != 'hidden': mansion_prev_state = mansion_state
 	mansion_state = state
 	if mansion_state == 'hidden': return
+	#Every state but the default one asks the player to pick somebody out of the list, and a
+	#list folded down to its title bar has nobody to pick. Only the default view shares its
+	#space with the floorplan below it.
+	if SlaveListModule != null:
+		SlaveListModule.apply_state_fold(mansion_state == "default")
 	match_state()
 	slave_list_manager()
-	get_node("TutorialButton").show()
 
 func reset_vars():
 #	input_handler.interacted_character = null
@@ -224,7 +524,7 @@ func reset_vars():
 		active_person = null
 	Journal.hide()
 
-# Handles Resizing and visibility
+# Handles state visibility
 func handle_test():
 	for nd in get_tree().get_nodes_in_group('test'):
 		nd.visible = in_test_mode
@@ -233,54 +533,55 @@ func handle_test():
 
 
 func match_state():
+	refresh_local_tasks_attention()
 	handle_test()
 	if gui_controller.clock != null and visible and mansion_state != 'craft':
 		gui_controller.clock.show()
 		gui_controller.clock.raise()
 	gui_controller.nav_panel = $NavigationModule
 	gui_controller.nav_panel.build_accessible_locations()
-	Journal.visible = MenuModule.get_node("VBoxContainer/Journal").is_pressed()
+	Journal.visible = MenuModule.get_node("Buttons/Journal").is_pressed()
 	for node in get_children():
-		if node.get_class() == "Tween":
+		#Tweens and the night sound players are plain Nodes with nothing to hide
+		if !(node is CanvasItem):
+			continue
+		if !show_legacy_character_panels and node.name in LEGACY_CHARACTER_PANELS:
+			node.hide()
 			continue
 		if node.name.findn(mansion_state) == -1 and ! node.name in always_show:
 			node.hide()
-	var menu_buttons = MenuModule.get_node("VBoxContainer")
+	var menu_buttons = MenuModule.get_node("Buttons")
 	for button in menu_buttons.get_children():
 		button.pressed = false
+	#the rail is built once and the craft icon depends on what stands on the plan, so it is
+	#asked again whenever the screen is looked at rather than only when a room goes up
+	MenuModule.refresh_craft_button()
 	match mansion_state:
 		"default":
 			reset_vars()
 			SlaveListModule.show()
 			SlaveListModule.mode = 'default'
-			$MansionSlaveListModule.set_size(Vector2(1100, 805))
-			$MansionSlaveListModule/ScrollContainer.set_size(Vector2(1004, 640))
-			# SlaveListModule.get_node("Background").set_size(Vector2(1100, 845))
-			$MansionSkillsModule.show()
+			if show_legacy_character_panels:
+				$MansionSkillsModule.show()
 			if active_person == null:
 				return
 			if mansion_state != mansion_prev_state && mansion_prev_state != "skill":
-				ResourceScripts.core_animations.UnfadeAnimation($MansionSkillsModule, 0.3)
+				if show_legacy_character_panels:
+					ResourceScripts.core_animations.UnfadeAnimation($MansionSkillsModule, 0.3)
 				ResourceScripts.core_animations.UnfadeAnimation($MansionSlaveListModule, 0.3)
 				$MansionJobModule2.close_job_pannel()
 				
 				
 		"skill":
 			$MansionSlaveListModule.show()
-			$MansionSlaveListModule.set_size(Vector2(1100, 805))
-			# SlaveListModule.get_node("Background").set_size(Vector2(1100, 845))
-			$MansionSlaveListModule/ScrollContainer.set_size(Vector2(1004, 640))
 			$MansionSlaveListModule.rebuild()
 			if mansion_state != mansion_prev_state:
-				ResourceScripts.core_animations.UnfadeAnimation($MansionSkillsModule, 0.3)
+				if show_legacy_character_panels:
+					ResourceScripts.core_animations.UnfadeAnimation($MansionSkillsModule, 0.3)
 				ResourceScripts.core_animations.UnfadeAnimation($MansionSlaveListModule, 0.3)
 				$MansionJobModule2.close_job_pannel()
 		"travels":
 			$map.open()
-		"upgrades":
-			UpgradesModule_.show()
-			if mansion_state != mansion_prev_state:
-				ResourceScripts.core_animations.UnfadeAnimation(UpgradesModule_, 0.3)
 		"occupation":
 			$MansionSlaveListModule.rebuild()
 			if mansion_state != mansion_prev_state:
@@ -298,18 +599,13 @@ func match_state():
 			# CraftModule.get_node("filter").hide()
 			ResourceScripts.core_animations.UnfadeAnimation(CraftModule, 0.3)
 			ResourceScripts.core_animations.UnfadeAnimation($MansionSlaveListModule, 0.3)
-			menu_buttons.get_node("CraftButton").pressed = true
 		"sex":
 			SlaveListModule.show()
-			$MansionSlaveListModule.set_size(Vector2(1100, 780))
-			SlaveListModule.get_node("Background").set_size(Vector2(1100, 780))
-			$MansionSlaveListModule/ScrollContainer.set_size(Vector2(1004, 550))
 			if mansion_state != mansion_prev_state:
 				ResourceScripts.core_animations.UnfadeAnimation(SexSelect, 0.3)
 				ResourceScripts.core_animations.UnfadeAnimation($MansionSlaveListModule, 0.3)
 			SexSelect.show()
 			sex_handler()
-			menu_buttons.get_node("SexButton").pressed = true
 	
 	rebuild_task_info()
 
@@ -328,12 +624,14 @@ func open_char_info():
 	ResourceScripts.core_animations.UnfadeAnimation(gui_controller.slavepanel, 0.3)
 
 func rebuild_mansion():
+	refresh_local_tasks_attention()
 	$MansionSlaveListModule.update()
-	$MansionSkillsModule.build_skill_panel()
+	RoomsModule.queue_refresh()
+	if show_legacy_character_panels:
+		$MansionSkillsModule.build_skill_panel()
 	CraftModule.rebuild_scheldue()
 	#UpgradesModule.open_queue()
-	SlaveModule.show_slave_info()
-	$TutorialButton.show()
+	update_legacy_slave_panel()
 
 #same work as rebuild_mansion, but split over frames so a turn does not stall the game.
 #day_extras covers what advance_day used to rebuild on a day change
@@ -341,18 +639,340 @@ func rebuild_after_turn(day_extras):
 	yield(get_tree(), 'idle_frame') #always a coroutine, callers yield on 'completed'
 	yield(SlaveListModule.refresh_after_turn(true), 'completed')
 	yield(get_tree(), 'idle_frame')
-	$MansionSkillsModule.build_skill_panel()
+	#the floorplan gets its own slice rather than riding on the list's
+	rooms_after_turn()
+	yield(get_tree(), 'idle_frame')
+	if show_legacy_character_panels:
+		$MansionSkillsModule.build_skill_panel()
 	if !day_extras:
 		return
 	yield(get_tree(), 'idle_frame')
 	CraftModule.rebuild_scheldue()
 	yield(get_tree(), 'idle_frame')
-	SlaveModule.show_slave_info()
-	$TutorialButton.show()
+	update_legacy_slave_panel()
+
+
+#What a passed turn does to the floorplan. A turn advances builds, finishes tasks and can
+#leave somebody without a bed, so it is redrawn - and it comes back to work while it is at it,
+#because beds are arranged in a sitting and then done with, and a new day is about who is
+#working. Its own function so the self test can ask for it without sitting through the whole
+#staggered rebuild around it.
+#The estate has two faces: the floorplan is the building, local tasks is the work the estate
+#itself offers. Same place, two things to arrange, so this swaps what the backdrop is drawing
+#rather than opening a screen over it - the slave list and the strip of portraits stay put,
+#which is what people are dragged onto the work from.
+func tut_get_local_tasks_btn():
+	return LocalTasksButton
+
+
+#Leaving local tasks is pressing the other half of the pair rather than pressing this one
+#again, so the tutorial step that used to say "close it" has its own button to point at.
+func tut_get_mansion_scope_btn():
+	return ViewModes.get_node("Scope/MansionButton")
+
+
+#What the plan is arranging - the day's work, or where everybody sleeps. Two buttons rather
+#than one toggle, so the lesson that hands out beds points at one on the way in and the other
+#on the way back.
+func tut_get_mode_beds_btn():
+	return mode_tab("ModeBeds")
+func tut_get_mode_work_btn():
+	return mode_tab("ModeWork")
+
+
+#### the two tabs on the strip ####
+
+#They stand on the floorplan's own idle strip (RestPanel in mansion_view.tscn) rather than on this
+#screen, and they stand before its labels in that panel's children - which is the whole of what
+#makes the warning it writes across that row draw over them instead of being cut in half by them.
+#A Control has no z_index in Godot 3; tree order is the only word on what covers what.
+#
+#They come and go with the strip by being part of it, so nothing here has to hide them. Asked for
+#by name in one place, so moving them again is one edit rather than nine.
+func mode_tab(tab_name):
+	if RoomsModule == null or !is_instance_valid(RoomsModule) or RoomsModule.rest_panel == null:
+		return null
+	return RoomsModule.rest_panel.get_node_or_null(tab_name)
+
+
+#### which of the two views is up ####
+
+#The mansion screen is two things one behind the other: the household list, which is what it
+#opens on, and the floorplan under it. Folding the list away is what uncovers the plan, so
+#"the plan is up" and "the list is folded" are one fact - asked of the list rather than kept
+#a second time here, where the two could drift apart.
+func plan_shown():
+	if SlaveListModule == null or !is_instance_valid(SlaveListModule):
+		return false
+	return SlaveListModule.list_fold_state == SlaveListModule.FOLD_FOLDED
+
+
+#Remembered either way: the view the player is left looking at is the one the mansion gives
+#back when they return to it from a character panel, the town or a scene.
+func show_plan(shown):
+	if SlaveListModule == null or !is_instance_valid(SlaveListModule):
+		return
+	SlaveListModule.set_fold_from_view(shown)
+
+
+#Whatever moved the fold - one of these buttons, the handle on the list's own bar, a card
+#opening over it, a lesson - the buttons that name the view follow it, so what is pressed is
+#always what is on screen.
+func on_list_fold_changed(_state = null):
+	sync_local_tasks_button(RoomsModule.place)
+
+
+#Something asked this screen to show another place's work, or the estate's own. The panel that
+#answers lies under the household list, so it comes up with the ask. Being put back on the
+#estate's rooms is not that ask - that is where the screen rests when nothing is being looked
+#at, and what the mansion rests on is the list.
+func on_place_changed(_code = null):
+	if !RoomsModule.in_mansion() or RoomsModule.local_tasks:
+		show_plan(true)
+	sync_local_tasks_button(RoomsModule.place)
+
+
+#The estate is looked at one way or the other - the building itself, or the work it offers -
+#so the two buttons put each other out rather than each toggling on its own. Either one also
+#brings the plan up over the list; pressing the one that is already up puts the plan away and
+#gives the household back, which is what the whole row of four is for.
+func set_local_tasks_scope(value):
+	#Pressed at another place it is the way home, and it brings back what it names rather than folding
+	#anything away: there is nothing here yet for the press to have been about.
+	if !RoomsModule.in_mansion():
+		RoomsModule.set_place(RoomsModule.LocationTasks.MANSION_CODE)
+		RoomsModule.set_local_tasks(value)
+		show_plan(true)
+		sync_local_tasks_button(RoomsModule.place)
+		return
+	if plan_shown() and RoomsModule.local_tasks == value:
+		show_plan(false)
+		sync_local_tasks_button(RoomsModule.place)
+		return
+	RoomsModule.set_local_tasks(value)
+	show_plan(true)
+	sync_local_tasks_button(RoomsModule.place)
+
+
+#The salvage bench, opened from the forge. The screen itself is the one the workers' guild used
+#to lend: it reads nothing but the player's own bags, so it works as well over the mansion as
+#it did over the city. Made when it is first asked for rather than kept in the scene, the way
+#the inventory and the game menu are.
+var disassembly = null
+
+
+func open_disassembly():
+	if disassembly == null or !is_instance_valid(disassembly):
+		disassembly = load("res://gui_modules/Exploration/Modules/DisassembleModule.tscn").instance()
+		add_child(disassembly)
+	gui_controller.win_btn_connections_handler(true, disassembly, null)
+	disassembly.show()
+	disassembly.raise()
+	disassembly.open()
+
+
+#Opened from the master's bedroom now, not from the rail down the left - so the window is
+#registered without a button of its own to keep pressed.
+func open_sex_selection():
+	if SexSelect.visible:
+		close_sex_selection()
+		return
+	#open() shows it, raises it and registers it as an open window - there is no button of its
+	#own to pair it with any more, and pairing it with none sent close_scene down a tail that
+	#put the mansion back over the scene it had just started
+	SexSelect.open()
+
+
+func close_sex_selection():
+	SexSelect.hide()
+
+
+#The beauty parlor's two windows: the tattoo bench, and - once the room has been improved -
+#the body editor. Two buttons on the room's card, so two windows rather than one wearing two
+#faces. Made when first asked for, like the salvage bench. Their own open() shows, raises and
+#registers them as open windows, so no win_btn_connections_handler: there is no rail button to
+#pair them with, and their hide() takes them back out of the register.
+var beauty_parlor = null
+var body_mod = null
+
+
+func open_beauty_parlor():
+	if beauty_parlor == null or !is_instance_valid(beauty_parlor):
+		beauty_parlor = load("res://gui_modules/Mansion/Modules/BeautyParlorModule.tscn").instance()
+		add_child(beauty_parlor)
+	beauty_parlor.open()
+
+
+func open_body_mod():
+	body_mod_window().open()
+
+
+#The ritual room's appearance change sends the one character it readied - see
+#BodyModModule.open_for_rite.
+func open_body_mod_for_rite(person, target, method):
+	body_mod_window().open_for_rite(person, target, method)
+
+
+func body_mod_window():
+	if body_mod == null or !is_instance_valid(body_mod):
+		body_mod = load("res://gui_modules/Mansion/Modules/BodyModModule.tscn").instance()
+		add_child(body_mod)
+	return body_mod
+
+
+#The scope pair does say what is on screen: with the list up neither is pressed, because
+#neither the estate's rooms nor its errands are being looked at. The mode tabs above are a
+#different kind of button - see sync_view_mode_buttons.
+func sync_local_tasks_button(_place = null):
+	var at_mansion = RoomsModule.in_mansion()
+	var local = RoomsModule.local_tasks if at_mansion else false
+	var up = plan_shown()
+	#The pair stays on the rail at another place as well: it is the way home, and with it gone the screen
+	#said nothing about where home was.
+	ViewModes.get_node("Scope").visible = true
+	LocalTasksButton.pressed = up and at_mansion and local
+	ViewModes.get_node("Scope/MansionButton").pressed = up and at_mansion and !local
+	refresh_local_tasks_attention()
+	sync_view_mode_buttons(RoomsModule.mode)
+
+
+#These two are tabs, not switches: one of them is always the one pressed, and what they choose
+#between is what the plan is arranging. There is no un-press - pressing the tab that is already
+#down changes nothing and, above all, never puts the plan away, because the list is not what
+#this pair is about. Putting the plan away is the scope pair's business (set_local_tasks_scope).
+func set_rooms_mode(value):
+	RoomsModule.set_mode(value)
+	#A press asks to see that arrangement, so it uncovers the plan if the list was over it. Only
+	#a press does this; there is nothing here that can fold the list open again.
+	show_plan(true)
+	sync_view_mode_buttons(RoomsModule.mode)
+
+
+func sync_view_mode_buttons(value = null):
+	if value == null:
+		value = RoomsModule.mode
+	ViewModes.visible = true
+	var work = mode_tab("ModeWork")
+	var beds = mode_tab("ModeBeds")
+	#One row of tabs at a time. Work and beds arrange the estate's plan; while the screen is showing
+	#errands - the estate's own or another place's - the row names the places that can be turned to.
+	var plan = RoomsModule.showing_plan()
+	var places = mode_tab("PlaceTabs")
+	if places != null:
+		places.visible = !plan
+	if work == null or beds == null:
+		return
+	work.visible = plan
+	beds.visible = plan
+	#One of the pair is always down: they name which of the two arrangements the plan is in, and
+	#the plan is always in one of them. What is on screen over it is a different question, and
+	#the scope pair on the rail answers that one.
+	work.pressed = value == 'work'
+	beds.pressed = value == 'sleep'
+	beds.disabled = !plan
+
+
+func rooms_after_turn():
+	RoomsModule.mode = 'work'
+	RoomsModule.refresh()
+	refresh_local_tasks_attention()
+	#set directly rather than through set_mode, so nothing was emitted to tell the row of
+	#buttons that beds is no longer what is being arranged
+	sync_view_mode_buttons(RoomsModule.mode)
+
+
+func _turn_product_texture(value):
+	if value is String:
+		return load(value)
+	return value
+
+
+#Capture coordinates before the simulation. Completed tasks can remove and rebuild their
+#rows during managed tick yields; retaining positions keeps every icon aimed at its own row.
+func capture_turn_production_layout():
+	var layout = {sources = {}, targets = {}}
+	if !is_visible_in_tree() or !TaskModule.is_visible_in_tree():
+		return layout
+	layout.targets = TaskModule.get_turn_animation_targets()
+	for person_id in ResourceScripts.game_party.character_order:
+		var source = SlaveListModule.get_turn_animation_source(person_id)
+		if source != null:
+			layout.sources[str(person_id)] = source.get_global_rect().get_center()
+	return layout
+
+
+func play_turn_production_animations(layout, production_events):
+	#Always yield once so ClockModule can safely await this even when no route is visible.
+	yield(get_tree(), "idle_frame")
+	if production_events.empty() or !is_visible_in_tree():
+		return
+	var routes = []
+	for event in production_events:
+		var person_id = str(event.person_id)
+		var task_id = str(event.task_id)
+		if !layout.sources.has(person_id) or !layout.targets.has(task_id):
+			continue
+		var texture = _turn_product_texture(event.texture)
+		if texture == null:
+			continue
+		routes.append({
+			texture = texture,
+			start = layout.sources[person_id],
+			target = layout.targets[task_id],
+		})
+	if routes.empty():
+		return
+	input_handler.ClearContainer(TurnProductionOverlay)
+	TurnProductionOverlay.raise()
+	var inverse_canvas = TurnProductionOverlay.get_global_transform_with_canvas().affine_inverse()
+	var max_delay = 0.0
+	var index = 0
+	for route in routes:
+		if route.texture == null:
+			continue
+		var fly_icon = input_handler.DuplicateContainerTemplate(TurnProductionOverlay)
+		fly_icon.get_node("Icon").texture = route.texture
+		var half_size = fly_icon.rect_size * 0.5
+		var start_position = inverse_canvas.xform(route.start) - half_size
+		var target_position = inverse_canvas.xform(route.target) - half_size
+		var delay = min(index * TURN_PRODUCT_STAGGER, TURN_PRODUCT_MAX_STAGGER)
+		max_delay = max(max_delay, delay)
+		fly_icon.rect_position = start_position
+		fly_icon.rect_scale = Vector2(0.72, 0.72)
+		fly_icon.modulate = Color(1, 1, 1, 0)
+		var tween = fly_icon.get_node("Tween")
+		tween.interpolate_property(fly_icon, "modulate", Color(1, 1, 1, 0), Color(1, 1, 1, 1),
+			0.08, Tween.TRANS_QUAD, Tween.EASE_OUT, delay)
+		tween.interpolate_property(fly_icon, "rect_position", start_position, target_position,
+			TURN_PRODUCT_FLY_TIME, Tween.TRANS_CUBIC, Tween.EASE_IN_OUT, delay)
+		tween.interpolate_property(fly_icon, "rect_scale", Vector2(0.72, 0.72), Vector2(1.08, 1.08),
+			TURN_PRODUCT_FLY_TIME * 0.55, Tween.TRANS_BACK, Tween.EASE_OUT, delay)
+		tween.interpolate_property(fly_icon, "rect_scale", Vector2(1.08, 1.08), Vector2(0.45, 0.45),
+			TURN_PRODUCT_FLY_TIME * 0.45, Tween.TRANS_QUAD, Tween.EASE_IN, delay + TURN_PRODUCT_FLY_TIME * 0.55)
+		tween.interpolate_property(fly_icon, "modulate", Color(1, 1, 1, 1), Color(1, 1, 1, 0),
+			0.12, Tween.TRANS_QUAD, Tween.EASE_IN, delay + TURN_PRODUCT_FLY_TIME - 0.12)
+		tween.interpolate_callback(fly_icon, delay + TURN_PRODUCT_FLY_TIME, "hide")
+		tween.start()
+		index += 1
+	if index == 0:
+		return
+	yield(get_tree().create_timer(max_delay + TURN_PRODUCT_FLY_TIME + 0.02), "timeout")
+	input_handler.ClearContainer(TurnProductionOverlay)
 
 func try_rebuild_slave_list():
 	if gui_controller.current_screen != self: return
 	SlaveListModule.rebuild()
+
+
+#The floorplan keeps its own list of who is idle and who is at work, and nothing in the model
+#tells it when that changed. Whatever moves somebody in or out of work from off this screen -
+#a scene sending a child to their tutelage, most of all - has to say so, or the idle strip goes
+#on offering a portrait for work the character has already been taken away from.
+#No current_screen guard, unlike the list above: this is asked for exactly when the plan is
+#behind a scene, and the refresh waits for the plan to be looked at again on its own.
+func try_refresh_rooms():
+	if RoomsModule == null or !is_instance_valid(RoomsModule): return
+	RoomsModule.queue_refresh()
 
 func rebuild_task_info():
 	var char_on_quest = false
@@ -397,6 +1017,7 @@ func skill_manager():
 	SlaveListModule.rebuild()
 
 func slave_list_manager():
+	refresh_local_tasks_attention()
 	match mansion_state:
 		'default':
 			if mansion_prev_state == "skill" || mansion_prev_state == "sex":
@@ -409,15 +1030,17 @@ func slave_list_manager():
 			SlaveListModule.update_buttons()
 			if active_person == null:
 				return
-			SkillModule.build_skill_panel()
-			SlaveModule.show_slave_info()
+			if show_legacy_character_panels:
+				SkillModule.build_skill_panel()
+			update_legacy_slave_panel()
 		'skill':
 			if active_person.is_on_quest():
 				return
 			if active_person in chars_for_skill:
 				SkillModule.use_skill(active_person)
 			set_active_person(skill_source)
-			SkillModule.build_skill_panel()
+			if show_legacy_character_panels:
+				SkillModule.build_skill_panel()
 			SlaveListModule.rebuild()
 		'travels':
 			if is_travel_selected:
@@ -430,7 +1053,7 @@ func slave_list_manager():
 #			TravelsModule.update_buttons()
 		'upgrades':
 			if !select_chars_mode:
-				SlaveModule.show_slave_info()
+				update_legacy_slave_panel()
 				SlaveListModule.rebuild()
 				return
 			if chars_for_upgrades.has(active_person):
@@ -450,7 +1073,12 @@ func slave_list_manager():
 				sex_participants.erase(active_person)
 			SlaveListModule.rebuild()
 			update_sex_date_buttons()
-	SlaveModule.show_slave_info()
+	update_legacy_slave_panel()
+
+
+func update_legacy_slave_panel():
+	if show_legacy_character_panels:
+		SlaveModule.show_slave_info()
 
 func update_sex_date_buttons():
 	SexSelect.get_node("SexButton").hint_tooltip = ""
@@ -490,13 +1118,13 @@ func update_sex_date_buttons():
 
 func set_hovered_person(node, person):
 	hovered_person = person
-	SlaveModule.show_slave_info()
+	update_legacy_slave_panel()
 
 func remove_hovered_person():
 #	if SlaveListModule.is_in_area():
 #		return
 	hovered_person = null
-	SlaveModule.show_slave_info()
+	update_legacy_slave_panel()
 
 
 func _on_TestButton_pressed():
@@ -510,6 +1138,36 @@ func _on_TestButton_pressed():
 func show_map():
 	$map.open()
 
+
+#Every costume and every set the doll can draw, dropped in the inventory so a
+#test run can dress anyone in anything without crafting or shopping first.
+#
+#Two lists, because they answer different questions: `geartype == 'costume'` is
+#what the game calls a costume - collars, masks, plugs, the pet suit - while the
+#gear map is what the *doll* has art for, which includes the armour bases nobody
+#would think to look up. Anything in both is added once; `AddItemToInventory`
+#stacks by base, so a second copy would only pile up.
+func stock_the_test_wardrobe():
+	var wanted = []
+	for base in Items.itemlist.keys():
+		if str(Items.itemlist[base].get('geartype', '')) == 'costume':
+			wanted.append(base)
+	for base in DOLL_GEAR.ITEM_PARTS.keys():
+		if !(base in wanted):
+			wanted.append(base)
+	for base in DOLL_GEAR.ALSO.keys():
+		if !(base in wanted):
+			wanted.append(base)
+	var made = 0
+	for base in wanted:
+		if !Items.itemlist.has(base):
+			continue
+		#no achievements: this is a wardrobe handed out by the test switch, not
+		#something anybody found, and the unlock banner it would raise has no panel
+		#to sit in this early in the screen's life
+		globals.AddItemToInventory(globals.CreateGearItem(base, {}), true, false)
+		made += 1
+	print("test mode: %d pieces of gear in the wardrobe" % made)
 
 func test_mode():
 	input_handler.CurrentScene = self
@@ -528,29 +1186,70 @@ func test_mode():
 		character.fill_boosters()
 		character.unlock_class("master")
 		characters_pool.move_to_state(character.id)
-		ResourceScripts.game_res.upgrades.resource_gather_veges = 1
-		ResourceScripts.game_res.upgrades.resource_gather_grain = 1
-		ResourceScripts.game_res.upgrades.resource_gather_cloth = 1
-		ResourceScripts.game_res.upgrades.resource_gather_iron = 1
-		ResourceScripts.game_res.upgrades.resource_gather_mithril = 1
-		ResourceScripts.game_res.upgrades.resource_gather_wood = 1
-		ResourceScripts.game_res.upgrades.resource_gather_wood_magic = 1
-		ResourceScripts.game_res.upgrades.resource_gather_wood_iron = 1
-		ResourceScripts.game_res.upgrades.resource_gather_stone = 1
-		ResourceScripts.game_res.upgrades.resource_gather_obsidian = 1
-		ResourceScripts.game_res.upgrades.resource_gather_cloth_silk = 1
-		ResourceScripts.game_res.upgrades.alchemy = 3
-		ResourceScripts.game_res.upgrades.tailor = 3
-		ResourceScripts.game_res.upgrades.rooms = 5
-		ResourceScripts.game_res.upgrades.forge = 3
-		ResourceScripts.game_res.upgrades.resting = 1
-		ResourceScripts.game_res.upgrades.buildertools = 3
+		ResourceScripts.game_res.ensure_mansion_layout()
+		#the master's room already widened, so beds mode opens with the one room whose rule is
+		#peculiar - his own bed is held for him however many are added - showing more than one
+		ResourceScripts.game_res.max_out_master_room()
+		#both floors to look at straight away, rather than a staircase to pay for first
+		ResourceScripts.game_res.open_stairs()
+		#the estate's gathering used to be a row of 'resource_gather_*' upgrades handed out
+		#here; it comes out of the buildings on the grounds now
+		ResourceScripts.game_res.build_test_grounds()
+		#The workshops, the practice room and a few beds - see TEST_ROOMS.
+		ResourceScripts.game_res.build_test_rooms()
 		ResourceScripts.game_res.fix_tax()
-		
-#		ResourceScripts.game_res.upgrades.tattoo_set = 1
+		#A quest waiting at the estate with nobody on it, so the Local tasks button has
+		#something to call attention to. Shaped like the ones the questlines add through the
+		#'add_special_task_for_location' effect - see act4_sebastian_railroad.gd.
+		ResourceScripts.game_res.add_special_job({
+			location = 'aliron',
+			amount = 4,
+			name = "MANSIONVIEW_TESTQUEST",
+			descript = "MANSIONVIEW_TESTQUESTDESCRIPT",
+			max_workers = 2,
+			workstat = 'wits',
+			icon = "res://assets/Textures_v2/MANSION/quest_task.png",
+			args = [],
+		})
+		#and a second one somewhere that is not home, so the navigation strip has a place to
+		#light up. The world is generated fresh here, so the settlement is picked out of it
+		#rather than named - codes like 'L3' are not stable between worlds.
+		var away = null
+		for area in ResourceScripts.game_world.areas.values():
+			for location in area.locations.values():
+				if location.has('id') and location.type != 'capital':
+					away = location.id
+					break
+			if away != null:
+				break
+		if away != null:
+			ResourceScripts.game_res.add_special_job({
+				location = away,
+				amount = 8,
+				name = "MANSIONVIEW_TESTQUESTAWAY",
+				descript = "MANSIONVIEW_TESTQUESTAWAYDESCRIPT",
+				max_workers = 2,
+				workstat = 'wits',
+				icon = "res://assets/Textures_v2/MANSION/quest_task.png",
+				args = [],
+			})
+		else:
+			print_debug("test mode: no settlement found to place the away quest in")
+		#the market at rank A: make_world() rolled rank-D quests, so the pool is emptied first
+		ResourceScripts.slave_quests.get_quest_pool().clear()
+		ResourceScripts.slave_quests.set_rank('A')
+		ResourceScripts.slave_quests.add_tokens(100)
+
+		#a storm over the house on the first turn, so the rain, the flash and the thunder are
+		#there to look at straight away; it then blows over and comes back on its own chance,
+		#the same as in a played game
+		ResourceScripts.game_globals.rain_turns_left = 3
+		ResourceScripts.game_globals.storm = true
+
 		var item = globals.CreateGearItem("strapon", {})
 		globals.AddItemToInventory(item)
 		character.equip(item)
+		stock_the_test_wardrobe()
 		character.set_stat('charm', 100)
 		character.set_stat('wits', 100)
 	#	character.add_stat('wits', 100)
@@ -621,8 +1320,11 @@ func test_mode():
 #		globals.impregnate(character, character)
 		character.set_stat('pregnancy_duration', 2)
 		#globals.common_effects([{code = 'unlock_class', name = 'healer', operant = 'eq', value = true}])
+		#The household is every furry race, so the doll can be looked at on each of them. The
+		#furry setting renames a beastkin to its halfkin at creation; the fur is put back.
 		character = ResourceScripts.scriptdict.class_slave.new("test_main_real")
-		character.create('Centaur', 'male', 'random')
+		character.create('BeastkinWolf', 'male', 'random')
+		character.set_furry_form(true)
 		character.fill_boosters()
 		character.set_stat('height', 'tiny')
 		character.set_stat('skin', 'grey')
@@ -631,14 +1333,16 @@ func test_mode():
 		characters_pool.move_to_state(character.id)
 		character.process_training_metrics({physical = 10, magic = 5, positive = 20}) #example of testing
 		character = ResourceScripts.scriptdict.class_slave.new("test_main_real")
-		character.create('Orc', 'female', 'random')
+		character.create('BeastkinCat', 'female', 'random')
+		character.set_furry_form(true)
 		character.fill_boosters()
 		character.set_stat('height', 'petite')
 		character.is_players_character = true
 		character.unlock_class("berserker")
 		characters_pool.move_to_state(character.id)
 		character = ResourceScripts.scriptdict.class_slave.new("test_main_real")
-		character.create('Elf', 'female', 'random')
+		character.create('BeastkinFox', 'female', 'random')
+		character.set_furry_form(true)
 		character.fill_boosters()
 		character.set_stat('height', 'short')
 		character.is_players_character = true
@@ -650,20 +1354,23 @@ func test_mode():
 		character.unlock_class("battlesmith")
 		character.unlock_class("dragonknight")
 		character = ResourceScripts.scriptdict.class_slave.new("test_main_real")
-		character.create('Goblin', 'female', 'random')
+		character.create('BeastkinBunny', 'female', 'random')
+		character.set_furry_form(true)
 		character.fill_boosters()
 		character.set_stat('height', 'average')
 		character.set_slave_category('servant')
 		character.is_players_character = true
 		characters_pool.move_to_state(character.id)
 		character = ResourceScripts.scriptdict.class_slave.new("test_main_real")
-		character.create('Goblin', 'female', 'random')
+		character.create('BeastkinTanuki', 'female', 'random')
+		character.set_furry_form(true)
 		character.fill_boosters()
 		character.set_stat('height', 'tall')
 		character.is_players_character = true
 		characters_pool.move_to_state(character.id)
 		character = ResourceScripts.scriptdict.class_slave.new("test_main_real")
-		character.create('Ratkin', 'female', 'random')
+		character.create('BeastkinWolf', 'female', 'random')
+		character.set_furry_form(true)
 		character.fill_boosters()
 		character.set_stat('height', 'towering')
 		characters_pool.move_to_state(character.id)
@@ -691,6 +1398,21 @@ func test_mode():
 		character.set_stat('physics', 100)
 		character.set_stat('wits', 100)
 		character.set_stat('consent', 5)
+		#A body the farm has plenty of use for: milk wants lactation, seed wants the parts, and
+		#blood, scales and skin all want a Dragonkin - so one card opens on a full produce list
+		#and the growth factor that caps how many at once actually bites.
+		character = ResourceScripts.scriptdict.class_slave.new("test_main_real")
+		character.create('Dragonkin', 'female', 'random')
+		character.fill_boosters()
+		character.set_stat('lactation', true)
+		character.set_stat('growth_factor', 5)
+		character.is_players_character = true
+		characters_pool.move_to_state(character.id)
+		#already at work, so the farm's card has somebody to show without one being placed first
+		ResourceScripts.game_res.sync_room_tasks()
+		var farm_task = ResourceScripts.game_res.first_free_farm_task()
+		if farm_task != null:
+			character.assign_to_task(farm_task)
 		var text = ''
 		var base_price = 0
 		var output_price = 0
@@ -778,7 +1500,7 @@ func test_mode():
 		ResourceScripts.game_res.money = 80000
 		#globals.common_effects("add_money")
 		for i in Items.materiallist:
-			ResourceScripts.game_res.materials[i] = 100
+			ResourceScripts.game_res.materials[i] = 10000
 		globals.AddItemToInventory(globals.CreateGearItem("anastasia_bracelet", {}))
 		globals.AddItemToInventory(globals.CreateGearItem("daisy_dress", {}))
 		globals.AddItemToInventory(globals.CreateGearItem("daisy_dress_lewd", {}))

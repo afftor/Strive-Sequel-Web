@@ -264,6 +264,11 @@ var statdata = {
 		tags = [],
 		default_bonus = 'set',
 	},
+	head_size = {
+		code = 'head_size',
+		tags = [],
+		default_bonus = 'set',
+	},
 	ears = {
 		code = 'ears',
 		tags = [],
@@ -328,16 +333,19 @@ var statdata = {
 		code = 'eyeshape',
 		tags = [],
 		default_bonus = 'set',
+		container = 'exterior',
 	},
 	nose = {
 		code = 'nose',
 		tags = [],
 		default_bonus = 'set',
+		container = 'exterior',
 	},
 	lips = {
 		code = 'lips',
 		tags = [],
 		default_bonus = 'set',
+		container = 'exterior',
 	},
 	body_color_skin = {
 		code = 'body_color_skin',
@@ -346,6 +354,28 @@ var statdata = {
 	},
 	body_color_lips = {
 		code = 'body_color_lips',
+		tags = ['custom_getter'],
+		default_bonus = 'set',
+	},
+	#empty leaves the nipples the shade worked out from the skin - see doll2_view._apply_colours
+	body_color_nipples = {
+		code = 'body_color_nipples',
+		tags = [],
+		default_bonus = 'set',
+	},
+	#the doll's picture of a crotch tattoo - see statlist.gd
+	tattoo_crotch_style = {
+		code = 'tattoo_crotch_style',
+		tags = [],
+		default_bonus = 'set',
+	},
+	tattoo_crotch_color = {
+		code = 'tattoo_crotch_color',
+		tags = [],
+		default_bonus = 'set',
+	},
+	body_color_eyebrows = {
+		code = 'body_color_eyebrows',
 		tags = ['custom_getter'],
 		default_bonus = 'set',
 	},
@@ -361,7 +391,7 @@ var statdata = {
 	},
 	body_color_horns = {
 		code = 'body_color_horns',
-		tags = [],
+		tags = ['custom_getter'],
 		default_bonus = 'set',
 	},
 	body_color_animal = {
@@ -372,6 +402,12 @@ var statdata = {
 	body_color_ears = {
 		code = 'body_color_ears',
 		tags = ['custom_getter'],
+		default_bonus = 'set',
+	},
+	#the coat's own colours, comma separated - see statlist.gd and ch_stats.set_coat_colour
+	body_color_coat = {
+		code = 'body_color_coat',
+		tags = [],
 		default_bonus = 'set',
 	},
 	hair_base = {
@@ -579,7 +615,7 @@ var statdata = {
 		descript = '',
 		baseicon = 'stat_df',
 		type = 'factor',
-		abb = 'TIM',
+		abb = 'AUT',
 		tags = ['integer', 'factor'],
 		direct = false,
 		innate_bonuses = {mincap = variables.minimum_factor_value, maxcap = variables.maximum_factor_value},
@@ -789,7 +825,8 @@ var statdata = {
 		name = '',
 		descript = '',
 		baseicon = 'stat_cf',
-		tags = [],
+		#custom_bonuses: fame's loyalty_bonus is added in ch_dyn_stats.fix_stat_data()
+		tags = ['custom_bonuses'],
 		show_info = {category = 'non_combat'}
 	},
 	trainer_training_points_bonus = {
@@ -918,7 +955,9 @@ var statdata = {
 #		percent = true,
 		baseicon = 'food_love',
 		type = 'misc',
-		tags = ['integer'],
+		#custom_bonuses is what makes ch_dyn_stats.fix_stat_data() run for this stat, which is
+		#where the master's bedmates add to his recovery
+		tags = ['integer', 'custom_bonuses'],
 		direct = false,
 		innate_bonuses = {mincap = 0},
 		custom_order = ['add_part', 'mul', 'add'],
@@ -1182,6 +1221,11 @@ var statdata = {
 		tags = ['bool'],
 		default_bonus = 'set',
 	},
+	use_paperdoll = {
+		code = 'use_paperdoll',
+		tags = ['bool'],
+		default_bonus = 'set',
+	},
 	#other
 	is_hirable = {
 		code = 'is_hirable',
@@ -1370,7 +1414,8 @@ var statdata = {
 		baseicon = 'food_love',
 		type = 'misc',
 		default_bonus = 'add',
-		tags = ['numeric', 'integer'],
+		#custom_bonuses: fame's manhunt_bonus is added in ch_dyn_stats.fix_stat_data()
+		tags = ['numeric', 'integer', 'custom_bonuses'],
 		direct = false,
 		show_info = {category = 'non_combat'}
 	},

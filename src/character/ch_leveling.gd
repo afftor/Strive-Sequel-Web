@@ -8,7 +8,16 @@ var previous_work = ''
 #var workproduct = null
 #var previous_workproduct = null
 var previous_location = ResourceScripts.game_world.mansion_location
-var work_rules = {lock = false, ration = false, shifts = false, constrain = false, luxury = false, contraceptive = false, bindings = false, nudity = false, personality_lock = false, relationship = true, masturbation = false}
+#'luxury' used to live here; the private-room bonus now follows where a character
+#sleeps, see the 'lives_in_room' condition and mansion_room_types.gd
+var work_rules = {lock = false, hide = false, ration = false, shifts = false, constrain = false, contraceptive = false, bindings = false, nudity = false, relationship = true, masturbation = false}
+
+#How much of the character the player left the doll showing.  The nudity work rule
+#above is the same choice as a bool - it only says dressed or not - and the two are
+#always written together, so a character who was stripped to their underwear comes
+#back in their underwear rather than in whatever the bool happened to draw.
+const UNDRESS_LEVELS = ['dressed', 'underwear', 'bare', 'naked']
+var undress_level = 'dressed'
 
 var priority_materials = {
 	cooking = 4,
@@ -87,7 +96,33 @@ func check_work_rule(rule):
 func set_work_rule(rule, value):
 	if variables.work_rules.has(rule):
 		work_rules[rule] = value
+		if rule == 'nudity':
+			#dressing a character again is one level, stripping them is whichever level
+			#they were last stripped to
+			if !value:
+				undress_level = 'dressed'
+			elif undress_level == 'dressed':
+				undress_level = 'bare'
 		parent.get_ref().reset_rebuild()
+
+
+#Saves written before the level existed carry only the bool, and a character who was
+#nude in one of them comes back as 'bare' - the single undressed look that bool drew.
+func get_undress_level():
+	var stored_is_valid = typeof(undress_level) == TYPE_STRING and UNDRESS_LEVELS.has(undress_level)
+	if !stored_is_valid or (undress_level != 'dressed') != bool(check_work_rule('nudity')):
+		undress_level = 'bare' if check_work_rule('nudity') else 'dressed'
+	return undress_level
+
+
+func set_undress_level(level):
+	if !UNDRESS_LEVELS.has(level):
+		level = 'dressed'
+	if undress_level == level and bool(check_work_rule('nudity')) == (level != 'dressed'):
+		return
+	undress_level = level
+	work_rules['nudity'] = level != 'dressed'
+	parent.get_ref().reset_rebuild()
 
 
 func get_job_order(materials = true):
@@ -218,11 +253,11 @@ func check_brothel_rule(rule):
 	if !brothel_rules.has(rule):
 		print("warning - brothel rule %s removed" % rule)
 		return false
-	return brothel_rules[rule]
+	return brothel_rules[rule] and service_rule_offered(rule)
 
 
 func set_brothel_rule(rule, value):
-	if variables.brothel_rules.has(rule):
+	if variables.brothel_rules.has(rule) and (!value or service_rule_offered(rule)):
 		brothel_rules[rule] = value
 
 
@@ -612,6 +647,7 @@ func select_brothel_activity():
 	var no_consent = false
 	for i in brothel_rules:
 		if !brothel_rules[i] || i in ['males','futa','females']: continue
+		if !service_rule_offered(i): continue
 		if variables.brothel_non_sex_options.has(i):
 			non_sex_rules.append(i)
 		else:
@@ -653,16 +689,20 @@ func select_brothel_activity():
 			parent.get_ref().take_virginity('vaginal', 'brothel_customer')
 			bonus_gold += parent.get_ref().calculate_price(false, true) * 0.01
 		if sex_rules.has('pussy') && penis_check:
-			var tmpchar = ResourceScripts.scriptdict.class_slave.new("test_main")
-			tmpchar.create('random', 'male', 'random')
 			if randf() < variables.brothel_pregnancy_chance:
+				var tmpchar = ResourceScripts.scriptdict.class_slave.new("test_main")
+				tmpchar.create('random', 'male', 'random')
 				globals.impregnate(tmpchar, parent.get_ref())
-			tmpchar.is_active = false
+				tmpchar.is_active = false
 		if sex_rules.has('anal') && penis_check:
 			parent.get_ref().take_virginity('anal', 'brothel_customer')
 
+		var selected_workstat = null
 		if data.workstats.size() > 0:
-			work_tick_values(input_handler.random_from_array(data.workstats))
+			#Pick at the original point in the RNG sequence, but apply the stat gain
+			#after payout calculations so it cannot invalidate and rebuild every
+			#dynamic stat halfway through the same service action.
+			selected_workstat = input_handler.random_from_array(data.workstats)
 		parent.get_ref().try_rise_fame('service')
 
 		parent.get_ref().add_stat('metrics_randompartners', globals.fastif(sex_rules.has('group'), 2, 1))
@@ -685,15 +725,23 @@ func select_brothel_activity():
 
 		goldearned = apply_boosters(goldearned)
 		goldearned = round(goldearned)
+		goldearned = take_service_pay(goldearned)
+		if selected_workstat != null:
+			work_tick_values(selected_workstat)
+		else:
+			sex_service_tick_values()
 
 
 		parent.get_ref().add_stat('metrics_goldearn', goldearned)
 
 		ResourceScripts.game_res.money += goldearned
+		if goldearned > 0:
+			globals.emit_signal("work_produced", parent.get_ref().id, "service", "res://assets/images/iconsitems/gold.png")
 
 
 		#TODO add decriptions and impregnation
 		update_brothel_log(parent.get_ref().get_stat('name'), goldearned, data, brothel_customer_gender, full_gold)
+		try_virginity_offer()
 		return
 	elif non_sex_rules.size() > 0:
 		parent.get_ref().add_stat('metrics_serviceperformed', 1)
@@ -703,8 +751,9 @@ func select_brothel_activity():
 		var highest_value = get_highest_value(non_sex_rules)
 		
 		var data = tasks.gold_tasks_data[highest_value.code]
+		var selected_workstat = null
 		if data.workstats.size() > 0:
-			work_tick_values(input_handler.random_from_array(data.workstats))
+			selected_workstat = input_handler.random_from_array(data.workstats)
 		parent.get_ref().try_rise_fame('service')
 		
 		var goldearned = highest_value.value
@@ -717,30 +766,85 @@ func select_brothel_activity():
 
 		goldearned = apply_boosters(goldearned)
 		goldearned = round(goldearned)
+		goldearned = take_service_pay(goldearned)
+		if selected_workstat != null:
+			work_tick_values(selected_workstat)
 		
 		parent.get_ref().add_stat('metrics_goldearn', goldearned)
 		
 		ResourceScripts.game_res.money += goldearned
+		if goldearned > 0:
+			globals.emit_signal("work_produced", parent.get_ref().id, "service", "res://assets/images/iconsitems/gold.png")
 		update_brothel_log(parent.get_ref().get_stat('name'), goldearned, data)
 	else:
 		remove_from_task()
 		parent.get_ref().rest_tick()
 	
 
+#A client who would rather buy what the house is not selling: her first time, outright. Offered only
+#to somebody who sells no penetration at all and still has her maidenhead, and only now and then.
+func try_virginity_offer():
+	var person = parent.get_ref()
+	if person.get_stat('has_womb') != true or person.get_stat('vaginal_virgin_lost') != null:
+		return
+	for rule in variables.penetrative_service_rules:
+		if brothel_rules.get(rule, false) and service_rule_offered(rule):
+			return
+	if randf() >= variables.virginity_offer_chance:
+		return
+	var price = int(max(1, round(get_estimated_service_value() * globals.rng.randf_range(
+		variables.virginity_offer_mult[0], variables.virginity_offer_mult[1]))))
+	var data = {
+		text = person.translate(tr("SERVICE_VIRGINITY_OFFER")),
+		tags = ['dialogue_scene'],
+		image = null,
+		options = [
+			{
+				code = 'close',
+				text = person.translate(globals._report_text("SERVICE_VIRGINITY_SELL", [price])),
+				reqs = [],
+				bonus_effects = [
+					{code = 'money_change', operant = '+', value = price},
+					{code = 'take_virginity', value = 'vaginal'},
+					{code = 'affect_active_character', type = 'stat', stat = 'affection',
+						value = -variables.virginity_offer_affection_loss},
+				],
+			},
+			{
+				code = 'close',
+				text = tr("SERVICE_VIRGINITY_REFUSE"),
+				reqs = [],
+				bonus_effects = [
+					{code = 'affect_active_character', type = 'stat', stat = 'affection',
+						value = variables.virginity_offer_affection_gain},
+				],
+			},
+		],
+	}
+	input_handler.interactive_message(data, 'direct',
+		{set_active_character = person.id, scene_characters_add = [person.id]})
+
+
 func update_brothel_log(ch_name, gold, data, customer_gender = "", full_gold = true):
+	var text = ""
+	if customer_gender != "":
+		var key = globals.fastif(full_gold, "BROTHELLOGSEX", "BROTHELLOGSEXPARTIAL")
+		#The group service is served by several customers at once, so it takes the plural line.
+		#Locales without that line yet fall back to the singular one they do have.
+		if data.code == 'group' and tr(key + "GROUP") != key + "GROUP":
+			key += "GROUP"
+		text = tr(key)  % [tr(ch_name), str(gold), tr("BROTHEL" + data.code.to_upper()), customer_gender.capitalize()]
+		#text = tr(ch_name) + " earned " + str(gold) + " gold doing " + tr("BROTHEL" + data.code.to_upper()) + " with a " + customer_gender
+	else:
+		text = tr("BROTHELLOGNO_SEX")  % [tr(ch_name), str(gold), tr("BROTHEL" + data.code.to_upper())]
+		#text = tr(ch_name) + " earned " + str(gold) + " gold working as " + tr("BROTHEL" + data.code.to_upper())
+	#The same line the old log was given, kept as the breakdown behind the turn's service
+	#report. This is the only place a service payout is described, so it is where the report
+	#is fed from - and it has to run whether or not the old log node is up.
+	globals.mansion_activity_service(gold, text)
 	if globals.log_node != null && weakref(globals.log_node).get_ref():
 #		if ResourceScripts.game_globals.hour == 4:
 #			globals.log_node.clean_log()
-		var text = ""
-		if customer_gender != "":
-			if full_gold:
-				text = tr("BROTHELLOGSEX")  % [tr(ch_name), str(gold), tr("BROTHEL" + data.code.to_upper()), customer_gender.capitalize()]
-			else:
-				text = tr("BROTHELLOGSEXPARTIAL")  % [tr(ch_name), str(gold), tr("BROTHEL" + data.code.to_upper()), customer_gender.capitalize()]
-			#text = tr(ch_name) + " earned " + str(gold) + " gold doing " + tr("BROTHEL" + data.code.to_upper()) + " with a " + customer_gender
-		else:
-			text = tr("BROTHELLOGNO_SEX")  % [tr(ch_name), str(gold), tr("BROTHEL" + data.code.to_upper())]
-			#text = tr(ch_name) + " earned " + str(gold) + " gold working as " + tr("BROTHEL" + data.code.to_upper())
 		globals.text_log_add('work', text)
 #		var ServiceLog = globals.log_node.get_node("ServiceLog")
 #		var newfield = ServiceLog.get_node("VBoxContainer/field").duplicate()
@@ -769,6 +873,13 @@ func apply_boosters(value):
 	return value * mul
 
 
+#Service is paid out of what its settlement's clients have left this week - game_world.pay_service_gold().
+#Whoever is on service is on the service of the place they stand in, and that place's clients are the
+#ones who pay them (game_world.service_gold). A settlement with no purse pays in full.
+func take_service_pay(gold):
+	return ResourceScripts.game_world.pay_service_gold(service_location(), gold)
+
+
 func get_highest_value(array):#find highest profit option
 	var values = {}
 	var highest_value = {code = '', value = 0}
@@ -784,8 +895,27 @@ func get_highest_value(array):#find highest profit option
 func get_gold_value(task):
 	var value = call(tasks.gold_tasks_data[task].formula)
 	value = value * (parent.get_ref().get_stat('productivity') * parent.get_ref().get_stat(tasks.gold_tasks_data[task].workmod)/100.0)
-
+	#clients pay more for whatever their settlement is after this week
+	value *= ResourceScripts.game_world.service_bonus_multiplier(service_location(), parent.get_ref(), task)
 	return value
+
+
+#Where this person's service is sold, which is where they stand: the estate's own work is Aliron's.
+func service_location():
+	var location = parent.get_ref().get_location()
+	if location == 'mansion' or location == '':
+		return 'aliron'
+	return location
+
+
+#An act nobody here buys, or one their gear takes off the table, is not on offer however it is toggled.
+func service_rule_offered(rule):
+	if !ResourceScripts.game_world.service_allows_rule(service_location(), rule):
+		return false
+	for gear in variables.service_gear_blocks:
+		if variables.service_gear_blocks[gear].has(rule) and parent.get_ref().equipment.check_gear_equipped(gear):
+			return false
+	return true
 
 
 func get_enabled_sex_actions():
@@ -793,7 +923,7 @@ func get_enabled_sex_actions():
 	for i in variables.brothel_rules:
 		if variables.brothel_non_sex_options.has(i) or i in ['males','futa','females']:
 			continue
-		if brothel_rules.get(i, false):
+		if brothel_rules.get(i, false) and service_rule_offered(i):
 			res.append(i)
 	return res
 
@@ -846,6 +976,17 @@ func get_booster_multiplier_preview():#same as apply_boosters, but doesn't consu
 	return mul
 
 
+func get_booster_stop_tier():#the tier (1-3) where apply_boosters stops: switched off, or not more than 1 of its material in stock. No tier from there up applies; 4 when all three do
+	for i in range(3):
+		var id = 'boost%d' % (i + 1)
+		var res = service_boosters[id].res
+		if !service_boosters[id].value:
+			return i + 1
+		if !(ResourceScripts.game_res.materials.has(res) and ResourceScripts.game_res.materials[res] > 1):
+			return i + 1
+	return 4
+
+
 func get_estimated_service_value():#best-case gold per tick for the currently toggled sex actions, incl. boosters/service/productivity bonuses and the over-cap desirability bonus, but not the full/half gold roll
 	var enabled = get_enabled_sex_actions()
 	if enabled.size() == 0:
@@ -862,7 +1003,7 @@ func get_estimated_service_value():#best-case gold per tick for the currently to
 func get_enabled_non_sex_actions():
 	var res = []
 	for i in variables.brothel_non_sex_options:
-		if brothel_rules.get(i, false):
+		if brothel_rules.get(i, false) and service_rule_offered(i):
 			res.append(i)
 	return res
 
@@ -880,6 +1021,13 @@ func get_estimated_non_sex_service_value():#best-case gold per tick for the curr
 		best = max(best, value)
 	best *= get_booster_multiplier_preview()
 	return best
+
+
+func get_estimated_current_service_value():
+	var has_clients = brothel_rules.males || brothel_rules.females || brothel_rules.futa
+	if has_clients && !get_enabled_sex_actions().empty():
+		return get_estimated_service_value()
+	return get_estimated_non_sex_service_value()
 
 
 func quest_tick():
@@ -926,27 +1074,40 @@ func add_metric_for_outcome(res_id, amount = 1):
 			parent.get_ref().add_stat('metrics_materialearn', amount)
 
 
+const WORK_TICK_EXP = 5
+const WORK_TICK_STAT_GAIN = 0.36
+
 func work_tick_values(workstat):
-	if !parent.get_ref().has_status('no_working_bonuses'):
+	var person = parent.get_ref()
+	if !person.has_status('no_working_bonuses'):
+		#Read the multiplier and award experience while the dynamic-stat cache is
+		#still valid. The work-stat gain intentionally invalidates it last, for the
+		#next consumer, instead of forcing a full rebuild inside every work action.
+		person.add_stat('base_exp', WORK_TICK_EXP)
 		if workstat.findn("sex_skills") < 0:
-			parent.get_ref().add_stat(workstat, 0.36)
-		parent.get_ref().add_stat('base_exp', 5)
+			person.add_stat(workstat, WORK_TICK_STAT_GAIN)
+
+
+#a sex service action pays a share of the usual experience and stat gain (variables.sex_service_*)
+func sex_service_tick_values():
+	var person = parent.get_ref()
+	if person.has_status('no_working_bonuses'):
+		return
+	var mult = variables.sex_service_work_gain_mult
+	person.add_stat('base_exp', WORK_TICK_EXP * mult)
+	for st in variables.sex_service_work_stats:
+		person.add_stat(st, WORK_TICK_STAT_GAIN * mult)
 
 
 func predict_active_task():
-	var joborder = get_job_order(true) 
-	for job in joborder:
-		var real_job = job + '_material'
-		var curupgrade = ResourceScripts.game_res._active_task_find(ResourceScripts.game_res.crafting_lists[real_job])
-		if curupgrade != null:
-			return curupgrade
-	
-	joborder = get_job_order(false) 
-	for job in joborder:
-		var real_job = job
-		if job != 'building':
-			real_job += '_item'
-		var curupgrade = ResourceScripts.game_res._active_task_find(ResourceScripts.game_res.crafting_lists[real_job])
+	#the item order is tried before the material order, the way process_craft works them; both
+	#name craft types, each with one queue of orders - 'building' with its list of upgrades
+	var tried = []
+	for job in get_job_order(false) + get_job_order(true):
+		if tried.has(job):
+			continue
+		tried.append(job)
+		var curupgrade = ResourceScripts.game_res._active_task_find(ResourceScripts.game_res.crafting_lists[job])
 		if curupgrade != null:
 			return curupgrade
 	return null
@@ -992,12 +1153,12 @@ func fill_task_mods(task):
 	task_mods.diff = int(task_mods.diff)
 
 
-func fill_task_mods_res(task):
+func fill_task_mods_res(task): 
 	task_mods.crit = parent.get_ref().get_stat('base_task_crit_chance')
 	task_mods.diff = 0
 	task_mods.eff = 0
-	if task.has('worktool'):
-		var item = task.worktool
+	if task.has('tool_type'): #!!! change to worktool in case of proper rework to passing taskdata
+		var item = task.tool_type
 		task_mods.eff = parent.get_ref().get_stat('task_efficiency_' + item)
 		task_mods.crit += parent.get_ref().get_stat('task_crit_' + item)
 	
@@ -1019,12 +1180,16 @@ func get_job_value(temptask, count_crit = false):
 	
 	if count_crit == true && randf() <= get_task_crit_chance():
 		value = value * 2
-	if location.has('gather_mod'): #maybe 2fix, idk if non-dungeons still has their gather mods intact
+	#get_location_from_code answers null for a code that is not in location_links, and the throw
+	#here left the whole function returning Nil - which the mansion card then multiplied
+	#(mansion_view.person_yield_in_room) and concatenated (mansion_char_slot.refresh), so the slot
+	#lost its tooltip and half its contents to an error three frames away from its cause.
+	if location != null and location.has('gather_mod'): #maybe 2fix, idk if non-dungeons still has their gather mods intact
 		value *= location.gather_mod
 	return value
 
 
-func get_progress_resource(tempresource, count_crit = false):
+func get_progress_resource(tempresource, count_crit = false): #do not like this method for operating not a task but material data
 	var resource = Items.materiallist[tempresource]
 	var location = ResourceScripts.world_gen.get_location_from_code(parent.get_ref().get_location())
 	# var subtask = task.production[tempsubtask]
@@ -1037,6 +1202,8 @@ func get_progress_resource(tempresource, count_crit = false):
 	
 	if count_crit == true && randf() <= get_task_crit_chance():
 		value = value * 2
+	if location == null:
+		return value #same unresolvable location code as in get_job_value, above
 	if location.type == 'dungeon':
 		value *= Items.get_loot().get_gather_mod_from_loc(location, tempresource)
 	elif location.has('gather_mod'): #2fix

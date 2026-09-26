@@ -1,0 +1,2188 @@
+extends Control
+
+# The doll as the game embeds it, standing in for `ragdoll.tscn`.
+#
+# A Control rather than a Node2D, and that is the whole trick of fitting into the
+# screens: it clips its own contents, so the doll cannot draw outside the box the
+# screen gives it.  The old doll needed a `Light2D` in mask mode over a 1500x1500
+# texture on every screen, plus `light_mask` on all 192 of its nodes, to do the
+# same rectangular crop.  Here it is one property, and the box is the node's own
+# rect - which the screen was already authoring.
+#
+# The screens talk to this and never to the new doll directly: they call the same
+# handful of methods the old paperdoll had - `rebuild`, `rebuild_cloth`,
+# `rebuild_underwear`, `rebuild_stat` - so replacing the doll is a change of node
+# and not a rewrite of eight screens.
+#
+# What it does not do yet, on purpose: no animation and no poses.  The doll is
+# solved once per rebuild and then stands still, which is also why it costs
+# nothing per frame.
+
+const CATALOGUE = preload("res://Character_generator/Doll2Spine/doll2_catalogue.gd")
+const CHARACTER_MAP = preload("res://Character_generator/Doll2Spine/universal/doll_character_map.gd")
+const MODEL = preload("res://Character_generator/Doll2Spine/Doll2Preview.tscn")
+const MODIFIERS = preload("res://Character_generator/Doll2Spine/universal/doll_modifiers.gd")
+const COLORS = preload("res://Character_generator/Doll2Spine/universal/doll_colors.gd")
+const COVERAGE = preload("res://Character_generator/Doll2Spine/universal/doll_coverage.gd")
+const GEAR = preload("res://Character_generator/Doll2Spine/universal/doll_gear_map.gd")
+const EMOTES = preload("res://Character_generator/Doll2Spine/universal/doll_emotes.gd")
+const DOLL_DROPDOWN_THEME = preload("res://assets/Themes_v2/UNIVERSAL/DropDown.tres")
+# The frame is sized for the tallest character there can be, so the others stay
+# visibly shorter inside it.
+const TALLEST_TIER = "towering"
+
+# The stats the map reads.  Kept here rather than fetched from GeneratorData, so
+# the new doll does not depend on the old one's data file.
+const STATS = [
+	"race", "sex", "chin", "eyeshape", "eye_tex", "eyebrows", "lips", "nose",
+	"ears", "hair_base", "hair_back", "hair_assist", "horns", "wings", "tail",
+	"penis_type", "tits_size", "pregnancy_status", "height", "skin_coverage",
+	"multiple_tits", "multiple_tits_developed", "body_shape", "hand_pose", "face_markings",
+	"ass_size", "beard", "penis_size", "balls_size", "head_size",
+	# how long each hair layer is worn - the doll scales the strands by them, see
+	# HAIR_LENGTH_STATS
+	"hair_base_length", "hair_back_length", "hair_assist_length",
+	# the two piercings the customize menu offers once there is skin to see them on
+	"piercing_nipples", "piercing_navel",
+	# the crotch tattoo the doll draws, and which drawing it is
+	"tattoo_crotch", "tattoo_crotch_style",
+]
+
+# Colour channel -> the stat that picks its colour, and the stat that picks the
+# second one where the channel is two-tone.  The old doll kept a colour per part;
+# the new one keeps a colour per channel, and the two line up one to one.
+const CHANNEL_COLOURS = {
+	"skin": ["body_color_skin", ""],
+	"eyes": ["eye_color", ""],
+	"lips": ["body_color_lips", ""],
+	"eyebrows": ["body_color_eyebrows", ""],
+	"hair": ["hair_base_color_1", "hair_base_color_2"],
+	# The male rig grew beard art; the game has carried `hair_facial_color` since
+	# the old doll with nothing to paint.
+	"beard": ["hair_facial_color", ""],
+	"hair_back": ["hair_back_color_1", "hair_back_color_2"],
+	"hair_assist": ["hair_assist_color_1", "hair_assist_color_2"],
+	# `ears` is decided per part below: only an animal ear takes the ear colour.
+	"ears": ["body_color_ears", ""],
+	"tail": ["body_color_tail", ""],
+	"wings": ["body_color_wings", ""],
+	"horns": ["body_color_horns", ""],
+	"animal": ["body_color_animal", ""],
+	"race": ["body_color_skin", ""],
+	# nipples have no stat of their own: their table is keyed by the skin's code,
+	# so they follow the skin a character was given
+	"nipples": ["body_color_skin", ""],
+	# a piercing's metal - an unset stat leaves the art as drawn, see _apply_colours
+	"piercing_nipple": ["piercing_nipples_color", ""],
+	"piercing_belly": ["piercing_navel_color", ""],
+	# a tattoo's ink, laid on flat - see `flat` on the channel
+	"tattoo": ["tattoo_crotch_color", ""],
+}
+
+# What the new doll wants and the character does not carry yet.  They are listed
+# in `legacy/old_doll_behaviour.md` with where each one belongs; until they are
+# added, asking for them would raise, so the doll does without and takes the
+# catalogue's default.  Delete a name here as its stat is added.
+#
+# The list is written out rather than checked against `statdata`, because naming
+# an autoload from a script this early in the load order does not parse.
+const NOT_A_STAT_YET = ["body_shape", "hand_pose", "face_markings"]
+
+# Old stat -> catalogue axis, for the dimensions that select between several
+# attachments of one part rather than between parts.
+const AXES = {
+	"tits_size": "tits_size",
+	"pregnancy_status": "pregnancy",
+	"hand_pose": "hand_pose",
+	"multiple_tits": "many_tits",
+}
+# The extra rows a beastkin grows under the chest, by how many pairs the
+# character carries.  The art counts breasts - four is one extra pair, six is
+# two - and stops there, so a third pair is drawn as the second.
+const MANY_TITS = ["none", "4", "6"]
+const TITS = {
+	"flat": "flat", "small": "small", "average": "normal", "average_high": "normal",
+	"average_narrow": "normal", "average_wide": "normal", "big": "large",
+	"big_high": "large", "big_narrow": "large", "huge": "big", "huge_high": "big",
+	"huge_narrow": "big", "masculine": "flat",
+	# the two shapes the old doll also carried, which fell through to `normal`
+	"big_wide": "large", "huge_wide": "big",
+}
+const PREGNANCY = {"no": "none", "early": "mid", "heavy": "big"}
+# Races the export cut a heavier pair of legs for.
+const ORC_LEGS = ["Orc", "Goblin"]
+
+
+# A little room at the top, so hair and horns are not flush against the edge.
+export var frame_headroom = 0.04
+# The screens show the doll from the hips up, as the old one did: it is drawn
+# large and the frame keeps the upper body.  Turn this off for a screen that
+# wants the whole figure.
+export var show_from_the_hips = true
+# Frames the head instead of the whole figure, for the portrait booth.  The old
+# doll cropped a rectangle out of the rendered screen and the crop ran off the
+# canvas on tall characters; here the doll is simply drawn at the size the
+# portrait wants, so there is nothing to trim.
+export var portrait_mode = false
+# How much of the shot is head: 1.0 would be the head box exactly, and the rest
+# is shoulders and hair.
+export var portrait_zoom = 1.55
+# Whether the doll moves by itself at all - the idle, the blink, the chest's
+# swing and the faces it pulls.  Off for the booths, whose dolls are only ever
+# photographed: a doll inside a Viewport counts as seen even while nothing shows
+# that viewport, and a moving doll solves its whole skin again on the CPU every
+# frame - one left idling in the body rites' booth cost the mansion screen about
+# 25 ms a frame.
+export var animated = true setget set_animated
+# The player may look closer and move the doll about, as they could on the old
+# one.  Its limits are kept: a tenth per wheel step, three quarters to one and a
+# half, and a pan that cannot push the figure out of its own frame.
+export var allow_zoom = true
+# The four undress steps, as toggles in the doll's own top corner.  Off for the
+# portrait booth and for any screen that would rather drive the level itself.
+export var show_undress_buttons = true
+# Which of the four steps this screen offers, empty for all of them.  Character
+# creation shows only underwear and naked: the character being made has no gear
+# on, so `dressed` and `bare` are two more words for the same two pictures.
+export var offered_undress_levels = []
+# The hair menu belongs where a character is being looked at, not where one is
+# being made - creation has its own hair rows.
+export var show_hair_menu = true
+# On the mansion screens the undress buttons are not a way of looking at the
+# character but the Nudity work rule itself, which used to be a checkbox in the
+# rules list.  With this on, the buttons obey the rule's own requirement and what
+# the player picks is written back to the character, so the portraits and the
+# stored sprites are shot the way the doll is standing.  Off everywhere the doll
+# is only being looked at - character creation, the previews, the booth.
+export var undress_is_a_rule = false
+# Below this the frame is a thumbnail and the buttons would cover the character.
+const UNDRESS_BAR_NEEDS = Vector2(240, 300)
+const UNDRESS_BAR_MARGIN = 6
+const ZOOM_STEP = 0.1
+const ZOOM_MIN = 0.75
+const ZOOM_MAX = 1.5
+const DRAG_THRESHOLD = 6.0
+# Between a swatch and the colour wheel it opens.
+const COLOUR_POPUP_GAP = 4.0
+# Sideways and downwards the old doll's limits are plenty.  Upwards is another
+# matter: the screens frame the doll from the hips, so the legs and the feet are
+# below the frame and only a long pull brings them into it.
+const PAN_LIMIT_X = 220.0
+const PAN_LIMIT_DOWN = 0.35
+const PAN_LIMIT_UP = 1.1
+
+var view_zoom = 1.0
+var view_pan = Vector2.ZERO
+var _drag_from = Vector2.ZERO
+var _pan_from = Vector2.ZERO
+var _drag_candidate = false
+var _dragging = false
+
+# Standing in for the old doll's own flags, so the screens can keep setting them.
+var test_mode = false
+var update_character_portrait = true
+var character = null
+# How much of the character is shown, one of GEAR.LEVELS.  `rebuild_cloth`, which
+# is what the screens call, still speaks in dressed-or-not and lands on `dressed`
+# or `bare` - the level the old doll had when it stripped somebody.
+var undress_level = GEAR.DRESSED
+
+var model = null
+# Pushes the whole set of corner buttons down the frame; see
+# `place_controls_below`, which is the only thing that should set it.
+var controls_offset = 0
+var _undress_bar = null
+var _undress_bar_top = 0.0
+var _undress_buttons = {}
+var _hair_button = null
+var _frame = null
+var _hair_panel = null
+var _hair_panel_width = 0.0
+# How much room beside the doll the open menu was given, and what was widened to
+# make it.  The doll's own rect is never one of them: the character and the
+# corner buttons must not move when the menu opens.
+var _menu_room = 0.0
+var _widened = []
+var _look_changed = false
+var _hair_controls = {}
+# When the doll last solved itself, so a rebuild the screen already did on the
+# game's own signal is not repeated, and whether one is waiting on the idle frame.
+var _applied_frame = -1
+var _apply_queued = false
+
+# The screens around the doll redraw what they show of the character - a card
+# portrait, a stored sprite - when the player strips one.
+signal undress_level_changed(level)
+# the menu opens over whatever the screen keeps in that corner, so the screen
+# may want to put it away meanwhile
+signal hair_menu_toggled(open)
+
+
+func _ready():
+	# The frame clips, not the doll.  The character still cannot draw outside its
+	# box - the frame is that box - but the corner menu is no longer inside it, so
+	# on a screen with room beside the doll the menu can open into it instead of
+	# over the character.
+	rect_clip_content = false
+	_frame = get_node("Frame")
+	_frame.rect_clip_content = true
+	# the doll takes the wheel and the drag inside its own rect and lets everything
+	# else through, which is what the old doll's `ZoomArea` did
+	mouse_filter = Control.MOUSE_FILTER_PASS if allow_zoom and !portrait_mode else Control.MOUSE_FILTER_IGNORE
+	# the rig is built only for a game that draws dolls - see _make_model
+	if !_dolls_switched_off():
+		_make_model()
+	if portrait_mode or !show_undress_buttons:
+		for control_name in ["UndressLevels", "HairMenuButton", "HairMenu"]:
+			get_node(control_name).queue_free()
+	else:
+		if !show_hair_menu:
+			get_node("HairMenuButton").queue_free()
+			get_node("HairMenu").queue_free()
+		_build_undress_bar()
+		connect("resized", self, "_refresh_undress_bar")
+		connect("visibility_changed", self, "_on_doll_visibility_changed")
+		var handler = _singleton("input_handler")
+		if handler != null and handler.has_signal("update_ragdoll"):
+			handler.connect("update_ragdoll", self, "_on_game_changed_a_character")
+		if handler != null and handler.has_signal("doll_settings_changed"):
+			handler.connect("doll_settings_changed", self, "_on_doll_settings_changed")
+	# Any doll a player looks at pulls a face at what is put on the character.  Not
+	# tied to the undress buttons above: the inventory's own doll carries none.
+	if !portrait_mode:
+		var events = _singleton("input_handler")
+		if events != null and events.has_signal("character_item_equipped"):
+			events.connect("character_item_equipped", self, "_on_character_item_equipped")
+	set_process(false)
+
+
+# The rig itself, built only for a game that draws dolls.  With them switched off in
+# the options nothing is loaded here; the first rebuild after they come back on builds
+# it then (_apply), and switching them off lets it go (_on_doll_settings_changed).
+func _make_model():
+	model = MODEL.instance()
+	# said before the model enters the tree, so its editor panel is never built
+	model.interface_enabled = false
+	# the frame is the first child, so the authored controls still draw over it
+	_frame.add_child(model)
+	# the preview carries an editor panel and drag handles; in the game the doll
+	# is only ever looked at
+	for child in model.get_children():
+		if child is CanvasLayer:
+			child.queue_free()
+	model.handle_buttons.clear()
+	model.handles_visible = false
+	model.set_process_unhandled_input(false)
+	_apply_idle_animation()
+	_hold_still()
+
+
+func _dolls_switched_off():
+	var handler = _singleton("input_handler")
+	return handler != null and bool(handler.globalsettings.get("disable_paperdoll", false))
+
+
+# --- the old doll's API -------------------------------------------------------
+
+func rebuild(character_to_build):
+	# A different character is a fresh look at a fresh doll: whatever the player
+	# zoomed into or dragged off-frame on the last one is not where they want to
+	# start on this one.
+	if character_to_build != character:
+		view_zoom = 1.0
+		view_pan = Vector2.ZERO
+		# how much of themselves the character was left showing is theirs rather than
+		# the screen's, so a new one is picked up on the step they were last put on
+		undress_level = _remembered_undress_level(character_to_build)
+		_close_hair_menu()
+		# a face pulled at something that happened to somebody else
+		_stop_emotes()
+	character = character_to_build
+	_apply()
+
+
+func rebuild_cloth(value):
+	if value != null:
+		# the screens still ask in dressed-or-not, and most of them ask it from the
+		# nudity rule - which is the character's own step with the detail taken out.
+		# So the remembered step answers whenever it agrees with what was asked, and
+		# only a screen asking for the opposite of it gets the plain two-way answer.
+		var wanted = GEAR.normalise(!bool(value))
+		var remembered = _remembered_undress_level(character)
+		if (remembered != GEAR.DRESSED) == (wanted != GEAR.DRESSED):
+			undress_level = remembered
+		else:
+			undress_level = wanted
+	_apply()
+
+
+# The step this character was last left on, `dressed` for anyone who carries none.
+func _remembered_undress_level(for_character):
+	if for_character == null or !for_character.has_method("get_undress_level"):
+		return GEAR.DRESSED
+	return GEAR.normalise(for_character.get_undress_level())
+
+
+# The four steps, for the screens and for the doll's own corner buttons.
+func set_undress_level(level):
+	var wanted = GEAR.normalise(level)
+	if wanted == undress_level:
+		return
+	if undress_is_a_rule and wanted != GEAR.DRESSED and !nudity_allowed():
+		_refresh_undress_bar()
+		return
+	undress_level = wanted
+	if undress_is_a_rule:
+		_write_undress_rule()
+	_apply()
+	emit_signal("undress_level_changed", undress_level)
+
+
+# Whether this character may be kept undressed at all - the requirement the
+# Nudity rule carried while it was a checkbox in the rules list.
+func nudity_allowed():
+	if character == null or !character.has_method("has_status"):
+		return false
+	return character.has_status("sexservice")
+
+
+# What the player left the doll wearing is the rule from here on: the portrait
+# booth and the unique sprites both read the work rule rather than the doll.
+func _write_undress_rule():
+	if character == null or !character.has_method("set_undress_level"):
+		return
+	if _remembered_undress_level(character) == undress_level:
+		return
+	# the character stores the step itself; the nudity work rule is written with it,
+	# so everything that still reads the rule sees the same choice
+	character.set_undress_level(undress_level)
+	if character.has_method("update_prt"):
+		character.update_prt()
+	var handler = _singleton("input_handler")
+	if handler != null and handler.has_method("reshoot_portrait"):
+		handler.reshoot_portrait(character)
+
+
+# --- faces --------------------------------------------------------------------
+
+# A face the character is pulling in answer to something, as the steps still to
+# play: [[emotion, seconds], ...], the first on the face for `_emote_left` more
+# seconds.  See doll_emotes.gd for what pulls which.
+var _emotes = []
+var _emote_left = 0.0
+
+
+func play_emotes(steps):
+	if model == null or !animated or steps.empty():
+		return
+	_emotes = steps.duplicate(true)
+	_start_emote_step()
+
+
+func _start_emote_step():
+	if model == null:
+		_emotes.clear()
+		set_process(false)
+		return
+	if _emotes.empty():
+		# every reaction ends back on the character's ordinary face
+		model.set_emotion("")
+		set_process(false)
+		return
+	model.set_emotion(str(_emotes[0][0]))
+	_emote_left = float(_emotes[0][1])
+	set_process(true)
+
+
+func _stop_emotes():
+	if _emotes.empty():
+		return
+	_emotes.clear()
+	set_process(false)
+	if model != null:
+		model.set_emotion("")
+
+
+func _process(delta):
+	if _emotes.empty():
+		set_process(false)
+		return
+	_emote_left -= delta
+	if _emote_left <= 0.0:
+		_emotes.pop_front()
+		_start_emote_step()
+
+
+# The game put an item on a character.  The one this doll shows reacts, as long as
+# the doll is on screen to be seen doing it.
+func _on_character_item_equipped(who, item):
+	if character == null or who != character or portrait_mode or !is_visible_in_tree():
+		return
+	_react(EMOTES.equip_reaction(character, item))
+
+
+# The player clicked the chest of the character this doll shows.
+func _on_chest_poked():
+	if character == null or portrait_mode:
+		return
+	_react(EMOTES.poke_reaction(character))
+
+
+# Plays a reaction, on the cooldown every reaction shares.  A rig without the
+# face - the male one has none - neither plays it nor spends the turn.
+func _react(steps):
+	if !animated or steps.empty() or model == null or !model.has_emotion(steps[0][0]) or !EMOTES.take_turn(character):
+		return
+	play_emotes(steps)
+
+
+func rebuild_underwear():
+	_apply()
+
+
+func rebuild_stat(_statname):
+	# the new doll has no per-stat path: a rebuild is 20-30 ms and every stat
+	# reaches the same solve, so there is nothing for a partial one to save
+	_apply()
+
+
+# --- the portrait pipeline ----------------------------------------------------
+
+# --- the undress toggles ------------------------------------------------------
+
+# Four toggles in the doll's top corner, over the figure rather than beside it:
+# the doll is handed a rect by the screen it sits in, and there is nothing next
+# to it that it owns.  A plain child of the doll, so it hides, clips and moves
+# with it - a CanvasLayer would float above the screen's own popups.
+# the styleboxes are owned by `Doll2View.tscn` now; keep its palette in sync
+# with `doll_control_styles.gd`, which still dresses the painted cast's toggle
+func _build_undress_bar():
+	_undress_bar = get_node("UndressLevels")
+	_undress_bar_top = _undress_bar.margin_top
+	for level in GEAR.LEVELS:
+		var button = _undress_bar.get_node(level)
+		button.text = tr(GEAR.LEVEL_LABELS[level])
+		button.pressed = level == undress_level
+		button.connect("pressed", self, "set_undress_level", [level])
+		_undress_buttons[level] = button
+	if !show_hair_menu:
+		if controls_offset != 0:
+			place_controls_below(controls_offset)
+		return
+	# This opens a menu rather than choosing a level, so it stands under the column
+	# rather than among it - and under rather than beside, because beside it stood
+	# over the character with the whole width of the frame free to its right.
+	_hair_button = get_node("HairMenuButton")
+	_hair_button.text = tr("DOLL2_CUSTOMIZE_MENU")
+	_hair_button.connect("toggled", self, "_on_hair_menu_toggled")
+	_undress_buttons["hair"] = _hair_button
+	_place_hair_button()
+	if controls_offset != 0:
+		place_controls_below(controls_offset)
+
+
+# How far down the doll's frame the buttons start, for a screen whose top corner
+# is already taken - the expanded card keeps its close button up there, and the
+# first level button was sitting under it.  `NudityToggle.place_below` is the
+# exact twin of this: the two are the same bar on the same screen, one for the
+# generated characters and one for the painted cast.
+func place_controls_below(offset):
+	controls_offset = offset
+	if _undress_bar != null:
+		var bar_top = _undress_bar_top + controls_offset
+		_undress_bar.margin_bottom += bar_top - _undress_bar.margin_top
+		_undress_bar.margin_top = bar_top
+	_place_hair_button()
+	_position_hair_panel()
+
+
+# The column is as wide as its widest button asks to be, which is wider than the
+# margins it was authored with - 150 against 116 - so it used to hang over the
+# right edge of the frame.  Widening it leftwards puts it back inside, and a
+# translation with longer words moves it further left rather than further out.
+func _fit_undress_bar():
+	if _undress_bar == null:
+		return
+	var width = max(_undress_bar.get_combined_minimum_size().x,
+		_undress_bar.margin_right - _undress_bar.margin_left)
+	_undress_bar.margin_left = _undress_bar.margin_right - width
+
+
+# Under the undress column and in one column with it: same left and right edges,
+# the height of one of its buttons, one separation below the last of them.  All
+# of it measured rather than authored - the column is two buttons tall for one
+# character and four for another, and its buttons are as tall as the theme's font
+# makes them.
+func _place_hair_button():
+	if _hair_button == null or _undress_bar == null:
+		return
+	_fit_undress_bar()
+	_hair_button.margin_left = _undress_bar.margin_left
+	_hair_button.margin_right = _undress_bar.margin_right
+	var separation = _undress_bar.get_constant("separation")
+	var step = 0.0
+	var stack = 0.0
+	var shown = 0
+	# the minimum, not the laid-out size: a container gives an unexpanded child
+	# exactly its minimum, and reading `rect_size` here catches the authored value
+	# from before the column has sorted itself
+	for child in _undress_bar.get_children():
+		step = max(step, child.get_combined_minimum_size().y)
+		if !child.visible:
+			continue
+		shown += 1
+	if shown > 0:
+		stack = step * shown + separation * (shown - 1)
+	_hair_button.margin_top = _undress_bar.margin_top + stack + separation
+	_hair_button.margin_bottom = _hair_button.margin_top + step
+
+
+# Hair, under a button of its own next to the undress levels.  Everything here is
+# free: any style on any character, any colour off the wheel - the doll is being
+# looked at, not rolled, so the race's own list has no say.
+#
+# Three layers, the same three the test preview has: the hair itself, what hangs
+# behind the head and the extra strands.  Each carries two colours - roots and
+# tips - which makes six, and they follow the styles rather than sitting among
+# them: a layer nobody wears takes its pair of pickers away with it.
+# `bald` is not among them: it is not a length, it is the absence of hair, and
+# offering it on the length row let a player shave a character by nudging a
+# slider one step past `short`.  Characters still generate bald - kobold males do
+# - so the value is still understood everywhere below, just never offered.
+const HAIR_LENGTHS = ["short", "default", "middle", "long"]
+# Which layer modifier each length stat drives.  The names differ by history: the
+# doll calls the base layer's length `hair_length`, the game `hair_base_length`.
+const HAIR_LENGTH_STATS = {
+	"hair_base_length": "hair_length",
+	"hair_back_length": "hair_back_length",
+	"hair_assist_length": "hair_assist_length",
+}
+const HAIR_LAYERS = [
+	{"id": "hair", "group": "hair", "stat": "hair_base", "label": "DOLL2_HAIR_STYLE", "tone": "DOLL2_HAIR_MENU"},
+	{"id": "hair_back", "group": "hair_back", "stat": "hair_back", "label": "DOLL2_HAIR_BACK", "tone": "DOLL2_HAIR_BACK"},
+	{"id": "hair_assist", "group": "hair_assist", "stat": "hair_assist", "label": "DOLL2_HAIR_ASSIST", "tone": "DOLL2_HAIR_ASSIST"},
+]
+const HAIR_TONES = ["DOLL2_HAIR_TONE_ROOTS", "DOLL2_HAIR_TONE_TIPS"]
+
+# Styles are named rather than spelled.  The menu used to read the part's own id
+# out loud - `hairs_base_dopple`, `hair_base_bobcut` - and the artist's keys are
+# not names. Trimming
+# the prefix off an id only hid half the problem.
+#
+# The name lives in `localization/en/main.gd` under the id itself, verbatim and in
+# capitals - `hair_base_bobcut` is `DOLL2_STYLE_HAIR_BASE_BOBCUT` - so there is no
+# second list here to fall out of step with the art, and the two families the
+# export carries (`hair_base_lion` beside `hairs_base_lion`) keep separate names.
+const STYLE_NAME_PREFIX = "DOLL2_STYLE_"
+
+# The piercing rows, named after the stats they write.  What each one offers is
+# CHARACTER_MAP.PIERCINGS; the row, its label and each word are named
+# `DOLL2_<STAT>` and `DOLL2_<STAT>_<WORD>`, so a `ring` can be a hoop through a
+# nipple on one row and a ring hanging from the navel on the other.
+const PIERCING_ROWS = ["piercing_nipples", "piercing_navel"]
+
+# The colour under each piercing, painted through its own channel.  An unset one
+# leaves the art as drawn, and the swatch then shows that gold at the shader's
+# neutral lightness, so picking it unchanged gives back what is already there.
+const PIERCING_COLOUR_ROWS = [
+	{"id": "piercing_nipples_colour", "stat": "piercing_nipples_color", "piercing": "piercing_nipples"},
+	{"id": "piercing_navel_colour", "stat": "piercing_navel_color", "piercing": "piercing_navel"},
+]
+const PIERCING_ART_GOLD = Color("e0a01f")
+# The womb tattoos are drawn in near-black ink; an unset colour is that ink.
+const TATTOO_ART_INK = Color("030303")
+
+# Compatibility for characters saved before the atlas-path names were removed
+# from the public catalogue ids.
+const HAIR_PART_ALIASES = {
+	"hair_base_kare": "hair_base_bobcut",
+	"hair_back_care": "hair_back_bobcut",
+}
+
+# The face details that are a colour and nothing else.  Both stats already exist
+# on every character and both derive a colour when left empty - the eyebrows take
+# the hair, the lips take the skin - so the picker shows what is being drawn
+# rather than an empty value, and writing to it is what makes it the player's.
+const FACE_COLOUR_ROWS = [
+	{"id": "eyebrows_colour", "stat": "body_color_eyebrows", "label": "DOLL2_EYEBROWS_COLOUR", "group": "eyebrows"},
+	{"id": "lips_colour", "stat": "body_color_lips", "label": "DOLL2_LIPS_COLOUR", "group": "lips"},
+]
+
+# Gear, which is not painted in one colour: its art is coded in three hue bands -
+# the main material, a second one and the trim - so a piece is a row of three
+# swatches, and a band the worn piece has no art in takes its swatch away.
+#
+# The stats are the old paperdoll's own and are still on every character:
+# `armor_color_base` and `armor_color_lower` dressed the two halves of the body,
+# `armor_color_underwear` the underwear and `armor_color_weapon` what is carried.
+# A preset name - `default`, `default_metal` - means "leave the bands where the
+# catalogue starts them", which is what this doll has been drawing all along; a
+# picked colour is written back as `#rrggbb,#rrggbb,#rrggbb`, one per band, an
+# empty slot for a band still on its default.
+#
+# Clothes and underwear are each two rows, because the game equips a chest and a
+# pair of legs separately and the old doll painted them apart.  `from` says which
+# of the two garments a row is about - each half shows one or the other: the top
+# the chest's clothes or the underwear, the bottom the legs' clothes or the
+# underwear - and `half` is what the label says.
+const GEAR_COLOUR_ROWS = [
+	{"id": "underwear_colour", "stat": "armor_color_underwear", "channel": "outfit",
+		"label": "DOLL2_GEAR_UNDERWEAR", "from": "underwear", "half": "DOLL2_GEAR_HALF_TOP"},
+	{"id": "underwear_lower_colour", "stat": "armor_color_underwear_lower",
+		"channel": "outfit_lower", "label": "DOLL2_GEAR_UNDERWEAR", "from": "underwear",
+		"half": "DOLL2_GEAR_HALF_BOTTOM"},
+	{"id": "outfit_colour", "stat": "armor_color_base", "channel": "outfit",
+		"label": "DOLL2_GEAR_OUTFIT", "from": "clothing", "half": "DOLL2_GEAR_HALF_TOP"},
+	{"id": "outfit_lower_colour", "stat": "armor_color_lower", "channel": "outfit_lower",
+		"label": "DOLL2_GEAR_OUTFIT", "from": "clothing", "half": "DOLL2_GEAR_HALF_BOTTOM"},
+	{"id": "collar_colour", "stat": "armor_color_collar", "channel": "collar",
+		"label": "DOLL2_GEAR_COLLAR"},
+	# The head slot holds hats and masks alike and the catalogue keeps those in
+	# channels of their own, so one row answers for both - they are never worn
+	# together.  `armor_color_head` is the one stat here the old paperdoll never
+	# had; it is added to the `armor_color` container beside the other four.
+	{"id": "headgear_colour", "stat": "armor_color_head", "channel": "headgear",
+		"label": "DOLL2_GEAR_HEADGEAR"},
+	{"id": "weapon_colour", "stat": "armor_color_weapon", "channel": "weapon",
+		"label": "DOLL2_GEAR_WEAPON"},
+]
+
+# The catalogue groups a row's channel paints.  Only the body is left out: it is
+# the one channel two rows share, and which of them answers for it depends on
+# what the character has on rather than on a fixed list.
+const GEAR_CHANNEL_GROUPS = {
+	"collar": ["collar"],
+	"headgear": ["headgear", "mask"],
+	"weapon": ["weapon_belt", "weapon_back"],
+}
+# What each of the three swatches paints, said in its tooltip: the art carries
+# no names for its bands, only the three hues, so the order is the whole of it.
+const GEAR_ZONE_HINTS = ["DOLL2_GEAR_ZONE_MAIN", "DOLL2_GEAR_ZONE_SECOND",
+	"DOLL2_GEAR_ZONE_TRIM"]
+
+
+func _on_hair_menu_toggled(pressed):
+	if _hair_panel == null:
+		_build_hair_panel()
+	_hair_panel.visible = pressed
+	if pressed:
+		_take_room_for_the_menu()
+		_refresh_hair_panel()
+	else:
+		_give_back_the_room()
+	emit_signal("hair_menu_toggled", pressed)
+
+
+# The scene owns the panel and its rows.  Only the dropdown lists retain their
+# own game theme here: that resource knows how to dress PopupMenu, which the
+# scene tree cannot reach through its OptionButton.
+func _build_hair_panel():
+	_hair_panel = get_node("HairMenu")
+	_hair_panel_width = _hair_panel.margin_right - _hair_panel.margin_left
+	var title = get_node("HairMenu/VBox/Title/Label")
+	title.text = tr("DOLL2_CUSTOMIZE_MENU")
+	var close = get_node("HairMenu/VBox/Title/Close")
+	close.text = tr("OPTCLOSE")
+	close.connect("pressed", self, "_close_hair_menu")
+	var rows = get_node("HairMenu/VBox/Rows")
+	var row_texts = []
+	# each layer keeps its own colours right under it: picking a style and then
+	# hunting for its pair at the bottom of the panel is two jobs, not one
+	for layer in HAIR_LAYERS:
+		row_texts.append([layer.id + "_style", tr(layer.label)])
+		for tone in range(HAIR_TONES.size()):
+			var control_id = "%s_colour%d" % [layer.id, tone + 1]
+			row_texts.append([control_id,
+				"%s - %s" % [tr(layer.tone), tr(HAIR_TONES[tone])]])
+	row_texts.append(["hair_length", tr("DOLL2_HAIR_LENGTH")])
+	row_texts.append(["beard_style", tr("DOLL2_BEARD_STYLE")])
+	row_texts.append(["beard_colour", tr("DOLL2_BEARD_COLOUR")])
+	for row_data in FACE_COLOUR_ROWS:
+		row_texts.append([row_data.id, tr(row_data.label)])
+	for row in row_texts:
+		var control_id = row[0]
+		var control = rows.get_node(control_id)
+		var label = rows.get_node(control_id + "_label")
+		label.text = row[1]
+		_hair_controls[control_id] = control
+		_hair_controls[control_id + "_label"] = label
+		if control is ColorPickerButton:
+			control.connect("color_changed", self, "_on_hair_colour_picked", [control_id])
+			# the wheel is wider than the frame the doll stands in, so it opens
+			# beside the doll instead of over the character it changes
+			control.get_popup().connect("about_to_show", self, "_place_colour_popup", [control])
+		else:
+			control.get_popup().theme = DOLL_DROPDOWN_THEME
+			control.get_popup().connect("about_to_show", self, "_place_option_popup", [control])
+			control.connect("item_selected", self, "_on_hair_option_picked", [control_id, control])
+	# a gear row is a label and a box of swatches rather than a single control,
+	# so it is wired here instead of going through the pairs above
+	for row_data in GEAR_COLOUR_ROWS:
+		var box = rows.get_node(row_data.id)
+		var gear_label = rows.get_node(row_data.id + "_label")
+		gear_label.text = tr(row_data.label)
+		if row_data.has("half"):
+			gear_label.text = "%s - %s" % [tr(row_data.label), tr(row_data.half)]
+		_hair_controls[row_data.id] = box
+		_hair_controls[row_data.id + "_label"] = gear_label
+		for zone in range(GEAR_ZONE_HINTS.size()):
+			var picker = box.get_node("zone%d" % (zone + 1))
+			picker.hint_tooltip = tr(GEAR_ZONE_HINTS[zone])
+			picker.connect("color_changed", self, "_on_gear_colour_picked", [row_data.id, zone])
+			picker.get_popup().connect("about_to_show", self, "_place_colour_popup", [picker])
+			_hair_controls["%s_zone%d" % [row_data.id, zone]] = picker
+	# The piercings.  A row the scene has not got yet is skipped rather than failing
+	# the whole menu, so the panel opens either way.
+	for stat in PIERCING_ROWS:
+		if !rows.has_node(stat) or !rows.has_node(stat + "_label"):
+			continue
+		var piercing_row = rows.get_node(stat)
+		var piercing_label = rows.get_node(stat + "_label")
+		piercing_label.text = tr("DOLL2_" + stat.to_upper())
+		_hair_controls[stat] = piercing_row
+		_hair_controls[stat + "_label"] = piercing_label
+		piercing_row.get_popup().theme = DOLL_DROPDOWN_THEME
+		piercing_row.get_popup().connect("about_to_show", self, "_place_option_popup", [piercing_row])
+		piercing_row.connect("item_selected", self, "_on_hair_option_picked", [stat, piercing_row])
+	for row_data in PIERCING_COLOUR_ROWS:
+		if !rows.has_node(row_data.id) or !rows.has_node(row_data.id + "_label"):
+			continue
+		var swatch = rows.get_node(row_data.id)
+		var swatch_label = rows.get_node(row_data.id + "_label")
+		swatch_label.text = tr("DOLL2_" + str(row_data.piercing).to_upper() + "_COLOUR")
+		_hair_controls[row_data.id] = swatch
+		_hair_controls[row_data.id + "_label"] = swatch_label
+		swatch.connect("color_changed", self, "_on_hair_colour_picked", [row_data.id])
+		swatch.get_popup().connect("about_to_show", self, "_place_colour_popup", [swatch])
+	# the crotch tattoo: which drawing, and its ink
+	if rows.has_node("tattoo_crotch_style") and rows.has_node("tattoo_crotch_style_label"):
+		var drawing_row = rows.get_node("tattoo_crotch_style")
+		var drawing_label = rows.get_node("tattoo_crotch_style_label")
+		drawing_label.text = tr("DOLL2_TATTOO_CROTCH_STYLE")
+		_hair_controls["tattoo_crotch_style"] = drawing_row
+		_hair_controls["tattoo_crotch_style_label"] = drawing_label
+		drawing_row.get_popup().theme = DOLL_DROPDOWN_THEME
+		drawing_row.get_popup().connect("about_to_show", self, "_place_option_popup", [drawing_row])
+		drawing_row.connect("item_selected", self, "_on_hair_option_picked", ["tattoo_crotch_style", drawing_row])
+	if rows.has_node("tattoo_crotch_colour") and rows.has_node("tattoo_crotch_colour_label"):
+		var ink = rows.get_node("tattoo_crotch_colour")
+		var ink_label = rows.get_node("tattoo_crotch_colour_label")
+		ink_label.text = tr("DOLL2_TATTOO_CROTCH_COLOUR")
+		_hair_controls["tattoo_crotch_colour"] = ink
+		_hair_controls["tattoo_crotch_colour_label"] = ink_label
+		ink.connect("color_changed", self, "_on_hair_colour_picked", ["tattoo_crotch_colour"])
+		ink.get_popup().connect("about_to_show", self, "_place_colour_popup", [ink])
+	_position_hair_panel()
+
+
+func _position_hair_panel():
+	if _hair_panel == null or _hair_button == null:
+		return
+	# It hugs the doll's own right edge rather than its trigger's, which is 122 px
+	# further in: aligned to the button the panel ran off the left of the frame
+	# and was clipped away with the character.  The doll clips its contents, so
+	# this edge is as far right as it can go.  At the minimum supported width the
+	# left edge is clamped inside the doll instead.
+	# `_menu_room` is the strip beside the doll that the screen has lent it, so on
+	# a roomy screen the menu stands clear of the character altogether.
+	var panel_width = min(_hair_panel_width,
+		max(0.0, rect_size.x + _menu_room - UNDRESS_BAR_MARGIN * 2))
+	var panel_right = -UNDRESS_BAR_MARGIN + _menu_room
+	var panel_left = panel_right - panel_width
+	var left_limit = -rect_size.x + UNDRESS_BAR_MARGIN
+	if panel_left < left_limit:
+		panel_left = left_limit
+		panel_right = panel_left + panel_width
+	_hair_panel.margin_left = panel_left
+	_hair_panel.margin_right = panel_right
+	# and it opens under its own button, which is itself under the undress column,
+	# so nothing on that edge is covered
+	var panel_top = _hair_button.margin_bottom + 4
+	_hair_panel.margin_top = panel_top
+	_hair_panel.margin_bottom = panel_top + _hair_panel.get_combined_minimum_size().y
+# Under the swatch it belongs to.  It used to open beside the doll, which put it
+# the width of the character away from the square that had just been clicked -
+# far enough that it read as a window of its own rather than as that swatch's.
+func _place_colour_popup(picker):
+	var popup = picker.get_popup()
+	var wheel = popup.rect_size
+	# before its first showing a popup has no size yet, and what it will ask for
+	# is the only thing there is to place
+	if wheel.x <= 0.0 or wheel.y <= 0.0:
+		wheel = popup.get_combined_minimum_size()
+	popup.rect_global_position = _colour_popup_spot(
+		Rect2(picker.rect_global_position, picker.rect_size), wheel)
+
+
+# A dropdown opened low on the screen ran off the bottom: the engine keeps a popup
+# on screen, but it does so while the list is still zero rows tall and the rows
+# are added under it afterwards.  The ten tattoo drawings, at the foot of the
+# menu, were cut off after the eighth.  So the list is lifted, as it opens, until
+# all of it fits; one taller than the screen starts at the top, where the wheel
+# scrolls it.
+func _place_option_popup(control):
+	var popup = control.get_popup()
+	var need = popup.get_combined_minimum_size() * popup.rect_scale
+	var room = get_viewport().get_visible_rect().size
+	var at = popup.rect_global_position
+	if at.y + need.y > room.y:
+		at.y = max(0.0, room.y - need.y)
+		popup.rect_global_position = at
+
+
+# Under the swatch, or over it when the screen has no room below - a wheel that
+# hangs off the bottom is one the player cannot reach the sliders of.  Whatever
+# happens it stays on the screen.
+func _colour_popup_spot(swatch, wheel):
+	var room = get_viewport_rect().size
+	var below = swatch.end.y + COLOUR_POPUP_GAP
+	var above = swatch.position.y - wheel.y - COLOUR_POPUP_GAP
+	var y = below
+	if below + wheel.y > room.y and above >= 0.0:
+		y = above
+	return Vector2(
+		clamp(swatch.position.x, 0, max(0, room.x - wheel.x)),
+		clamp(y, 0, max(0, room.y - wheel.y)))
+
+
+# The lists are filled from the catalogue rather than from the character, so a
+# style nobody of that race wears is still on offer.
+func _refresh_hair_panel():
+	if _hair_panel == null or model == null:
+		return
+	CATALOGUE.use(model.doll_id)
+	for layer in HAIR_LAYERS:
+		var worn = str(model.selections.get(layer.group, ""))
+		_fill_options(layer.id + "_style", CHARACTER_MAP.offered_parts(layer.group, CATALOGUE.parts(layer.group), worn),
+			worn, layer.group != "hair")
+		# the two colours belong to the layer: with nothing worn there is nothing
+		# to paint, so the pair goes with it
+		for tone in [1, 2]:
+			var key = "%s_colour%d" % [layer.id, tone]
+			var stat = "%s_color_%d" % [layer.stat, tone]
+			_hair_controls[key].color = COLORS.colour_of(stat, _stat(stat))
+			_show_hair_row(key, worn != "")
+	# The length of the hair on the head.  Live now that the tiers drive the layer
+	# modifier - `bald` takes the hair off, the rest scale the strands.
+	# A character who is already bald keeps the value on the list, or the row would
+	# read `short` while the head is bare.  Leaving it is one way.
+	var lengths = HAIR_LENGTHS
+	if str(_stat("hair_base_length")) == "bald":
+		lengths = ["bald"] + HAIR_LENGTHS
+	_fill_options("hair_length", lengths, str(_stat("hair_base_length")))
+	_fill_options("beard_style", CATALOGUE.parts("beard"), str(model.selections.get("beard", "")), true)
+	_hair_controls.beard_colour.color = COLORS.colour_of("hair_facial_color", _stat("hair_facial_color"))
+	# a beard is a man's, and only while the art has any
+	var beards = !CATALOGUE.parts("beard").empty() and str(_stat("sex")) != "female"
+	_show_hair_row("beard_style", beards)
+	_show_hair_row("beard_colour", beards)
+	# A piercing is offered once there is bare skin to see it on, and only on a rig
+	# that has the art - the male export has none yet.  The rest of the time the
+	# row is gone, and whatever the character wears stays on them.
+	var skin_shows = GEAR.normalise(undress_level) in [GEAR.BARE, GEAR.NAKED]
+	for stat in PIERCING_ROWS:
+		if !_hair_controls.has(stat):
+			continue
+		var piercing = CHARACTER_MAP.PIERCINGS[stat]
+		var offered = []
+		for word in piercing.values.keys():
+			if str(piercing.values[word]) in CATALOGUE.parts(piercing.group):
+				offered.append(word)
+		_fill_piercing_options(stat, offered, str(_stat(stat)))
+		_show_hair_row(stat, skin_shows and !offered.empty())
+	# and its colour, for as long as there is a piece in to paint
+	for row_data in PIERCING_COLOUR_ROWS:
+		if !_hair_controls.has(row_data.id):
+			continue
+		var pierced = str(model.selections.get(CHARACTER_MAP.PIERCINGS[row_data.piercing].group, ""))
+		var metal = str(_stat(row_data.stat))
+		_hair_controls[row_data.id].color = Color(metal) if metal.begins_with("#") else PIERCING_ART_GOLD
+		_show_hair_row(row_data.id, skin_shows and pierced != "")
+	# The crotch tattoo, for anyone who has one.  Every drawing the rig carries is
+	# offered and there is no "none": taking a tattoo off is the parlour's work.
+	if _hair_controls.has("tattoo_crotch_style"):
+		var inked = str(_stat("tattoo_crotch")) != ""
+		var drawings = _in_number_order(CATALOGUE.parts("tattoo"))
+		_fill_options("tattoo_crotch_style", drawings, str(model.selections.get("tattoo", "")))
+		_show_hair_row("tattoo_crotch_style", inked and !drawings.empty())
+		if _hair_controls.has("tattoo_crotch_colour"):
+			var ink = str(_stat("tattoo_crotch_color"))
+			_hair_controls["tattoo_crotch_colour"].color = Color(ink) if ink.begins_with("#") else TATTOO_ART_INK
+			_show_hair_row("tattoo_crotch_colour", inked and !drawings.empty())
+	# an empty stat is a colour the character derives, and that derived colour is
+	# what the doll draws, so it is what the swatch has to show.  A face with no such
+	# part drawn - a cat has no mouth - has nothing to paint, and the row goes.
+	for row_data in FACE_COLOUR_ROWS:
+		_hair_controls[row_data.id].color = COLORS.colour_of(row_data.stat, _stat(row_data.stat))
+		_show_hair_row(row_data.id, str(model.selections.get(row_data.group, "")) != "")
+	_refresh_gear_rows()
+	_position_hair_panel()
+
+
+func _show_hair_row(control_id, shown):
+	_hair_controls[control_id].visible = shown
+	_hair_controls[control_id + "_label"].visible = shown
+
+
+func _fill_options(control_id, values, current, allow_none = false):
+	var control = _hair_controls[control_id]
+	control.clear()
+	if allow_none:
+		control.add_item(tr("DOLL2_HAIR_NONE"))
+		control.set_item_metadata(0, "")
+	for value in values:
+		control.add_item(_option_label(value))
+		control.set_item_metadata(control.get_item_count() - 1, value)
+	for i in range(control.get_item_count()):
+		if str(control.get_item_metadata(i)) == current:
+			control.select(i)
+			break
+
+
+# Part ids in reading order: `tatoo_womb10` after `tatoo_womb9`, not after
+# `tatoo_womb1` where a plain sort puts it.
+func _in_number_order(ids):
+	var keyed = []
+	for id in ids:
+		var name = str(id)
+		var cut = name.length()
+		while cut > 0 and name[cut - 1] >= "0" and name[cut - 1] <= "9":
+			cut -= 1
+		var number = int(name.substr(cut)) if cut < name.length() else 0
+		keyed.append([name.substr(0, cut), number, name])
+	keyed.sort_custom(self, "_by_stem_then_number")
+	var result = []
+	for entry in keyed:
+		result.append(entry[2])
+	return result
+
+
+func _by_stem_then_number(a, b):
+	if a[0] != b[0]:
+		return a[0] < b[0]
+	return a[1] < b[1]
+
+
+# `_fill_options` for a piercing row, which names each word by its row.
+func _fill_piercing_options(stat, words, current):
+	var control = _hair_controls[stat]
+	control.clear()
+	control.add_item(tr("DOLL2_HAIR_NONE"))
+	control.set_item_metadata(0, "")
+	for word in words:
+		var key = "DOLL2_%s_%s" % [stat.to_upper(), str(word).to_upper()]
+		var named = tr(key)
+		control.add_item(named if named != key else str(word).capitalize())
+		control.set_item_metadata(control.get_item_count() - 1, word)
+	for i in range(control.get_item_count()):
+		if str(control.get_item_metadata(i)) == current:
+			control.select(i)
+			break
+
+
+# What an option is called on screen.  A part nobody has named yet falls back to
+# its own id read as words, so art the artist adds tomorrow arrives legible
+# instead of as a missing key - `tr` hands back the key it was given when there
+# is no such key, which is how the two are told apart.
+func _option_label(value):
+	var key = STYLE_NAME_PREFIX + str(value).to_upper()
+	var named = tr(key)
+	return named if named != key else str(value).capitalize()
+
+
+func _on_hair_option_picked(_index, control_id, control):
+	_look_changed = true
+	if character == null:
+		return
+	var value = str(control.get_item_metadata(control.selected))
+	for layer in HAIR_LAYERS:
+		if control_id == layer.id + "_style":
+			# The part's own id goes in, not the name with the group's prefix cut
+			# off it.  The art carries two families - `hair_base_lion` alongside
+			# `hairs_base_lion` - and a cut name cannot be put back together: the
+			# map would rebuild the wrong one, or none at all.
+			character.set_stat(layer.stat, value)
+	if control_id == "hair_length":
+		character.set_stat("hair_base_length", value)
+	if control_id == "beard_style":
+		character.set_stat("beard", value.replace("beard_", ""))
+	if control_id in PIERCING_ROWS:
+		# taking one out puts the stat back to its own default rather than an empty word
+		character.set_stat(control_id, null if value == "" else value)
+	if control_id == "tattoo_crotch_style":
+		character.set_stat("tattoo_crotch_style", value)
+	# `_apply` refreshes the open menu itself
+	_apply()
+
+
+func _on_hair_colour_picked(colour, control_id):
+	_look_changed = true
+	if character == null:
+		return
+	var hex = "#" + colour.to_html(false)
+	if control_id == "beard_colour":
+		character.set_stat("hair_facial_color", hex)
+		_apply()
+		return
+	for row_data in FACE_COLOUR_ROWS:
+		if control_id == row_data.id:
+			character.set_stat(row_data.stat, hex)
+			_apply()
+			return
+	for row_data in PIERCING_COLOUR_ROWS:
+		if control_id == row_data.id:
+			character.set_stat(row_data.stat, hex)
+			_apply()
+			return
+	if control_id == "tattoo_crotch_colour":
+		character.set_stat("tattoo_crotch_color", hex)
+		_apply()
+		return
+	for layer in HAIR_LAYERS:
+		for tone in [1, 2]:
+			if control_id == "%s_colour%d" % [layer.id, tone]:
+				character.set_stat("%s_color_%d" % [layer.stat, tone], hex)
+	_apply()
+
+
+# One band of one piece.  The bands nobody has touched stay empty in the stat
+# rather than being written out at their current default: a default is the
+# catalogue's to change, and a piece left alone should follow it.
+func _on_gear_colour_picked(colour, control_id, zone):
+	_look_changed = true
+	if character == null:
+		return
+	for row_data in GEAR_COLOUR_ROWS:
+		if row_data.id != control_id:
+			continue
+		var picked = _gear_zone_colours(_stat(row_data.stat))
+		picked[zone] = colour
+		character.set_stat(row_data.stat, _gear_colour_stat_value(picked))
+	_apply()
+
+
+# The swatches follow what is on show.  A row nobody can see the effect of is
+# not offered: the piece it paints is off at this undress level, or - for the
+# two garments that share the body channel - the other one is the one drawn.
+func _refresh_gear_rows():
+	var equipment = _equipment()
+	for row_data in GEAR_COLOUR_ROWS:
+		var parts = _gear_parts_for(row_data, equipment)
+		var zones = []
+		for channel_id in _gear_channels_of(row_data):
+			for zone in CATALOGUE.channel_zones(channel_id, parts):
+				if !(zone in zones):
+					zones.append(zone)
+		zones.sort()
+		_show_hair_row(row_data.id, !zones.empty())
+		var picked = _gear_zone_colours(_stat(row_data.stat))
+		for zone in range(GEAR_ZONE_HINTS.size()):
+			var picker = _hair_controls["%s_zone%d" % [row_data.id, zone]]
+			picker.visible = zone in zones
+			picker.color = (picked[zone] if picked[zone] != null
+				else _zone_default(row_data.channel, zone))
+
+
+# What a row paints, as the {group: part} the catalogue measures zones from -
+# or nothing, which takes the row off the panel.
+#
+# Measured at the level the doll is actually standing at, so a row is offered
+# only while the piece it paints is being worn: a weapon goes with the clothes,
+# a collar stays until the character is naked.
+#
+# The two body rows need one test more.  The clothes and the underwear share the
+# doll's one body channel - a character shows one or the other, never both - so
+# only the garment being drawn can be painted, and the row for the other one
+# would sit there swallowing colours that never appear.  The test is
+# `_body_colour_stat`'s own, which is what decides the paint, so what the panel
+# offers and what the doll wears cannot drift apart.
+#
+# The whole selection goes in rather than the one group the row is named after:
+# `channel_zones` keeps only the parts whose slots the channel actually paints,
+# and which part that is varies with what is worn - a dress carries its own legs
+# and answers for the lower band itself, a skirt worn under a top is a part of
+# its own and answers for it instead.
+func _gear_parts_for(row_data, equipment):
+	var worn = GEAR.selections_for(equipment, GEAR.normalise(undress_level), model.doll_id)
+	if GEAR_CHANNEL_GROUPS.has(row_data.channel):
+		var result = {}
+		for group_id in GEAR_CHANNEL_GROUPS[row_data.channel]:
+			if worn.has(group_id):
+				result[group_id] = worn[group_id]
+		return result
+	if _body_colour_stat(row_data.channel) != row_data.stat:
+		return {}
+	return worn
+
+
+# Every colour channel a row paints.  Only the headgear row has more than one:
+# a hat and a mask are separate channels worn in the same slot.
+func _gear_channels_of(row_data):
+	if !GEAR_CHANNEL_GROUPS.has(row_data.channel):
+		return [row_data.channel]
+	var result = []
+	for group_id in GEAR_CHANNEL_GROUPS[row_data.channel]:
+		for channel_id in CATALOGUE.channels_for_group(group_id):
+			if !(channel_id in result):
+				result.append(channel_id)
+	return result
+
+
+# Whether what a dressed character shows on one half of the body comes out of the
+# underwear slot.  Each half is its own slot's to dress - the chest the top, the
+# legs the bottom - so a robe over bare legs has the underwear below it, and
+# trousers on their own have it above them (`selections_for` in the gear map).
+func _dressed_from_underwear(equipment, channel_id):
+	var slot_name = "legs" if channel_id == "outfit_lower" else "chest"
+	return str(equipment.get(slot_name, "")).empty()
+
+
+# `#rrggbb,#rrggbb,#rrggbb` -> a colour per band, `null` where the band is still
+# on its default.  A preset name is `null` from end to end: the old paperdoll's
+# four presets have no counterpart in this art, and reading them as unpainted is
+# what keeps every existing character looking exactly as they do now.
+func _gear_zone_colours(value):
+	var result = [null, null, null]
+	var text = str(value)
+	if text.find("#") < 0:
+		return result
+	var parts = text.split(",")
+	for zone in range(result.size()):
+		if zone >= parts.size():
+			break
+		var hex = str(parts[zone]).strip_edges()
+		if hex.begins_with("#") and hex.is_valid_html_color():
+			result[zone] = Color(hex)
+	return result
+
+
+# The three bands, back into the one stat that carries them.
+func _gear_colour_stat_value(colours):
+	var result = ""
+	for zone in range(colours.size()):
+		if zone > 0:
+			result += ","
+		if colours[zone] != null:
+			result += "#" + colours[zone].to_html(false)
+	return result
+
+
+# Where a band starts when nobody has painted it, which is the rule the model
+# builds its own materials on: the channel's own colours if it brought any, the
+# gear defaults otherwise.
+func _zone_default(channel_id, zone):
+	var channel = CATALOGUE.color_channels().get(channel_id, {})
+	var own = channel.get("zone_defaults", [])
+	if zone < own.size():
+		return own[zone]
+	if bool(channel.get("gear", false)):
+		return CATALOGUE.zone_defaults()[zone]
+	return Color(1, 1, 1)
+
+
+# Gear is painted band by band rather than in one colour, so its stats go to the
+# zone materials instead of `color_values`.  One channel carries both the clothes
+# and the underwear - a character shows one or the other, never both - so which
+# stat feeds it follows what the doll is actually wearing.
+func _apply_gear_zones():
+	var stats = {}
+	for row_data in GEAR_COLOUR_ROWS:
+		# a headgear row answers for the hats and the masks alike, and both are
+		# channels of their own
+		for channel_id in _gear_channels_of(row_data):
+			stats[channel_id] = (_body_colour_stat(channel_id) if row_data.has("from")
+				else row_data.stat)
+	for channel_id in stats.keys():
+		if !model.zone_values.has(channel_id):
+			continue
+		var picked = _gear_zone_colours(_stat(stats[channel_id]))
+		for zone in range(model.zone_values[channel_id].size()):
+			var colour = picked[zone] if zone < picked.size() else null
+			model.zone_values[channel_id][zone] = (colour if colour != null
+				else _zone_default(channel_id, zone))
+		model._apply_zone_colours(channel_id)
+
+
+# Which of the two rows sharing a body channel is feeding it: the clothes when
+# the character is dressed in something they equipped, the underwear otherwise.
+func _body_colour_stat(channel_id):
+	var dressed = (GEAR.normalise(undress_level) == GEAR.DRESSED
+		and !_dressed_from_underwear(_equipment(), channel_id))
+	var wanted = "clothing" if dressed else "underwear"
+	for row_data in GEAR_COLOUR_ROWS:
+		if row_data.channel == channel_id and str(row_data.get("from", "")) == wanted:
+			return row_data.stat
+	return ""
+
+
+# A screen closing is where a changed look gets written down: the hair menu is
+# put away so it does not spring open on the next character, and the portrait
+# on file - taken before the hairstyle changed - is shot again.
+func _on_doll_visibility_changed():
+	if is_visible_in_tree():
+		# the screen may have been away while the character was trained or dressed,
+		# and the corner controls are what says which levels are open now
+		_refresh_undress_bar()
+		_refresh_open_menu()
+		return
+	_close_hair_menu()
+	if !_look_changed:
+		return
+	_look_changed = false
+	var handler = _singleton("input_handler")
+	if handler != null and handler.has_method("reshoot_portrait"):
+		handler.reshoot_portrait(character)
+
+
+func _refresh_open_menu():
+	if _hair_panel != null and _hair_panel.visible:
+		_refresh_hair_panel()
+
+
+# Some changes reach the game without passing through the screen the doll sits
+# in - a potion, a dye, the inventory closing behind the player.  The signal is
+# the game's own; the doll answers it deferred and at most once, so a screen that
+# rebuilds it on the same signal is not made to do the work twice.
+func _on_game_changed_a_character():
+	if _apply_queued:
+		return
+	_apply_queued = true
+	call_deferred("_apply_queued_change")
+
+
+func _apply_queued_change():
+	_apply_queued = false
+	if character == null or !is_visible_in_tree():
+		return
+	if Engine.get_frames_drawn() == _applied_frame:
+		return
+	_apply()
+
+
+func _close_hair_menu():
+	if _hair_panel != null:
+		_hair_panel.visible = false
+	if _undress_buttons.has("hair"):
+		_undress_buttons["hair"].pressed = false
+	_give_back_the_room()
+	emit_signal("hair_menu_toggled", false)
+
+
+# The containers between the doll and the screen that would cut the menu off.
+# They are what has to give way for it, since the doll's own box is the one thing
+# that must not move.
+func _clipping_ancestors():
+	var result = []
+	var node = get_parent()
+	while node != null and node is Control:
+		if node.rect_clip_content:
+			result.append(node)
+		node = node.get_parent()
+	return result
+
+
+# The strip of screen to the right of the doll, which is all the menu can ever
+# have.  Measured against the screen and not against the containers: one that
+# stops short of the edge is something to widen, not a wall, and taking the
+# widest of them as the limit is what left the menu over the character on every
+# screen whose panels reach the edge.
+func _room_beside_the_doll():
+	var edge = rect_global_position.x + rect_size.x
+	return max(0.0, get_viewport_rect().size.x - edge - UNDRESS_BAR_MARGIN)
+
+
+# Opening the menu widens what would clip it, by no more than the menu's own
+# width - enough for it to stand entirely beside the doll - and by no more than
+# the screen has left.  A doll anchored to the edge it just moved would grow with
+# it, so its own right edge is pinned for as long as the menu is open; the
+# character is framed against that rect and would otherwise slide.
+func _take_room_for_the_menu():
+	_give_back_the_room()
+	if _hair_panel == null or !is_inside_tree():
+		return
+	# Enough to stand clear of the frame - the panel plus the margin it keeps from
+	# the edge - or as much of that as the screen has left.  A menu half out is
+	# not pretty, but a menu over the character is worse.
+	var wanted = min(_hair_panel_width + UNDRESS_BAR_MARGIN, _room_beside_the_doll())
+	if wanted <= 0.0:
+		return
+	# Each container is widened by what it lacks to reach that far, not by the
+	# whole strip: one that already extends past the doll needs less, and one that
+	# already reaches the screen edge needs nothing.
+	var reach = rect_global_position.x + rect_size.x + wanted
+	var was_width = rect_size.x
+	for node in _clipping_ancestors():
+		var short_by = reach - (node.rect_global_position.x + node.rect_size.x)
+		if short_by <= 0.0:
+			continue
+		_widened.append({"node": node, "was": node.margin_right})
+		node.margin_right += short_by
+	# A doll anchored to an edge that just moved grew with it.  How much is
+	# measured rather than assumed: the container that grew is not always the
+	# doll's own parent, and the two need not have grown by the same amount.
+	var grew = rect_size.x - was_width
+	if grew != 0.0:
+		_widened.append({"node": self, "was": margin_right})
+		margin_right -= grew
+	# the panel is placed from the doll's own right edge inwards, so its shift is
+	# the borrowed strip plus the margin that edge already keeps
+	_menu_room = wanted + UNDRESS_BAR_MARGIN
+	_position_hair_panel()
+
+
+func _give_back_the_room():
+	for entry in _widened:
+		if is_instance_valid(entry.node):
+			entry.node.margin_right = entry.was
+	_widened.clear()
+	_menu_room = 0.0
+
+
+func _refresh_undress_bar():
+	if _undress_bar == null:
+		return
+	var bar_visible = (rect_size.x >= UNDRESS_BAR_NEEDS.x
+		and rect_size.y >= UNDRESS_BAR_NEEDS.y)
+	_undress_bar.visible = bar_visible
+	if _hair_button != null:
+		_hair_button.visible = bar_visible and show_hair_menu
+	if !bar_visible:
+		_close_hair_menu()
+	var offered = _levels_that_differ()
+	# a level the character has no picture of its own for shows the next one down
+	var shown = ""
+	for level in GEAR.LEVELS:
+		if level in offered:
+			shown = level
+		if level == undress_level:
+			break
+	if shown == "":
+		# the level in hand is not offered because it looks like the next one down,
+		# so that is the button to light: a character with no clothes on shows the
+		# same picture dressed as in their underwear
+		shown = offered.front() if !offered.empty() else undress_level
+	var barred = undress_is_a_rule and !nudity_allowed()
+	for level in _undress_buttons.keys():
+		if level == "hair":
+			continue
+		_undress_buttons[level].visible = level in offered
+		_undress_buttons[level].pressed = level == shown
+		_undress_buttons[level].disabled = barred and level != GEAR.DRESSED
+	# while the buttons are the Nudity rule they say what the rule said
+	if undress_is_a_rule:
+		var stand_clear_of = _lowest_visible_button()
+		for level in GEAR.LEVELS:
+			if level == GEAR.DRESSED or !_undress_buttons.has(level):
+				continue
+			_rule_tooltip(_undress_buttons[level], stand_clear_of)
+	# the column is two buttons tall for one character and four for another, and
+	# the menu button sits under whatever it turned out to be
+	_place_hair_button()
+	_position_hair_panel()
+	if _hair_panel != null and _hair_panel.visible:
+		_refresh_hair_panel()
+
+
+# The bottom of the bar, which is what a tooltip has to be placed under.  Placed
+# under the button hovered instead, the panel lies across every button below it.
+func _lowest_visible_button():
+	if _undress_bar == null:
+		return null
+	var lowest = null
+	for child in _undress_bar.get_children():
+		if child.visible:
+			lowest = child
+	return lowest
+
+
+func _rule_tooltip(button, stand_clear_of = null):
+	var globals_singleton = _singleton("globals")
+	if globals_singleton == null or character == null:
+		return
+	var text = "[center]" + tr("WORKRULENUDITY") + "[/center]\n"
+	text += character.translate(tr("WORKRULENUDITYDESCRIPT"))
+	globals_singleton.connecttexttooltip(button, text, false, null, stand_clear_of)
+
+
+# Which of the four are worth offering.  A step that renders exactly what the
+# next one down renders is not a choice: a character with no outer clothes looks
+# the same dressed as in their underwear, and one with nothing to keep on looks
+# the same bare as naked.  The more dressed of the two is the one that goes -
+# what the button promises is what is missing from it.
+func _levels_that_differ():
+	if model == null or character == null:
+		return GEAR.LEVELS
+	var equipment = _equipment()
+	var pictures = {}
+	for level in GEAR.LEVELS:
+		var slots = CATALOGUE.compose(GEAR.selections_for(equipment, level, model.doll_id),
+			model.axis_values)
+		for slot_name in GEAR.hidden_slots(level):
+			slots.erase(slot_name)
+		pictures[level] = slots.hash()
+	var result = []
+	for index in GEAR.LEVELS.size():
+		var level = GEAR.LEVELS[index]
+		if !offered_undress_levels.empty() and !(level in offered_undress_levels):
+			continue
+		if index + 1 < GEAR.LEVELS.size() and pictures[level] == pictures[GEAR.LEVELS[index + 1]]:
+			continue
+		result.append(level)
+	return result
+
+
+# The wheel zooms, the left button drags.  Only inside this node's own rect,
+# because that is the rect the screen gave the doll.
+func _gui_input(event):
+	if !allow_zoom or portrait_mode or model == null:
+		return
+	if event is InputEventMouseButton:
+		if event.button_index == BUTTON_LEFT:
+			if event.pressed:
+				# a poke at the chest swings it, the way the old doll did; anywhere
+				# else the press starts a drag as before
+				if tits_interaction(event.position):
+					_on_chest_poked()
+					accept_event()
+					return
+				_drag_candidate = true
+				_dragging = false
+				_drag_from = event.position
+				_pan_from = view_pan
+			else:
+				_drag_candidate = false
+				_dragging = false
+			return
+		if !event.pressed or !(event.button_index in [BUTTON_WHEEL_UP, BUTTON_WHEEL_DOWN]):
+			return
+		var step = ZOOM_STEP if event.button_index == BUTTON_WHEEL_UP else -ZOOM_STEP
+		var zoomed = clamp(view_zoom + step, ZOOM_MIN, ZOOM_MAX)
+		if zoomed != view_zoom:
+			view_zoom = zoomed
+			_stand_on_the_node()
+		accept_event()
+		return
+	if event is InputEventMouseMotion and _drag_candidate:
+		var moved = event.position - _drag_from
+		if !_dragging and moved.length_squared() < DRAG_THRESHOLD * DRAG_THRESHOLD:
+			return
+		_dragging = true
+		view_pan = Vector2(
+			clamp(_pan_from.x + moved.x, -PAN_LIMIT_X, PAN_LIMIT_X),
+			clamp(_pan_from.y + moved.y, -rect_size.y * PAN_LIMIT_UP, rect_size.y * PAN_LIMIT_DOWN))
+		_stand_on_the_node()
+		accept_event()
+
+
+# Puts the view back where it started, for a screen that wants a clean doll.
+func reset_view():
+	view_zoom = 1.0
+	view_pan = Vector2.ZERO
+	_stand_on_the_node()
+
+
+# Shoots the doll into a picture.  Only in portrait mode, which means only in the
+# booth: on a screen this node's viewport is the game window, and a portrait is
+# not a screenshot of it.  The old doll cropped a rectangle out of whatever was
+# rendered and the crop ran off the canvas on tall characters; here the whole
+# viewport is the portrait.
+func save_portrait(name, char_ref = null):
+	if !portrait_mode:
+		return false
+	var folder = _portraits_folder()
+	var directory = Directory.new()
+	if !directory.dir_exists(folder):
+		directory.make_dir(folder)
+	var path = folder + name + ".png"
+	# the render has to land before it can be read
+	yield(get_tree(), "idle_frame")
+	yield(get_tree(), "idle_frame")
+	if !is_inside_tree() or get_viewport() == null:
+		if char_ref != null:
+			char_ref.portrait_failed()
+		return false
+	var image = get_viewport().get_texture().get_data()
+	image.flip_y()
+	_unpremultiply(image)
+	# handed over in memory as well as written: the png is only there to survive a
+	# restart, and nothing has to read it back to show the fresh portrait
+	var handler = _singleton("input_handler")
+	if handler != null:
+		handler.store_portrait(path, image)
+	if char_ref != null:
+		char_ref.portrait_ready(path)
+	image.save_png(path)
+	if handler != null:
+		handler.emit_signal("PortraitUpdate")
+	return true
+
+
+# The autoloads are fetched rather than named.  Naming one from this script does
+# not parse when the script is preloaded before the singletons are bound - the
+# node then falls back to a plain Control and every call on it fails.
+func _singleton(singleton_name):
+	if !is_inside_tree():
+		return null
+	return get_tree().get_root().get_node_or_null(singleton_name)
+
+
+func _portraits_folder():
+	var settings = _singleton("variables")
+	return str(settings.portraits_folder) if settings != null else "user://userportraits/"
+
+
+# A half transparent pixel comes back from the canvas already multiplied by its
+# own alpha, which darkens it.  Over a dark card that goes unnoticed; over a
+# location backdrop it draws a dark rim around hair and ears.
+func _unpremultiply(image):
+	image.lock()
+	for y in image.get_height():
+		for x in image.get_width():
+			var pixel = image.get_pixel(x, y)
+			if pixel.a <= 0.0 or pixel.a >= 1.0:
+				continue
+			image.set_pixel(x, y, Color(
+				min(pixel.r / pixel.a, 1.0), min(pixel.g / pixel.a, 1.0),
+				min(pixel.b / pixel.a, 1.0), pixel.a))
+	image.unlock()
+
+
+# The old doll had to slide its pose until a crop frame landed on an anchor.
+# This one is framed by construction, so there is nothing to centre.
+func center_portrait_frame(_anchor = Vector2.ZERO):
+	return portrait_mode
+
+
+# --- the breast interaction ---------------------------------------------------
+# Kept as no-ops so the screens that call them keep working; they need animation,
+# which is off for now.
+
+# A swing of the chest: the size sliders call this when the size changes, and a
+# click on the breasts calls it through `tits_interaction`.  The swing itself
+# belongs to the model, so the preview panel and the game show the same one.
+func jiggle_tits(_power = 1.0):
+	if model == null or !animated or !is_visible_in_tree():
+		return
+	model.play_titjump()
+
+
+# The old doll's API.  The swing is the authored `titjump` bone animation now,
+# and a rebuild does not interrupt it, so there is nothing to put back.
+func stop_tits_jiggle():
+	pass
+
+
+func tits_interaction(position = Vector2.ZERO):
+	if model == null or model.scale.x == 0.0:
+		return false
+	var box = _bounds_of(model.TITS_SLOTS)
+	if box.size.y <= 0.0:
+		return false
+	var local = (position - model.position) / model.scale
+	if !box.has_point(local):
+		return false
+	jiggle_tits()
+	return true
+
+
+func get_tits_mesh():
+	return null
+
+
+func get_tits_outline():
+	return null
+
+
+# --- driving the doll ---------------------------------------------------------
+
+func _apply():
+	# dolls switched back on since this one was made: the rig is built now
+	if model == null and character != null and !_dolls_switched_off():
+		_make_model()
+	if model == null or character == null:
+		return
+	# Read before the rebuild, compared after it: a top coming off is the moment
+	# the chest is worth a swing.
+	var was_covered = _chest_is_covered()
+	var stats = {}
+	for stat in STATS:
+		stats[stat] = _stat(stat)
+	stats["equipment"] = _equipment()
+	stats["undress"] = undress_level
+	stats["beast"] = _beast()
+
+	var doll_id = _doll_id(stats)
+	# a different sex is a different export, not only a different part list: the
+	# skeletons share neither their bones nor their parts, so the model has to be
+	# swapped rather than pointed at another catalogue
+	if doll_id != model.doll_id:
+		model._switch_doll(doll_id)
+		model.handle_buttons.clear()
+		model.handles_visible = false
+		_apply_idle_animation()
+	CATALOGUE.use(doll_id)
+	model.selections = CATALOGUE.default_selections()
+	var wanted = CHARACTER_MAP.selections_for(stats, doll_id)
+	for group_id in wanted.keys():
+		var part_id = str(wanted[group_id])
+		if part_id.empty() or part_id in CATALOGUE.parts(group_id):
+			model.selections[group_id] = part_id
+			continue
+		# This rig has not been drawn that piece.  Where the map names something it
+		# stands in for - a second cut of an elven ear falls back to the plain one -
+		# wear that; otherwise leave the slot as the catalogue has it.
+		var stand_in = CHARACTER_MAP.stand_in(group_id, part_id)
+		if stand_in != "" and stand_in in CATALOGUE.parts(group_id):
+			model.selections[group_id] = stand_in
+	# A hair stat that names a part outright is one somebody picked by hand, and
+	# it is worn as it stands: the map's prefix rule is for the short values the
+	# game generates (`straight` -> `hair_base_straight`) and cannot rebuild an
+	# id that does not follow it.
+	for layer in HAIR_LAYERS:
+		var picked = str(stats.get(layer.stat, ""))
+		picked = str(HAIR_PART_ALIASES.get(picked, picked))
+		if picked != "" and picked in CATALOGUE.parts(layer.group):
+			model.selections[layer.group] = picked
+	# How long each hair layer is worn.  A tier the doll has no factor for lands on
+	# the default, and `bald` is answered below by taking the hair off rather than
+	# by shortening it to nothing.
+	for stat in HAIR_LENGTH_STATS.keys():
+		model.proportions[HAIR_LENGTH_STATS[stat]] = MODIFIERS.step_factor(
+			str(HAIR_LENGTH_STATS[stat]), str(stats.get(stat, "")))
+	if str(stats.get("hair_base_length", "")) == "bald":
+		# no hair at all rather than a very short one; the fringe hangs off the
+		# base style and goes with it
+		model.selections["hair"] = ""
+	model.axis_values = CATALOGUE.default_axes()
+	for stat in AXES.keys():
+		var value = _axis_value(stat, stats.get(stat, ""))
+		if value != "" and model.axis_values.has(AXES[stat]):
+			model.axis_values[AXES[stat]] = value
+	# The heavier legs the export ships are a race's, not a stat's: an orc and a
+	# goblin stand on them, everybody else on the plain pair.
+	if model.axis_values.has("legs"):
+		model.axis_values["legs"] = "orc" if str(stats.get("race", "")) in ORC_LEGS else "default"
+	# what the level wears is already in the selections; this is what it wears but
+	# does not show, which is what makes a bare character bare
+	model.hidden_slots = GEAR.hidden_slots(undress_level)
+	# The extra rows under a beastkin's chest are nipples alone until they are
+	# developed into breasts.  A top covers both by draw order - see
+	# DRAW_ORDER_FIXES in doll2_overrides.gd.
+	var developed = bool(stats.get("multiple_tits_developed", false))
+	model.many_tits_developed = developed
+	# A pregnant beastkin's belly is drawn clean, and the nipples and small breasts
+	# on it are overlays of their own: worn only while the Extra Nipples option is
+	# on and the character has extra pairs - the breasts once those are developed.
+	if !_doll_setting("furry_multiple_nipples") or int(stats.get("multiple_tits", 0)) <= 0:
+		model.hidden_slots.append("beastkin_pregnancy_nipple")
+		model.hidden_slots.append("breasts_beastkin_pregnancy")
+	elif !developed:
+		model.hidden_slots.append("breasts_beastkin_pregnancy")
+	model.height_tier = _height(str(stats.get("height", "")))
+	#The preview picks the same six sizes by name, so the two cannot drift apart.
+	model.proportions["butt"] = MODIFIERS.step_factor("butt", stats.get("ass_size", ""))
+	# The art has one pair of genitals, so the three sizes the game carries are a
+	# scale on the bones they hang from.
+	model.proportions["dick"] = MODIFIERS.step_factor("dick", stats.get("penis_size", ""))
+	model.proportions["balls"] = MODIFIERS.step_factor("balls", stats.get("balls_size", ""))
+	# On top of whatever the height tier already does to the same bone - the two
+	# multiply, so a tall character with a big head is still small-headed for their
+	# height.
+	model.proportions["head_size"] = MODIFIERS.step_factor("head_size", stats.get("head_size", ""))
+	_apply_colours()
+	model._rebuild_model()
+	_apply_coverage()
+	model._update_animated_pose()
+	_stand_on_the_node()
+	_refresh_undress_bar()
+	# Whatever changed about the character - a piece equipped in the inventory, a
+	# status a training lifted - reaches the doll as a rebuild, and the open menu
+	# has to follow it: which rows are offered depends on what is worn.
+	_refresh_open_menu()
+	# Not on the first build - a doll that opens dressed has gone from nothing to
+	# covered, which is not a change anyone watched happen.
+	if _applied_frame >= 0 and _chest_is_covered() != was_covered:
+		jiggle_tits()
+	_applied_frame = Engine.get_frames_drawn()
+
+
+# The colour a worn item dictates for one channel, or `null` when nothing worn
+# has anything to say about it.  Only counts while the item is actually on: the
+# undress level decides that, so a stripped character stops being orange with the
+# plug that is no longer there.
+func _gear_colour(channel_id):
+	if !CHANNEL_COLOURS.has(channel_id):
+		return null
+	var equipment = _equipment()
+	# What is actually on the doll at this undress level, by part rather than by
+	# group: the channel and the group are not the same word - the `tail` channel
+	# paints the `tails` group - and the part is what both agree on.
+	var worn = {}
+	for group_id in GEAR.selections_for(equipment, undress_level, model.doll_id).values():
+		worn[str(group_id)] = true
+	for slot_name in equipment.keys():
+		var item_id = str(equipment[slot_name])
+		var wanted = GEAR.ITEM_COLOURS.get(item_id, {})
+		if !wanted.has(channel_id):
+			continue
+		if !worn.has(GEAR._part_for(item_id, model.doll_id)):
+			continue # the item is off at this undress level, and so is its colour
+		return COLORS.colour_of(str(CHANNEL_COLOURS[channel_id][0]), str(wanted[channel_id]))
+	return null
+
+
+# Whether anything is drawn over the breasts right now - the doll answers it off
+# its own meshes, and the preview panel asks the same question.
+func _chest_is_covered():
+	return model != null and model.chest_is_covered()
+
+
+# The character's own colours, on the channels that carry them.  A channel with
+# no colour keeps white, which the shader reads as "leave the art alone" - that is
+# what an unpainted part looked like on the old doll too.
+func _apply_colours():
+	# A coat is the artist's colour, not the character's.  The skin shade under it
+	# tints the fur through the shader's lightness, which turned a dark cat's
+	# orange coat muddy, so a furred body drops its skin before the pattern goes on.
+	var worn_coat = _coverage_pattern()
+	for channel_id in CHANNEL_COLOURS.keys():
+		if !model.color_values.has(channel_id):
+			continue
+		if channel_id == "skin" and worn_coat != "":
+			model.color_values[channel_id] = Color.white
+			model._apply_channel_colour(channel_id)
+			continue
+		var pair = CHANNEL_COLOURS[channel_id]
+		# A pointed ear is skin, not fur.  The old doll painted `body_color_ears`
+		# onto its furry-ear node alone and never touched the humanoid one, whose
+		# art is drawn in skin tone; the stat still answers for a human ear, with a
+		# fallback of `yellow2` that has nothing to do with the character.
+		if channel_id == "race" and str(model.selections.get("race_overlay", "")) in OVERLAY_FINS:
+			# a nereid's arm and leg webbing is the same fin as the ears and the
+			# tail, so it takes the fin colour instead of the skin the other race
+			# overlays are painted in
+			var webbing = COLORS.fins_code_for_skin(_stat("body_color_skin"))
+			if webbing == "":
+				webbing = str(_stat("body_color_skin"))
+			model.color_values[channel_id] = COLORS.colour_of("body_color_tail", webbing)
+			model._apply_channel_colour(channel_id)
+			continue
+		if channel_id == "nipples":
+			# a colour the player picked wins; left alone, a furred chest wears the
+			# coat's nipples rather than the skin's
+			var coat = null
+			var picked_nipples = str(_stat("body_color_nipples"))
+			if picked_nipples != "":
+				coat = COLORS.colour_of("body_color_nipples", picked_nipples)
+			if coat == null:
+				coat = COVERAGE.nipple_colour(_coverage_pattern())
+			if coat == null:
+				coat = COLORS.nipples_of(_stat("body_color_skin"))
+			# and a heavy pregnancy darkens them over whichever of the two it is,
+			# for as long as it lasts: the shade is not stored anywhere, so the
+			# character is back to their own the moment the status goes
+			if _wears_pregnancy_nipples():
+				coat = COLORS.pregnancy_nipples()
+			model.color_values[channel_id] = coat
+			model._apply_channel_colour(channel_id)
+			continue
+		if channel_id in ["piercing_nipple", "piercing_belly", "tattoo"]:
+			# No palette stands behind a piercing or a tattoo: a picked hex, or white,
+			# which is how the shader is told to leave the drawn gold or ink alone.
+			var metal = str(_stat(str(pair[0])))
+			model.color_values[channel_id] = Color(metal) if metal.begins_with("#") else Color.white
+			model._apply_channel_colour(channel_id)
+			continue
+		if channel_id == "ears" and !_wears_animal_ears():
+			# a shaped ear is the skin, unless the player painted it
+			var painted_ears = str(_stat("body_color_ears"))
+			if painted_ears != "":
+				model.color_values[channel_id] = COLORS.colour_of("body_color_ears", painted_ears)
+			else:
+				model.color_values[channel_id] = COLORS.colour_of("body_color_skin", _stat("body_color_skin"))
+			model._apply_channel_colour(channel_id)
+			continue
+		# A piece of gear can bring its own colour - a tail plug is orange because
+		# it was made orange, not because its wearer is a fox.
+		var forced = _gear_colour(channel_id)
+		if forced != null:
+			model.color_values[channel_id] = forced
+			model._apply_channel_colour(channel_id)
+			continue
+		model.color_values[channel_id] = COLORS.colour_of(str(pair[0]), _stat(str(pair[0])))
+		if str(pair[1]) != "":
+			model.color_values_secondary[channel_id] = COLORS.colour_of(str(pair[1]), _stat(str(pair[1])))
+		model._apply_channel_colour(channel_id)
+	_apply_gear_zones()
+
+
+# `skin_coverage` -> the fur pattern painted over the body.  The names carried
+# over unchanged where the art did; what the old doll had and this one has not is
+# listed as empty, and the body is then simply bare skin.
+const COVERAGE_PATTERNS = {
+	"fur_orange": "fur_orange",
+	"fur_orange_white": "fur_orange_white",
+	"fur_white": "fur_white",
+	"fur_grey": "fur_grey",
+	"fur_brown": "fur_brown",
+	"fur_black": "fur_black",
+	"fur_striped": "fur_striped",
+	"fur_tricolor": "fur_tricolor",
+	"kobold": "kobold",
+	# no art for these yet: feathers, plant, and the three scale patterns
+	"feathers": "",
+	"plant": "",
+	"scale": "",
+	"scale2": "",
+	"scale3": "",
+}
+
+
+# The fur or scales the character wears, painted over the body's own colour.  It
+# needs the masks, so it is applied after the meshes exist; and it belongs to a
+# beastkin body alone, exactly as the patterns declare.
+# The pattern the character actually wears: the stat says which one, the body
+# says whether it can carry one at all.
+func _coverage_pattern():
+	var wanted = str(COVERAGE_PATTERNS.get(str(_stat("skin_coverage")), ""))
+	if wanted != "" and !CATALOGUE.has_tag(str(model.selections.get("body", "")), COVERAGE.REQUIRES_TAG):
+		return ""
+	return wanted
+
+
+func _apply_coverage():
+	var wanted = _coverage_pattern()
+	model.coverage_id = wanted
+	model.coverage_colors = _coverage_colours(wanted)
+	model._apply_coverage_to_meshes()
+
+
+# The artist's colours for the pattern, with the character's own painted over
+# them: `body_color_coat` carries one "#rrggbb" per colour the pattern has, in
+# the order `doll_coverage` lists them, and '' anywhere the artist's still
+# stands.  A character who never repainted their coat has no list at all.
+func _coverage_colours(pattern_id):
+	var colours = COVERAGE.default_colors(pattern_id)
+	var painted = str(_stat("body_color_coat"))
+	if pattern_id == "" or painted == "":
+		return colours
+	var chosen = painted.split(",")
+	for i in range(min(chosen.size(), colours.size())):
+		var value = str(chosen[i]).strip_edges()
+		if value == "":
+			continue
+		#a name out of the palette the fur is painted from, the way every other body colour
+		#is spelled; an "#rrggbb" is taken as it is
+		if value.begins_with("#"):
+			colours[i] = Color(value)
+			continue
+		colours[i] = COLORS.colour_of("body_color_tail", value)
+	return colours
+
+
+# Ears drawn as fur rather than as skin.  Everything the art calls an ear that is
+# not one of the humanoid shapes.
+# Race overlays that are webbing rather than hide: their art is the same fin the
+# ears and the tail are, and it is painted in the fin colour.
+const OVERLAY_FINS = ["race_nereid"]
+
+# `ears_nereid` is deliberately absent: a nereid ear is a fin, and it takes the
+# fin colour through `body_color_ears` rather than the plain skin.  Every other
+# ear the art grows rather than shapes belongs to the animal side, so a new cut
+# has to be listed here or an elf ends up wearing fur colour on bare skin, which
+# is what the second elven ear did until it was added.
+const HUMANOID_EARS = ["ears_human", "ears_elven", "ears_elven2", "ears_orc", "ears_goblin"]
+
+func _wears_animal_ears():
+	var part_id = str(model.selections.get("ears", ""))
+	return part_id != "" and !(part_id in HUMANOID_EARS)
+
+
+# Only the second stage - the belly the art calls `big`, which is the one that
+# reads as pregnant across the room.  An early pregnancy shows a slight belly and
+# nothing else, and darkening for it would give the state away before the doll
+# does.
+func _wears_pregnancy_nipples():
+	if !_doll_setting("darker_pregnancy_nipples"):
+		return false
+	return _axis_value("pregnancy_status", _stat("pregnancy_status")) == "big"
+
+
+# The doll's own options, read live rather than cached: they are toggled in a
+# panel that is open over the doll it changes.  A tool with no game around it -
+# the catalogue builder, the option pictures - gets the default.
+func _doll_setting(setting_name):
+	var handler = _singleton("input_handler")
+	if handler == null:
+		return true
+	return bool(handler.globalsettings.get(setting_name, true))
+
+
+# What the doll does while nobody is asking anything of it: the idle its rig was
+# authored with - breathing - and a blink on its own timer.  The doll knows which
+# of its animations is the idle, which is what keeps the two rigs from needing a
+# list here; the blink is scheduled by the doll as well.
+#
+# A portrait is a still photograph, so it never animates at all: a frame caught
+# mid-breath would not match the one taken before it.
+func _apply_idle_animation():
+	for animation_name in model.animation_states.keys():
+		model.animation_states[animation_name] = false
+	var wanted = animated and !portrait_mode and _doll_setting("doll_idle_animation")
+	if wanted:
+		model._reset_animation_states()
+	model.set_blinking(wanted)
+
+
+# A doll that does not move gives its model nothing to do between rebuilds, so the
+# model gets no frames at all.  The model turns them back on itself whenever it
+# starts a swing, which is why `jiggle_tits` and the reactions ask first.
+func _hold_still():
+	if model != null:
+		model.set_process(animated)
+
+
+func set_animated(value):
+	animated = bool(value)
+	if model != null:
+		_apply_idle_animation()
+		_hold_still()
+
+
+func _on_doll_settings_changed():
+	# dolls switched off: the rig goes, and the screen shows its picture instead the next time it asks
+	if _dolls_switched_off():
+		if model != null:
+			model.queue_free()
+			model = null
+		return
+	if model == null:
+		return
+	_apply_idle_animation()
+	if character != null:
+		_apply_colours()
+
+
+# Two things at once: the doll is scaled to the frame it was given, and shifted
+# so this node's own position is the ground it stands on.
+#
+# Both are read off the drawn geometry rather than from the preview's own origin.
+# That origin is measured once per doll and does not follow the height tier - the
+# tier stretches the spine and shrinks the head rather than scaling the whole
+# figure, so the distance from the root to the feet moves with it.  Trusting it
+# left a switched doll floating 66 px above its own node while a freshly built
+# one stood 71 px below it.
+func _stand_on_the_node():
+	if model == null:
+		return
+	model.scale = Vector2.ONE
+	if portrait_mode:
+		_frame_the_head()
+		return
+	var shown = _bounds_of(BUST_PARTS) if show_from_the_hips else _body_bounds()
+	if shown.size.y <= 0.0:
+		return
+	var frame = rect_size
+	var tier = float(MODIFIERS.display_scale(model.height_tier))
+	var tallest = float(MODIFIERS.display_scale(TALLEST_TIER))
+	var fit = 1.0
+	if frame.y > 0.0 and tier > 0.0 and tallest > 0.0:
+		# Fitting what is shown to the frame would make every character exactly as
+		# tall as every other, which is the one thing the height tier is for.  The
+		# frame is fitted to a towering character instead, and this one keeps its
+		# share of it.
+		var reference = (shown.size.y * HEADROOM_FOR_HAIR) / tier
+		fit = (frame.y * (1.0 - frame_headroom)) / (reference * tallest)
+	fit *= view_zoom * float(SHORT_TIERS_NEARER.get(model.height_tier, 1.0))
+	model.scale = Vector2(fit, fit)
+	if show_from_the_hips:
+		# Anchored at the hips, which is where the old doll anchored: it scaled the
+		# whole figure by the tier (0.75 to 1.3) and then slid it up or down by a
+		# per-tier offset - +60 px for the smallest, -30 for the largest - which is
+		# exactly what it takes to keep everyone standing on one line while the
+		# head rises.  Pinning the head instead, as this did before, aligns the
+		# wrong end: heads level and feet wandering reads as being pushed about
+		# rather than as being taller.
+		var hip_line = HIPS_SIT_AT - float(SHORT_TIERS_HIGHER.get(model.height_tier, 0.0))
+		model.position = Vector2(frame.x * 0.5, frame.y * hip_line) + view_pan - Vector2(shown.position.x + shown.size.x * 0.5, shown.end.y) * fit
+	else:
+		# stands on the bottom of its own box, in the middle of it
+		model.position = Vector2(frame.x * 0.5, frame.y) + view_pan - Vector2(shown.position.x + shown.size.x * 0.5, shown.end.y) * fit
+
+
+# How tall the doll stands, measured from the parts every doll has.  Not from
+# everything drawn: a race overlay can carry a mesh with vertices far outside the
+# figure - the slime one does - and measuring that shrinks the whole doll to fit
+# a shape nobody can see.
+# What the whole figure is measured by.  The animal halves are in here because a
+# centaur or a lamia is that shape: measuring only the human half would leave the
+# barrel or the coils hanging out of the bottom of the frame.
+const MEASURED_BY = ["head", "head_skull", "torso", "pelvis", "leg_left", "leg_right",
+	"animal_body", "animal_frontbody"]
+# What a portrait is framed on.  The hair is left out on purpose: a very long
+# style would otherwise pull the frame down to the character's waist.
+#
+# The ears are left out for the same reason, and it is not a small one: a fox
+# pair stands 55 units above the skull against a face 104 tall, so framing on
+# them shrank the head by a quarter and left a band of empty canvas over it -
+# every beastkin got a portrait visibly smaller than a human's.  Horns were never
+# in here either, so this is also what the rest of the list already did.  What
+# rises above the crown may run past the top edge; the face is what a portrait is
+# of.
+const PORTRAIT_PARTS = ["head", "head_skull", "face", "eyes", "lips", "nose"]
+# Head to hips: what a screen shows.  The legs run past the bottom of the frame
+# and are clipped, which is how the old doll filled these panels.
+const BUST_PARTS = ["head", "head_skull", "torso", "pelvis"]
+# The head art stops at the crown; hair and horns sit above it, so the frame
+# keeps a little more room than the body alone asks for.
+const HEADROOM_FOR_HAIR = 1.12
+# Where the hip line sits in the frame, as a share of its height.  Every
+# character's hips land here whatever their height, and the head rises above it
+# as they get taller - the way the old doll's per-tier offsets kept them on a
+# common floor.
+const HIPS_SIT_AT = 0.93
+# A short character drawn at their own share of a frame built for a towering one
+# ends up small and low in it, which reads as standing further away rather than
+# as being short.  The smaller tiers are brought a little nearer and lifted a
+# little off the bottom - enough to sit in the frame, not enough to lose the
+# height difference, which is the whole point of the tier.
+const SHORT_TIERS_NEARER = {"tiny": 1.10, "petite": 1.06, "short": 1.03}
+const SHORT_TIERS_HIGHER = {"tiny": 0.04, "petite": 0.025, "short": 0.012}
+
+
+# Fills the rect with the head, centred, whatever the character's height or
+# hairstyle.  The frame is the portrait, so nothing is cropped afterwards.
+func _frame_the_head():
+	frame_on(PORTRAIT_PARTS, 1.0 / max(0.01, portrait_zoom))
+
+
+# Fills the frame with whatever parts are named, centred, with `fill` saying how
+# much of the frame they take: 1.0 is edge to edge and 0.4 leaves the rest of
+# the face around them, which is what a picture of one mouth needs to be read
+# at all.
+func frame_on(slots, fill = 1.0):
+	if model == null:
+		return
+	var box = _bounds_of(slots)
+	if box.size.y <= 0.0 or fill <= 0.0:
+		return
+	var frame = rect_size
+	var fit = min(frame.x * fill / box.size.x, frame.y * fill / box.size.y)
+	model.scale = Vector2(fit, fit)
+	model.position = frame * 0.5 - (box.position + box.size * 0.5) * fit
+
+
+# The figure's own box: where it stands and how tall it is.
+func _body_bounds():
+	return _bounds_of(MEASURED_BY)
+
+
+func _bounds_of(slots):
+	var minimum = Vector2(1e9, 1e9)
+	var maximum = Vector2(-1e9, -1e9)
+	for record in model.mesh_records:
+		if !is_instance_valid(record.polygon):
+			continue
+		if !(str(record.slot.get("name", "")) in slots):
+			continue
+		for point in record.polygon.polygon:
+			var world = point + record.polygon.position
+			minimum.x = min(minimum.x, world.x)
+			minimum.y = min(minimum.y, world.y)
+			maximum.x = max(maximum.x, world.x)
+			maximum.y = max(maximum.y, world.y)
+	if minimum.x > maximum.x:
+		return Rect2()
+	return Rect2(minimum, maximum - minimum)
+
+
+func _axis_value(stat, value):
+	value = str(value)
+	if stat == "tits_size":
+		return str(TITS.get(value, "normal"))
+	if stat == "pregnancy_status":
+		return str(PREGNANCY.get(value, "none"))
+	if stat == "hand_pose":
+		return value if value != "" else "1"
+	if stat == "multiple_tits":
+		return MANY_TITS[int(clamp(int(value), 0, MANY_TITS.size() - 1))]
+	return value
+
+
+# The two skeletons are separate exports; sex chooses between them and a femboy
+# body keeps the male one.
+func _doll_id(stats):
+	var sex = str(stats.get("sex", "female"))
+	return "male" if sex == "male" else "female"
+
+
+func _height(value):
+	return value if value in ["tiny", "petite", "short", "average", "tall", "towering"] else "average"
+
+
+# The animal a beastkin race is drawn from, for the muzzle.
+func _beast():
+	var race = str(_stat("race")).to_lower()
+	for animal in ["cat", "fox", "wolf", "rabbit", "bunny", "tanuki", "rat"]:
+		if race.find(animal) >= 0:
+			return animal
+	return "cat"
+
+
+func _equipment():
+	if character == null or !character.has_method("get_stat"):
+		return {}
+	var result = {}
+	# The slots the game actually has; there is no `back` - a weapon slung across
+	# the back is still equipped in a hand.
+	#
+	# `hands` and `ass` are here because gear lives in them that the doll draws:
+	# the paws and the tail plug.  A slot missing from this list is a slot whose
+	# items are invisible however carefully the gear map names their art, which is
+	# exactly what those two were.
+	for slot_name in ["chest", "legs", "underwear", "neck", "head", "rhand", "hands", "ass"]:
+		var item_id = null
+		if character.get("equipment") != null and character.equipment.has_method("get_gear_type"):
+			item_id = character.equipment.get_gear_type(slot_name)
+		if item_id != null:
+			result[slot_name] = str(item_id)
+	return result
+
+
+func _stat(statname):
+	if character == null or !character.has_method("get_stat"):
+		return ""
+	if statname in NOT_A_STAT_YET:
+		return ""
+	var value = character.get_stat(statname)
+	return "" if value == null else value
+
+
+# Wear a pattern the character has not chosen, for the picture that offers it.
+# The two roads a coat can take are both here: a dragon's scales and a kobold's
+# spots are drawn parts and swap the race overlay, everything else is a mask
+# painted over the body.  Nothing on the character is touched - this is a
+# picture of a choice, not a choice being made.
+func show_coverage(value):
+	if model == null:
+		return
+	var race = str(_stat("race"))
+	var variants = CHARACTER_MAP.OVERLAY_COVERAGE.get(str(CHARACTER_MAP.RACE_OVERLAYS.get(race, "")), {})
+	if variants.has(str(value)):
+		model.selections["race_overlay"] = str(variants[str(value)])
+		model._rebuild_model()
+		model._update_animated_pose()
+		return
+	var pattern = str(COVERAGE_PATTERNS.get(str(value), ""))
+	if pattern != "" and !CATALOGUE.has_tag(str(model.selections.get("body", "")), COVERAGE.REQUIRES_TAG):
+		pattern = ""
+	model.coverage_id = pattern
+	model.coverage_colors = COVERAGE.default_colors(pattern)
+	model._apply_coverage_to_meshes()
+	# the chest belongs to the coat as much as the back does
+	if model.color_values.has("nipples"):
+		var coat_nipples = COVERAGE.nipple_colour(pattern)
+		if coat_nipples == null:
+			coat_nipples = COLORS.nipples_of(_stat("body_color_skin"))
+		model.color_values["nipples"] = coat_nipples
+		model._apply_channel_colour("nipples")

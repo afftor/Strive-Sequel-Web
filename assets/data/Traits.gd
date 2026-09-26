@@ -8,7 +8,7 @@ var traits = {
 		descript = '',
 		visible = false,
 		icon = null,
-		effects = ['e_phy6', 'e_wit6', 'e_charm6', 'e_sex6', 'e_auth6', 'e_tame6', 'e_mag6', 'e_virgin', 'e_person_bold', 'e_person_shy', 'e_person_kind', 'e_person_serious', 'e_love', 'e_friend', 'e_rival', 'e_standing_love_pest', 'e_standing_housemate', 'e_standing_sworn_servant', 'e_standing_beloved', 'work_rule_luxury', 'work_rule_ration', 'work_rule_shifts', 'work_rule_masturbation', 'work_rule_constrain', 'e_pregnancy', 'e_pregnancy1', 'e_pregnancy_breeder', 'e_thrall',
+		effects = ['e_phy6', 'e_wit6', 'e_charm6', 'e_sex6', 'e_auth6', 'e_tame6', 'e_mag6', 'e_virgin', 'e_person_bold', 'e_person_shy', 'e_person_kind', 'e_person_serious', 'e_love', 'e_friend', 'e_rival', 'e_standing_love_pest', 'e_standing_housemate', 'e_standing_sworn_servant', 'e_standing_beloved', 'work_rule_luxury', 'room_office_exp', 'room_masters_bed', 'sleep_demand_unmet', 'slept_rough', 'work_rule_ration', 'work_rule_shifts', 'work_rule_masturbation', 'work_rule_constrain', 'e_pregnancy', 'e_pregnancy1', 'e_pregnancy_breeder', 'e_thrall',
 		'e_food_meat', 'e_food_fish', 'e_food_vege', 'e_food_grain', 'e_food_fishcakes', 'e_food_meatsoup', 'e_food_curry', 'e_food_vegetable_stirfry', 'e_food_roasted_feast', 'e_food_miners_lunch', 'e_food_fried_salmon', 'e_food_defenders_meal', 'e_food_demand', 'e_starve'],#'e_atkpass'],
 #		tags = ['bleed']
 	},
@@ -38,7 +38,7 @@ var traits = {
 		visible = true,
 		icon = "res://assets/images/iconsskills/icon_eyes.png",
 		effects = [],
-		tags = ['simple_icon', ],
+		tags = ['simple_icon', 'trait_only'],
 		bonusstats = {mod_hunt = 0.25, physics = 15, chg_dexterity_max = 1, mastery_stealth = 1}
 	},
 	spirit_boar = {
@@ -236,6 +236,15 @@ var traits = {
 		icon = null,
 		show_in_parent_stats = true,
 		effects = ['e_tr_ratkin'],
+		bonusstats = {}
+	},
+	refund_class_copy = {
+		code = 'refund_class_copy',
+		name = '',
+		descript = '',
+		visible = false,
+		icon = null,
+		effects = ['readd_class_copy'],
 		bonusstats = {}
 	},
 	#main characters
@@ -857,11 +866,10 @@ var traits = {
 		icon = "res://assets/images/iconstraits/brain.png",
 		effects = [],
 		bonusstats = {}, #hardcoded
-		weight = 100,
 		disposition_change = {
 			positive = [['weak', 75],['neutral', 25]]
 		},
-		tags = ['positive', 'can_start', 'disposition_change']
+		tags = ['positive', 'disposition_change']
 	},
 	gifted = {
 		code = 'gifted',
@@ -1224,7 +1232,7 @@ var traits = {
 		visible = false,
 		icon = "res://assets/images/iconstraits/l_mentorship.png",
 		effects = [],
-		bonusstats = {trainer_training_points_bonus = 0.25},
+		bonusstats = {trainer_training_points_bonus = 0.25, trainee_amount = 2},
 		reqs = [],
 		l_cost = 1,
 		tree_position = {tab = 3, x = 1, y = 0.5},
@@ -1982,6 +1990,80 @@ var traits = {
 		effects = ['obsidian_golem_trait','obsidian_golem_trait_2'],
 		tags = [],
 	},
+	#Jean quest finale - assets/data/skilldata/bosses/jean_demon.gd
+	jd_jean_trait = {
+		code = 'jd_jean_trait',
+		name = '',
+		descript = '',
+		icon = null,
+		visible = false,
+		effects = ['jd_demon_arrogance', 'jd_flame_sphere_open', 'jd_adaptive_ward_open', 'jd_second_mouth', 'jd_second_mouth_shut'],
+		tags = [],
+	},
+	jd_demon_trait = {
+		code = 'jd_demon_trait',
+		name = '',
+		descript = '',
+		icon = null,
+		visible = false,
+		effects = ['jd_demon_arrogance', 'jd_dream_eater', 'jd_dream_eater_display', 'jd_ennui_display', 'jd_ennui_rage', 'jd_ennui_unsilence'],
+		tags = [],
+	},
+	#coalition finale bosses - assets/data/skilldata/bosses/coalition.gd
+	coal_bolthar_trait = {
+		code = 'coal_bolthar_trait',
+		name = '',
+		descript = '',
+		icon = null,
+		visible = false,
+		effects = ['coal_flash_step', 'coal_flash_step_backline', 'coal_flash_step_spell_evade', 'coal_gnomes_wit_apply', 'coal_chamesh_avanim', 'coal_chamesh_autocrit', 'coal_chamesh_counter'],
+		tags = [],
+	},
+	coal_kobold_trait = {
+		code = 'coal_kobold_trait',
+		name = '',
+		descript = '',
+		icon = null,
+		visible = false,
+		effects = ['coal_bead_of_healing', 'coal_kobold_trait_apply'],
+		tags = [],
+	},
+	coal_ratkin_trait = {
+		code = 'coal_ratkin_trait',
+		name = '',
+		descript = '',
+		icon = null,
+		visible = false,
+		effects = ['coal_toxic_salt', 'coal_ratkin_trait_apply'],
+		tags = [],
+	},
+	coal_goblin_trait = {
+		code = 'coal_goblin_trait',
+		name = '',
+		descript = '',
+		icon = null,
+		visible = false,
+		effects = ['coal_lit_wick', 'coal_goblin_trait_apply'],
+		tags = [],
+	},
+	coal_dwarf_trait = {
+		code = 'coal_dwarf_trait',
+		name = '',
+		descript = '',
+		icon = null,
+		visible = false,
+		effects = ['coal_assist_defence', 'coal_dwarf_trait_apply'],
+		tags = [],
+	},
+	coal_moab_trait = {
+		code = 'coal_moab_trait',
+		name = '',
+		descript = '',
+		icon = null,
+		visible = false,
+		effects = ['coal_final_countdown'],
+		tags = [],
+	},
 	from_heaven_above = {
 		code = 'from_heaven_above',
 		name = '',
@@ -2108,6 +2190,45 @@ var traits = {
 		effects = ['environmental_object'],
 		tags = [],
 	},
+	#Grotus, act 4 finale. Effects live in assets/data/skilldata/bosses/grotus.gd.
+	#The two barrier traits are the phase split: grotus_ascended takes the first,
+	#grotus_king_boss the second. The other two are shared.
+	grotus_divine_barrier = {
+		code = 'grotus_divine_barrier',
+		name = '',
+		descript = '',
+		icon = null,
+		visible = false,
+		effects = ['grotus_barrier_dot_immunity','grotus_barrier_noncrit','grotus_barrier_mobile'],
+		tags = ['grotus_divine_barrier'],
+	},
+	grotus_tyrant_insecurity = {
+		code = 'grotus_tyrant_insecurity',
+		name = '',
+		descript = '',
+		icon = null,
+		visible = false,
+		effects = ['grotus_dot_shrug','grotus_hit_counter_watch','grotus_hit_counter_reset','grotus_contempt_from_hits','grotus_contempt_lowhp'],
+		tags = ['grotus_tyrant_insecurity'],
+	},
+	grotus_no_humiliation = {
+		code = 'grotus_no_humiliation',
+		name = '',
+		descript = '',
+		icon = null,
+		visible = false,
+		effects = ['grotus_humiliation_scorn_display','grotus_scorn_q1','grotus_scorn_q2','grotus_scorn_q3','grotus_scorn_q4','grotus_taunted_fury'],
+		tags = ['grotus_no_humiliation'],
+	},
+	grotus_apotheosis = {
+		code = 'grotus_apotheosis',
+		name = '',
+		descript = '',
+		icon = null,
+		visible = false,
+		effects = ['grotus_disarm_immunity','grotus_apotheosis_convert_shock','grotus_apotheosis_convert','grotus_holy_overflow'],
+		tags = ['grotus_apotheosis'],
+	},
 	unlit_brazier = {
 		code = 'unlit_brazier',
 		name = '',
@@ -2214,6 +2335,87 @@ var traits = {
 		icon = null,
 		visible = false,
 		effects = ['guardian_spirit_protection_frenzied_display','guardian_spirit_protection_frenzied','guardian_spirit_protection_frenzied_1'],
+		tags = [],
+	},
+	fbr_ceaseless_harvest = {
+		code = 'fbr_ceaseless_harvest',
+		name = '',
+		descript = '',
+		icon = null,
+		visible = false,
+		effects = ['fbr_ceaseless_harvest_display','fbr_ceaseless_harvest'],
+		tags = [],
+	},
+	first_class_service = {
+		code = 'first_class_service',
+		name = '',
+		descript = '',
+		icon = null,
+		visible = false,
+		effects = ['first_class_service_display','first_class_service'],
+		tags = [],
+	},
+	death_and_taxes = {
+		code = 'death_and_taxes',
+		name = '',
+		descript = '',
+		icon = null,
+		visible = false,
+		effects = ['death_and_taxes'],
+		tags = [],
+	},
+	rilu_payback = {
+		code = 'rilu_payback',
+		name = '',
+		descript = '',
+		icon = null,
+		visible = false,
+		effects = ['rilu_payback','rilu_payback_1'],
+		tags = [],
+	},
+	you_want_ticket = {
+		code = 'you_want_ticket',
+		name = '',
+		descript = '',
+		icon = null,
+		visible = false,
+		effects = ['you_want_ticket_display','you_want_ticket'],
+		tags = [],
+	},
+	giant_ribcage = {
+		code = 'giant_ribcage',
+		name = '',
+		descript = '',
+		icon = null,
+		visible = false,
+		effects = ['giant_ribcage_display','giant_ribcage',], #'giant_ribcage_cancel'
+		tags = [],
+	},
+	bloated_with_noxious_gas = {
+		code = 'bloated_with_noxious_gas',
+		name = '',
+		descript = '',
+		icon = null,
+		visible = false,
+		effects = ['bloated_with_noxious_gas_display','bloated_with_noxious_gas','bloated_with_noxious_gas_1',],
+		tags = [],
+	},
+	adrenal_glands_overdrive = {
+		code = 'adrenal_glands_overdrive',
+		name = '',
+		descript = '',
+		icon = null,
+		visible = false,
+		effects = ['adrenal_glands_overdrive_display','adrenal_glands_overdrive_apply',],
+		tags = [],
+	},
+	go_postal = {
+		code = 'go_postal',
+		name = '',
+		descript = '',
+		icon = null,
+		visible = false,
+		effects = ['go_postal_display','go_postal'],
 		tags = [],
 	},
 	#exploration related traits
@@ -2452,6 +2654,79 @@ var traits = {
 		effects = [],
 	},
 	
+	melchor_chancellor_of_palatine = {
+		code = 'melchor_chancellor_of_palatine',
+		name = '',
+		descript = '',
+		icon = null,
+		visible = false,
+		effects = ['melchor_chancellor_of_palatine'],
+		tags = ['melchor_chancellor_of_palatine'],
+	},
+	melchor_regulation_clause = {
+		code = 'melchor_regulation_clause',
+		name = '',
+		descript = '',
+		icon = null,
+		visible = false,
+		effects = ['melchor_session_count','melchor_full_extent_by_time','melchor_full_extent_by_hp'],
+		tags = ['melchor_regulation_clause'],
+	},
+	melchor_clear_the_field = {
+		code = 'melchor_clear_the_field',
+		name = '',
+		descript = '',
+		icon = null,
+		visible = false,
+		effects = ['melchor_clear_field_apply'],
+		tags = ['melchor_clear_the_field'],
+	},
+	rouge_refracted_image = {
+		code = 'rouge_refracted_image',
+		name = '',
+		descript = '',
+		icon = null,
+		visible = false,
+		effects = ['rouge_refracted_defense','rouge_refracted_offense'],
+		tags = ['rouge_refracted_image'],
+	},
+	rouge_appetizer = {
+		code = 'rouge_appetizer',
+		name = '',
+		descript = '',
+		icon = null,
+		visible = false,
+		effects = ['rouge_appetizer_apply'],
+		tags = ['rouge_appetizer'],
+	},
+	rouge_third_party = {
+		code = 'rouge_third_party',
+		name = '',
+		descript = '',
+		icon = null,
+		visible = false,
+		effects = ['rouge_exit_watch'],
+		tags = ['rouge_third_party'],
+	},
+	imperial_soldier_training = {
+		code = 'imperial_soldier_training',
+		name = '',
+		descript = '',
+		icon = null,
+		visible = false,
+		effects = ['imperial_soldier_pool','imperial_soldier_counter'],
+		tags = ['imperial_soldier_training'],
+	},
+	imperial_purge_target = {
+		code = 'imperial_purge_target',
+		name = '',
+		descript = '',
+		icon = null,
+		visible = false,
+		effects = [],
+		tags = ['imperial_purge_target'],
+	},
+	
 	#unused or obsolete
 	
 }
@@ -2465,6 +2740,7 @@ var body_upgrades = {
 		reqs = [{code = 'has_coverage', coverage = 'fur', check = false}, {code = 'has_coverage', coverage = 'scales', check = false}],
 		cost = 40,
 		goldcost = 10000,
+		manacost = 80,
 		traits = ['upgrade_thick_skin']
 	},
 	upgrade_thick_coverage = {
@@ -2474,6 +2750,7 @@ var body_upgrades = {
 		reqs = [{code = 'has_coverage', coverage = 'fur', check = true}, {orflag = true, code = 'has_coverage', coverage = 'scales', check = true}],
 		cost = 30,
 		goldcost = 10000,
+		manacost = 60,
 		traits = ['upgrade_thick_coverage']
 	},
 	upgrade_nipples = {
@@ -2483,6 +2760,7 @@ var body_upgrades = {
 		reqs = [{code = 'stat_in_set', stat = 'tits_size', value = ['average', 'big', 'huge', 'average_high', 'big_high', 'huge_high', 'average_narrow', 'big_narrow', 'huge_narrow', 'average_wide', 'big_wide', 'huge_wide']}],
 		cost = 20,
 		goldcost = 5000,
+		manacost = 40,
 		traits = ['upgrade_nipples']
 	},
 	upgrade_tongue = {
@@ -2492,6 +2770,7 @@ var body_upgrades = {
 		reqs = [],
 		cost = 20,
 		goldcost = 5000,
+		manacost = 40,
 		traits = ['upgrade_tongue']
 	},
 	upgrade_eggs = {
@@ -2501,6 +2780,7 @@ var body_upgrades = {
 		reqs = [{code = 'stat', stat = 'has_womb', operant = 'eq', value = true}],
 		cost = 30,
 		goldcost = 8000,
+		manacost = 60,
 		traits = ['upgrade_eggs']
 	},
 	upgrade_silk = {
@@ -2510,6 +2790,7 @@ var body_upgrades = {
 		reqs = [],
 		cost = 40,
 		goldcost = 12500,
+		manacost = 80,
 		traits = ['upgrade_silk']
 	},
 	upgrade_strongarm = {
@@ -2519,6 +2800,7 @@ var body_upgrades = {
 		reqs = [{code = 'stat', stat = 'physics_factor', operant = 'gte', value = 5}],
 		cost = 40,
 		goldcost = 10000,
+		manacost = 80,
 		traits = ['upgrade_strongarm']
 	},
 	upgrade_resist = {
@@ -2528,6 +2810,7 @@ var body_upgrades = {
 		reqs = [{code = 'stat', stat = 'magic_factor', operant = 'gte', value = 4}],
 		cost = 60,
 		goldcost = 15000,
+		manacost = 120,
 		traits = ['upgrade_resist']
 	},
 	upgrade_thickblood = {
@@ -2537,6 +2820,7 @@ var body_upgrades = {
 		reqs = [{code = 'stat', stat = 'physics_factor', operant = 'gte', value = 3}],
 		cost = 50,
 		goldcost = 15000,
+		manacost = 100,
 		traits = ['upgrade_thickblood']
 	},
 	upgrade_breeder = { #2fix parameters
@@ -2546,6 +2830,7 @@ var body_upgrades = {
 		reqs = [],
 		cost = 40,
 		goldcost = 10000,
+		manacost = 80,
 		traits = ['upgrade_breeder']
 	},
 	upgrade_metabolism = { #2fix parameters
@@ -2555,6 +2840,7 @@ var body_upgrades = {
 		reqs = [],
 		cost = 20,
 		goldcost = 1500,
+		manacost = 40,
 		traits = ['upgrade_metabolism']
 	},
 }
@@ -3271,16 +3557,21 @@ var b_template = {
 
 func make_buff_for_trait(tr_id):
 	var trdata = traits[tr_id]
-	if trdata.has('visible') and !trdata.visible: 
+	if trdata.has('visible') and !trdata.visible:
 		return null
-	if !trdata.has('icon'): 
+	#shown in the traits row only, no duplicate icon in the buffs row
+	if trdata.tags.has('trait_only'):
+		return null
+	if !trdata.has('icon'):
 		return null
 	if trdata.icon == null: 
 		return null
 	if !trdata.tags.has('simple_icon'):
 		return null
 	var template = b_template.duplicate()
-	template.icon = trdata.icon.get_path()
+	#Buff.icon is a String - either a res:// path or a key in input_handler.images.icons.
+	#Trait icons are declared both ways, so only a preloaded Texture needs unwrapping.
+	template.icon = trdata.icon if trdata.icon is String else trdata.icon.get_path()
 	template.description = trdata.descript
 	template.t_name = template.t_name % trdata.code
 	template.name = template.t_name

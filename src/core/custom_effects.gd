@@ -169,11 +169,11 @@ func negotiation_finish(log_text):
 
 
 func negotiation_refresh_panel():
-	if gui_controller.slavepanel == null:
+	if gui_controller.mansion == null:
 		return
-	var upgrades_list = gui_controller.slavepanel.get_node_or_null("SlaveInfoModule/UpgradesPanel/UpgradesList")
-	if upgrades_list != null:
-		upgrades_list.match_state()
+	var popup = gui_controller.mansion.get_node_or_null("CharacterTrainingPopup")
+	if popup != null:
+		popup.match_state()
 
 
 func hairdye(character):
@@ -329,19 +329,62 @@ func oblivionpot(character):
 	character.try_breakdown('brk_oblivion')
 
 
+#The sex swap potion: the body swap below, then the message saying which way it went.
 func sex_swap(character):
 	input_handler.active_character = character
+	var was = character.get_stat('sex')
+	swap_sex_of(character)
+	match was:
+		'male':
+			input_handler.interactive_message_follow("sex_swap_potion_female",'char_translate', {ch = character})
+		'female':
+			input_handler.interactive_message_follow("sex_swap_potion_male",'char_translate', {ch = character})
+
+
+#A male body turned female or a female one male, shared by the potion and the ritual room's sex change
+#(body_rites.gd). The first change generates a look for the new sex and keeps the old exterior aside;
+#changing back puts that exterior on again (swap_alternate_exterior) - though not the hair length,
+#which statlist leaves out of the backup (exterior_stats_composite). The first name goes the same way:
+#the current one is kept for the old sex, and a name once given for the new sex comes back with it.
+#Returns the new sex.
+func swap_sex_of(character):
+	character.remember_name_for_sex()
 	match character.get_stat('sex'):
 		'male':
 			character.set_stat('sex', 'female')
-			input_handler.interactive_message_follow("sex_swap_potion_female",'char_translate', {ch = character})
 		'female':
 			character.set_stat('sex', 'male')
-			input_handler.interactive_message_follow("sex_swap_potion_male",'char_translate', {ch = character})
 	character.swap_alternate_exterior()
+	var bound_name = character.name_for_sex(character.get_stat('sex'))
+	if bound_name != '':
+		character.set_stat('name', bound_name)
 	character.set_stat('portrait_update', true)
 	input_handler.emit_signal('update_ragdoll')
+	#the portrait on file shows the old body, and the booth only shoots by itself someone who never had one
+	input_handler.reshoot_portrait(character)
+	return character.get_stat('sex')
 	
+
+
+#the ritual room's personality change: each option of body_rite_personality comes here
+func body_rite_personality_kind():
+	body_rite_personality('kind')
+
+func body_rite_personality_bold():
+	body_rite_personality('bold')
+
+func body_rite_personality_shy():
+	body_rite_personality('shy')
+
+func body_rite_personality_serious():
+	body_rite_personality('serious')
+
+func body_rite_personality(personality):
+	load("res://src/core/body_rites.gd").give_personality(input_handler.active_character, personality)
+	#the rite dialogue sits on a layer of its own, so it is closed directly
+	var dialogue = gui_controller.dialogue
+	if dialogue != null and is_instance_valid(dialogue):
+		dialogue.close()
 
 
 func zephyra_underwear(character):
@@ -380,11 +423,25 @@ func lactation_pot(character):
 func close():#for the cancel function
 	input_handler.get_spec_node(input_handler.NODE_DIALOGUE).close()
 
-func map(dungeon_code):
+#Which region a treasure map leads into. Half the map templates name no area of their own, and
+#selected_area is null until some screen has set it, so the starting region is the last word.
+func map_area(dungeon_code):
 	var dungeon = DungeonData.dungeons[dungeon_code]
 	if dungeon.has('purchase_area'):
-		input_handler.selected_area = ResourceScripts.game_world.areas[dungeon.purchase_area]
-	if input_handler.selected_area.locations.size() < 8:
+		return ResourceScripts.game_world.areas[dungeon.purchase_area]
+	if input_handler.selected_area != null:
+		return input_handler.selected_area
+	return ResourceScripts.game_world.areas[ResourceScripts.game_world.starting_area]
+
+
+func can_use_map(dungeon_code):
+	return ResourceScripts.game_world.can_add_location(map_area(dungeon_code))
+
+
+func map(dungeon_code):
+	var dungeon = DungeonData.dungeons[dungeon_code]
+	input_handler.selected_area = map_area(dungeon_code)
+	if ResourceScripts.game_world.can_add_location(input_handler.selected_area):
 		var randomlocation = []
 		for i in input_handler.selected_area.locationpool:
 			randomlocation.append(DungeonData.dungeons[i].code)
@@ -411,6 +468,7 @@ func class_copy(character, target):
 	var data = {text = '', tags = ['skill_report_event'], options = []}
 	var text
 	var has_option = false
+	var unavailable_classes = []
 	for prof in target.get_professions():
 		if character.has_profession(prof):
 			continue
@@ -421,14 +479,14 @@ func class_copy(character, target):
 		var profdata = classesdata.professions[prof]
 		var is_racial = false
 		var can_obtain = true
+		var unmet_reqs = []
 		for req in profdata.reqs:
 			if req.code in ['race', 'one_of_races']:
 				is_racial = true
 				continue
 			if !character.valuecheck(req):
 				can_obtain = false
-				break
-				pass
+				unmet_reqs.append(req)
 		if is_racial and can_obtain:
 			has_option = true
 			var op_text = tr(ResourceScripts.descriptions.get_class_name(profdata, character))
@@ -436,12 +494,19 @@ func class_copy(character, target):
 			op_bonus.push_back({code = 'affect_active_character', type = 'remove_soc_skill', skill = 'class_copy'})
 			op_bonus.push_back({code = 'affect_active_character', type = 'add_class', class = prof})
 			data.options.append({code = 'close', text = op_text, reqs = [], bonus_effects = op_bonus})
+		elif is_racial and !unmet_reqs.empty():
+			var unavailable_class_name = tr(ResourceScripts.descriptions.get_class_name(profdata, character))
+			var req_text = character.decipher_reqs(unmet_reqs, true)
+			unavailable_classes.append("{color=yellow|%s}\n%s" % [unavailable_class_name, req_text])
 	
 	data.options.append({code = 'close', text = tr("DIALOGUECLOSE"), reqs = []})
 	if has_option:
 		text = tr("DIALOGUECLASS_COPYREPORT")
 	else:
 		text = tr("DIALOGUECLASS_COPYREPORT_FAILED")
+	if !unavailable_classes.empty():
+		text += "\n\n" + tr("REQUIREMENTS_TOOLTIP") + ":\n"
+		text += PoolStringArray(unavailable_classes).join("\n\n")
 	
 	text = character.translate(text)
 	text = target.translate(text.replace("[target", "["))

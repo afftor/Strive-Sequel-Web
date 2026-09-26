@@ -1,5 +1,7 @@
 extends Node
-const gameversion = '0.15.0c'
+const gameversion = '0.16.1'
+#pure data script, no autoloads of its own - see its header
+const SaveSanitizer = preload("res://src/core/save_sanitizer.gd")
 
 #time
 signal hour_tick
@@ -10,6 +12,9 @@ signal travel_completed
 signal slave_departed
 signal update_clock
 signal task_removed
+signal rooms_changed
+signal upkeep_changed
+signal work_produced(person_id, task_id, texture)
 
 var hour_turns_set = 1
 
@@ -19,6 +24,7 @@ var CurrentScreen
 var CurrentLine = 0
 var log_node
 var log_storage = []
+var mansion_activity_log_node
 
 var start_new_game = false
 var gameover_process = false
@@ -56,6 +62,11 @@ signal scene_change_start
 
 var can_manifest = false
 
+
+#Experimental builds carry "Experimental" in the version string ("0.16.0 Experimental").
+#Used to keep the storefront-facing prompts out of test builds.
+func is_experimental_build():
+	return gameversion.to_lower().find("experimental") >= 0
 
 func _init():
 	#load sex actions
@@ -106,7 +117,7 @@ func _ready():
 	modding_core.load_mods()
 	Effectdata.fix_eff_data()
 	
-	if OS.has_feature('editor'):
+	if OS.has_feature('editor') && false:
 		for loc_path in input_handler.scanfolder(variables.LocalizationFolder):
 			var loc_code = loc_path.replace(variables.LocalizationFolder, '')
 			if loc_code != "en":
@@ -115,6 +126,10 @@ func _ready():
 	#console
 	var console = load("res://gui_modules/Console/console.tscn").instance()
 	get_tree().root.call_deferred("add_child", console)
+
+	#the frame counter, on the root beside the console so it outlives every screen
+	var fps_meter = load("res://gui_modules/Universal/Modules/FpsMeter.tscn").instance()
+	get_tree().root.call_deferred("add_child", fps_meter)
 	
 	if log_alert != null and is_instance_valid(log_alert):
 		log_alert.fix_cur_log_position()#should miss starting irrelevant strings in log by this time in game load
@@ -122,56 +137,19 @@ func _ready():
 	get_tree().get_root().connect("ready", self, 'free_manifest', [], CONNECT_ONESHOT)
 
 
-#not used
-#func EventCheck():
-#	if state.CurEvent != "": return;
-#	for s in get_tree().get_nodes_in_group('char_sprite'):
-#		s.set_active_val();
-#	for event in EventList.keys():
-#		if SimpleEventCheck(event, false):
-#			StartEventScene(event);
-#			break;
-#
-#func SimpleEventCheck(event, skip = true):
-#	#var tmp_d = {global = 'skip'};
-#	if state.OldEvents.has(event):
-#		return false
-#	for check in EventList[event]:
-#		if check.size() == 0:
-#			if skip:
-#				continue
-#			else:
-#				return false
-#		if !globals.valuecheck(check):
-#			return false
-#	return true
-#
-#func LoadEvent(name):
-#	var dict
-#
-#	if file.file_exists("res://assets/data/events/"+ name + '.json'):
-#		file.open("res://assets/data/events/"+ name + '.json', File.READ)
-#		dict = parse_json(file.get_as_text())
-#		file.close()
-#	else:
-#		print('Event not found: ' + name)
-#	return dict
-#
-#func StartEventScene(name, debug = false, line = 0):
-#	state.CurEvent = name;
-#	scenes[name] = LoadEvent(name)
-#	var scene = input_handler.get_spec_node(input_handler.NODE_EVENT) #input_handler.GetEventNode()
-#	scene.visible = true
-#	scene.Start(scenes[name], debug, line)
 
-func get_duplicate_id_if_exist(item):
+#`ignore` is for an item that is already in the inventory, so it does not find itself.
+func get_duplicate_id_if_exist(item, ignore = null):
 	var itemtemplate = Items.itemlist[item.itembase]
 	if itemtemplate.has('tags') and itemtemplate.tags.has('no_stack'):
 		return null
 	if item.curse != null or !item.enchants.empty():
 		return null
 	for i in ResourceScripts.game_res.items.values():
-		if i.curse != null or !i.enchants.empty():
+		if i == ignore or i.curse != null or !i.enchants.empty():
+			continue
+		#a stack spent down to 0 is already queued for removal (Item.amount_set) and would take anything added to it along
+		if i.amount <= 0:
 			continue
 		if str(i.itembase) == str(item.itembase) and str(i.parts) == str(item.parts) and i.quality == item.quality and i.owner == null: #mb more
 			return i.id
@@ -306,9 +284,12 @@ func CreateUsableItem(item, amount = 1):
 	newitem.CreateUsable(item, amount)
 	return newitem
 
-func AddItemToInventory(item, dont_duplicate = true):
+#`count_achievements` is for gear the player did not earn - the test wardrobe
+#stocks 88 pieces at once, and each one that carries an achievement would open
+#the unlock banner over a screen that is still being built.
+func AddItemToInventory(item, dont_duplicate = true, count_achievements = true):
 #	item.inventory = ResourceScripts.game_res.items
-	if item.get("itembase") != null:
+	if count_achievements and item.get("itembase") != null:
 		input_handler.achievements.try_add_item_achimnt(item.itembase)
 	if dont_duplicate && item.stackable == false:
 		var duplicate = get_duplicate_id_if_exist(item)
@@ -330,6 +311,20 @@ func AddItemToInventory(item, dont_duplicate = true):
 			ResourceScripts.game_res.itemcounter += 1
 
 
+#For an item already in the inventory that has just been changed (improved to a new quality, say): if it now
+#matches another stack it joins that stack, rather than keeping a row of its own. Equipped gear stays put.
+func restack_item(item):
+	if item.owner != null:
+		return
+	var duplicate = get_duplicate_id_if_exist(item, item)
+	if duplicate == null:
+		return
+	ResourceScripts.game_res.items[duplicate].amount += item.amount
+	item.amount = 0
+	#erased here as well: amount_set only defers the removal, and a list redrawn on the next idle_frame can run first
+	ResourceScripts.game_res.items.erase(item.id)
+
+
 func remove_item(item):
 	var duplicate = get_duplicate_id_if_exist(item)
 	if duplicate != null:
@@ -349,10 +344,36 @@ func disconnect_text_tooltip(node):
 	if node.is_connected("mouse_entered",self,'showtexttooltip'):
 		node.disconnect("mouse_entered",self,'showtexttooltip')
 
-func connecttexttooltip(node, text, move_right = false):
+#"anchor" is what the panel is placed against, when that is not the thing being hovered. A row
+#inside a card wants the whole card stood clear of, not just itself: placed against the row,
+#a tall tooltip covers the rows under it and the buttons on them.
+func connecttexttooltip(node, text, move_right = false, tooltip_node = null, anchor = null):
 	if node.is_connected("mouse_entered",self,'showtexttooltip'):
 		node.disconnect("mouse_entered",self,'showtexttooltip')
-	node.connect("mouse_entered",self,'showtexttooltip', [node, text, move_right])
+	node.connect("mouse_entered",self,'showtexttooltip', [node, text, move_right, tooltip_node, anchor])
+
+func character_type_key(person):
+	var class_code = person.get_stat('slave_class')
+	if class_code == 'servant_notax':
+		class_code = 'servant'
+	return "CHARTYPE" + class_code.to_upper()
+
+
+func character_type_name(person):
+	var key = character_type_key(person)
+	if person.get_stat('sex') != 'male':
+		key += "F"
+	return tr(key)
+
+
+func character_type_tooltip(person):
+	var result = "[center]{color=yellow|" + character_type_name(person) + "}[/center]"
+	var description_key = character_type_key(person) + "DESCRIPT"
+	var description = tr(description_key)
+	if description != description_key:
+		result += "\n\n" + person.translate(description)
+	return result
+
 
 func get_character_personality_tooltip(personality):
 	var text = tr("INFOPERSONALITY")
@@ -371,11 +392,13 @@ func highlight_current_personality_bonus_tooltip(text, personality):
 	var section = text.substr(section_start, section_end - section_start)
 	return text.substr(0, section_start) + "{color=green|" + section + "}" + text.substr(section_end, text.length() - section_end)
 
-func showtexttooltip(node, text, move_right):
+func showtexttooltip(node, text, move_right, tooltip_node = null, anchor = null):
 	if node == null or !is_instance_valid(node) or !node.is_visible_in_tree():
 		return
-	var texttooltip = input_handler.get_spec_node(input_handler.NODE_TEXTTOOLTIP) #input_handler.GetTextTooltip()
-	texttooltip.showup(node, text, move_right)
+	var texttooltip = tooltip_node
+	if texttooltip == null or !is_instance_valid(texttooltip):
+		texttooltip = input_handler.get_spec_node(input_handler.NODE_TEXTTOOLTIP) #input_handler.GetTextTooltip()
+	texttooltip.showup(node, text, move_right, anchor)
 
 func connectitemtooltip(node, item):
 	if node.is_connected("mouse_entered",item,'tooltip'):
@@ -411,6 +434,19 @@ func tempitemtooltip(targetnode, item, mode):
 	data.price = str(item.price)
 	data.amount = ResourceScripts.game_res.get_item_amount(item.code)
 	node.showup(targetnode, data, mode)
+
+#The dungeon's races, as icons - the plain text tooltip cannot hold images, so this one has its own panel.
+func connectracetooltip(node, location):
+	if node.is_connected("mouse_entered", self, 'showracetooltip'):
+		node.disconnect("mouse_entered", self, 'showracetooltip')
+	node.connect("mouse_entered", self, 'showracetooltip', [node, location])
+
+
+func showracetooltip(node, location):
+	if node == null or !is_instance_valid(node) or !node.is_visible_in_tree():
+		return
+	input_handler.get_spec_node(input_handler.NODE_RACETOOLTIP).showup(node, location)
+
 
 func connectskilltooltip(node, skill, character):
 	if node.is_connected("mouse_entered",self,'showskilltooltip'):
@@ -458,25 +494,28 @@ func closeclasstooltip():
 #	if node.is_connected("mouse_entered",item,'tooltip'):
 #		node.disconnect("mouse_entered",item,'tooltip')
 
-func connectmaterialtooltip(node, material, bonustext = '', type = null):
+func connectmaterialtooltip(node, material, bonustext = '', type = null, tooltip_node = null):
 	if node.is_connected("mouse_entered",self,'mattooltip'):
 		node.disconnect("mouse_entered",self,'mattooltip')
 	if type == null:
-		node.connect("mouse_entered",self,'mattooltip', [node, material, bonustext])
-	else:
-		node.connect("mouse_entered",self,'mattooltip', [node, material, bonustext, type])
+		type = 'materialowned'
+	node.connect("mouse_entered",self,'mattooltip', [node, material, bonustext, type, tooltip_node])
 
-func connectslavetooltip(node, person):
+#'tooltip_node' names a panel to use instead of the shared one, the way connecttexttooltip and
+#connectmaterialtooltip already take one. A caller drawing inside a CanvasLayer needs it: that
+#layer is painted over everything at the tree root whatever order they were added in, so the
+#shared panel would come up behind the very card that asked for it.
+func connectslavetooltip(node, person, tooltip_node = null):
 	if node.is_connected("mouse_entered",self,'slavetooltip'):
 		node.disconnect("mouse_entered",self,'slavetooltip')
-	node.connect("mouse_entered",self,'slavetooltip', [node, person])
+	node.connect("mouse_entered",self,'slavetooltip', [node, person, tooltip_node])
 
-func slavetooltip(targetnode, person):
-	var node = input_handler.get_spec_node(input_handler.NODE_SLAVETOOLTIP) #input_handler.GetSlaveTooltip()
+func slavetooltip(targetnode, person, tooltip_node = null):
+	var node = tooltip_node
+	if node == null or !is_instance_valid(node):
+		node = input_handler.get_spec_node(input_handler.NODE_SLAVETOOLTIP) #input_handler.GetSlaveTooltip()
 	node.showup(targetnode, person)
 
-#what a food item is worth to anyone: its demand tier, how long it keeps a character fed
-#and the buff it leaves behind. used by every material tooltip and by the food column header
 func get_food_info_text(item):
 	if item.type != 'food':
 		return ''
@@ -490,9 +529,6 @@ func get_food_info_text(item):
 	return res
 
 
-#the part of a food tooltip that only makes sense for one character. reads the cached
-#demand rather than recomputing it - call person.get_food_demand() once first if the
-#value may be stale
 func get_food_char_text(item, person):
 	if item.type != 'food':
 		return ''
@@ -504,8 +540,37 @@ func get_food_char_text(item, person):
 	return res
 
 
-#tooltip for the food column of the slave list: what they last ate, how long it holds and
-#what it is doing to them
+func get_character_demand_tooltip(person, demand = null):
+	if demand == null:
+		demand = person.get_food_demand()
+	var text = "[center]{color=yellow|%s}[/center]\n%s" % [tr("DEMAND"), tr("DEMANDDESCRIPT")]
+	if person.food.ignores_demand():
+		text += "\n{color=green|%s}" % tr("DEMANDSLAVEEXEMPT")
+	var top_tier = variables.food_demand_order[variables.food_demand_order.size() - 1]
+	for tier in variables.food_demand_order:
+		var active = tier == demand
+		var tier_name = tr("FOODDEMAND" + tier.to_upper())
+		if !active:
+			tier_name = "{color=%s|%s}" % [variables.food_demand_colors[tier], tier_name]
+		var block = "[center]%s[/center]" % tier_name
+		block += "\n" + get_demand_requirement_text(tier)
+		block += "\n" + tr("FOODDEMAND" + tier.to_upper() + "DESCRIPT")
+		if tier == top_tier:
+			block += "\n" + tr("DEMANDLODGING")
+		if active:
+			block = "{color=green|%s}" % block
+		text += "\n\n" + block
+	return text
+
+
+func get_demand_requirement_text(tier):
+	var fame = variables.food_demand_by_fame.get(tier, null)
+	var value = variables.food_demand_by_value.get(tier, null)
+	if fame == null and value == null:
+		return tr("DEMANDREQNONE")
+	return tr("DEMANDREQ") % [fame, value]
+
+
 func get_food_state_tooltip(person):
 	var st = person.food.get_state()
 	if st.state == 'starving':
@@ -526,9 +591,46 @@ func get_food_state_tooltip(person):
 	return res
 
 
-func mattooltip(targetnode, material, bonustext = '', type = 'materialowned'):
+func get_food_warning(person):
+	if person == null or person.food == null:
+		return ''
+	return person.food.predict_meal_problem()
+
+
+func get_sleep_warning(person):
+	if person == null:
+		return ''
+	return ResourceScripts.game_res.sleep_warning(person.id)
+
+
+func get_food_warning_tooltip(person, state):
+	if state == 'starve':
+		return "[center]{color=red|%s}[/center]\n%s" % [
+			tr("CARDWARNFOODNONE"), tr("CARDWARNFOODNONEDESCRIPT")]
+	var demand_name = tr("FOODDEMAND" + person.food.get_demand().to_upper())
+	return "[center]{color=red|%s}[/center]\n%s\n%s" % [
+		tr("CARDWARNFOODPOOR"),
+		_report_text("CARDWARNFOODPOORDESCRIPT", [demand_name]),
+		tr("TRAITEFFECTCHEAPFOOD").replace("%%", "%")]
+
+
+func get_sleep_warning_tooltip(person, state):
+	if state == 'none':
+		return "[center]{color=red|%s}[/center]\n%s\n%s" % [
+			tr("CARDWARNBEDNONE"), tr("CARDWARNBEDNONEDESCRIPT"),
+			tr("SLEPTROUGH").replace("%%", "%")]
+	var demand_name = tr("FOODDEMAND" + person.food.get_demand().to_upper())
+	return "[center]{color=red|%s}[/center]\n%s\n%s" % [
+		tr("CARDWARNBEDPOOR"),
+		_report_text("CARDWARNBEDPOORDESCRIPT", [demand_name]),
+		tr("SLEEPDEMANDUNMET")]
+
+
+func mattooltip(targetnode, material, bonustext = '', type = 'materialowned', tooltip_node = null):
 	var image
-	var node = input_handler.get_spec_node(input_handler.NODE_ITEMTOOLTIP) #input_handler.GetItemTooltip()
+	var node = tooltip_node
+	if node == null or !is_instance_valid(node):
+		node = input_handler.get_spec_node(input_handler.NODE_ITEMTOOLTIP) #input_handler.GetItemTooltip()
 	var data = {}
 	var text = material.descript #'[center]' + material.name + '[/center]\n' + material.descript
 	text += get_food_info_text(material)
@@ -544,20 +646,6 @@ func mattooltip(targetnode, material, bonustext = '', type = 'materialowned'):
 	
 	node.showup(targetnode, data, type)
 
-#func mattooltip(targetnode, material, bonustext = '', type = 'materialowned'):
-#	var image
-#	var node = input_handler.get_spec_node(input_handler.NODE_ITEMTOOLTIP) #input_handler.GetItemTooltip()
-#	var data = {}
-#	var text = '[center]' + material.name + '[/center]\n' + material.descript
-#	data.text = text + bonustext
-#	data.item = material
-#	data.icon = material.icon
-#	data.price = str(material.price)
-#	data.type = material.type
-#	if ResourceScripts.game_res.materials[material.code] > 0:
-#		data.amount = ResourceScripts.game_res.materials[material.code]
-#
-#	node.showup(targetnode, data, type)
 
 
 func get_traitlist_for_char(person):
@@ -570,6 +658,9 @@ func get_traitlist_for_char(person):
 			icon = b.icon,
 			text = text
 		})
+	var upgrades_entry = get_body_upgrades_trait_entry(person)
+	if upgrades_entry != null:
+		traitlist.append(upgrades_entry)
 	var trlist = person.get_traits_by_arg('visible', true)
 	for tr in trlist:
 		var trdata = Traitdata.traits[tr]
@@ -600,8 +691,91 @@ func get_traitlist_for_char(person):
 					entry.positive = true
 				if trdata.tags.has('negative'):
 					entry.negative = true
+					#How far the practice room has talked them out of it. Only worth saying once
+					#the work has started - a nought on every bad habit is noise.
+					var mended = person.get_trait_correction(tr)
+					if mended > 0:
+						entry.correction = mended
+						var line = "\n" + tr("TRAITCORRECTION") % int(round(mended))
+						entry.text += line
+						entry.text_with_name += line
 		traitlist.append(entry)
 	return traitlist
+
+
+#Every body upgrade a character carries, as one icon in the trait row with one tooltip naming them all -
+#the way the maxed factors share b_factor_maxed. The upgrades' own traits are hidden (visible = false),
+#so this is the only sign of them in a trait row. null when the character carries none.
+const BODY_UPGRADES_TRAIT_ICON = "res://assets/images/iconsskills/icon_blood_explosion.png"
+
+func get_body_upgrades_trait_entry(person):
+	var lines = []
+	for code in person.get_body_upgrades():
+		var data = Traitdata.body_upgrades.get(code)
+		if data == null:
+			continue
+		lines.append("{color=yellow|" + tr(data.name) + "}: " + person.translate(tr(data.descript)))
+	if lines.empty():
+		return null
+	return {
+		icon = BODY_UPGRADES_TRAIT_ICON,
+		text = "[center]" + tr("BODYRITE_TITLE") + "[/center]\n" + PoolStringArray(lines).join("\n"),
+	}
+
+
+#Grey enough to read as "being scrubbed out", translucent enough to leave the icon legible.
+const TRAIT_CORRECTION_COLOR = Color(0.1, 0.1, 0.1, 0.55)
+
+
+const TRAIT_FRAME = "res://assets/images/iconstraits/grey.png"
+const TRAIT_CROSS = "res://assets/images/iconstraits/cross.png"
+const TRAIT_PLATE = "res://assets/Textures_v2/CHAR_INFO/traitpanel/button_traits_universal.png"
+
+
+#The two templates build_traitlist_for_char() duplicates, made for a container that has none.
+#Five panels carry them in their own scenes; this is for the ones that do not, so a trait row
+#can be put anywhere without the same subtree being drawn by hand in another scene file.
+func ensure_trait_templates(node, size = 50):
+	if node.has_node('Button') and node.has_node('Button2'):
+		return
+	if !node.has_node('Button2'):
+		var simple = TextureRect.new()
+		simple.name = 'Button2'
+		simple.visible = false
+		simple.expand = true
+		simple.rect_min_size = Vector2(size, size)
+		var label = Label.new()
+		label.name = 'Label'
+		label.visible = false
+		simple.add_child(label)
+		node.add_child(simple)
+	if node.has_node('Button'):
+		return
+	var button = TextureButton.new()
+	button.name = 'Button'
+	button.visible = false
+	button.expand = true
+	button.rect_min_size = Vector2(size, size)
+	button.texture_normal = load(TRAIT_FRAME)
+	#the plate sits under the picture, the picture over it, the cross over both - the order
+	#they are added in is the order they paint in
+	for part in [['TextureRect', TRAIT_PLATE, 0], ['icon', null, 10], ['cross', TRAIT_CROSS, 10]]:
+		var piece = TextureRect.new()
+		piece.name = part[0]
+		piece.expand = true
+		piece.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		if part[1] != null:
+			piece.texture = load(part[1])
+		piece.anchor_right = 1.0
+		piece.anchor_bottom = 1.0
+		piece.margin_left = part[2]
+		piece.margin_top = part[2]
+		piece.margin_right = -part[2]
+		piece.margin_bottom = -part[2]
+		if part[0] == 'cross':
+			piece.visible = false
+		button.add_child(piece)
+	node.add_child(button)
 
 
 func build_traitlist_for_char(person, node):
@@ -627,6 +801,32 @@ func build_traitlist_for_char(person, node):
 					button.get_node('icon').texture = load(entry.icon)
 				else:
 					button.get_node('icon').texture = entry.icon
+			#The habit being worked out of somebody fills its own icon from the bottom as it
+			#goes. The overlay is made here rather than put in each panel's scene: five scenes
+			#draw trait icons from this one function, and a sixth added later would silently
+			#miss out.
+			var fill = button.get_node_or_null('Correction')
+			if fill == null and entry.has('correction'):
+				fill = ColorRect.new()
+				fill.name = 'Correction'
+				fill.color = TRAIT_CORRECTION_COLOR
+				#the icon under it keeps the tooltip - the overlay must not take the hover
+				fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+				fill.anchor_left = 0.0
+				fill.anchor_right = 1.0
+				fill.anchor_bottom = 1.0
+				fill.margin_left = 0
+				fill.margin_right = 0
+				fill.margin_bottom = 0
+				#added last, so it paints over the icon rather than under it
+				button.add_child(fill)
+			if fill != null:
+				fill.visible = entry.has('correction')
+				if fill.visible:
+					#the top edge slides down as the work goes on: nothing covered at nought,
+					#the whole icon at a hundred
+					fill.anchor_top = 1.0 - clamp(entry.correction / 100.0, 0.0, 1.0)
+					fill.margin_top = 0
 			if entry.has('cross'):
 				button.get_node('cross').visible = true
 			else:
@@ -654,6 +854,187 @@ func build_training_traitlist(person, node):
 		else:
 			button.get_node('icon').texture = upgrade_data.icon
 
+
+
+const SEX_TRAINING_PROGRESS = {
+	novice = 0,
+	skilled = 50,
+	mastered = 100,
+}
+
+const SEX_TRAINING_MASTERY = {
+	penetration = [["missionary", "missionaryanal"], ["doggy", "doggyanal"], ["lotus", "lotusanal"], ["revlotus", "revlotusanal"], ["ontop", "ontopanal"]],
+	pussy = [["missionary"], ["doggy"], ["lotus"], ["revlotus"], ["ontop"]],
+	anal = [["missionaryanal"], ["doggyanal"], ["lotusanal"], ["revlotusanal"], ["ontopanal"]],
+	petting = [["fondletits", "titjob"], ["handjob", "fingering", "assfingering"], ["footjob", "massagefoot"], ["fisting", "analfisting"]],
+	oral = [["kiss"], ["sucknipples"], ["rimjob"], ["cunnilingus", "blowjob"]],
+	tail = [["tailjob"], ["inserttailv"], ["inserttaila"]],
+}
+
+const SEX_ACTION_KEYS = {
+	missionary = "SEXACTION_MISSIONARY",
+	missionaryanal = "SEXACTION_MISSIONARY_ANAL",
+	doggy = "SEXACTION_DOGGY_STYLE",
+	doggyanal = "SEXACTION_DOGGY_ANAL",
+	lotus = "SEXACTION_LOTUS",
+	lotusanal = "SEXACTION_LOTUS_ANAL",
+	revlotus = "SEXACTION_REVLOTUS",
+	revlotusanal = "SEXACTION_REVLOTUSANAL",
+	ontop = "SEXACTION_ON_TOP",
+	ontopanal = "SEXACTION_ON_TOP_ANAL",
+	inserttailv = "SEXACTION_INSERT_TAIL_PUSSY",
+	inserttaila = "SEXACTION_INSERT_TAIL_ASS",
+	caress = "SEXACTION_CARESS",
+	assfingering = "SEXACTION_ASS_FINGERING",
+	fingering = "SEXACTION_FINGERING",
+	fondletits = "SEXACTION_FONDLE_CHEST",
+	footjob = "SEXACTION_FOOTJOB",
+	titjob = "SEXACTION_TITJOB",
+	handjob = "SEXACTION_HANDJOB",
+	frottage = "SEXACTION_FROTTAGE",
+	analfisting = "SEXACTION_ANAL_FISTING",
+	fisting = "SEXACTION_FISTING",
+	massagefoot = "SEXACTION_MASSAGE_WITH_FOOT",
+	rimjob = "SEXACTION_RIMJOB",
+	cunnilingus = "SEXACTION_CUNNILINGUS",
+	blowjob = "SEXACTION_BLOWJOB",
+	kiss = "SEXACTION_KISS",
+	sucknipples = "SEXACTION_NIPPLE_SUCKING",
+	tailjob = "SEXACTION_TAILJOB",
+}
+
+
+func get_sex_training_label(state):
+	match state:
+		'novice': return tr("SEX_TRAINING_LEVEL_NOVICE")
+		'skilled': return tr("SEX_TRAINING_LEVEL_SKILLED")
+		'mastered': return tr("SEX_TRAINING_LEVEL_MASTERED")
+	return str(state).capitalize()
+
+
+func build_sex_training_tooltip(person, code, state):
+	var text = person.translate(tr("STAT" + code.to_upper() + "DESCRIPT"))
+	text += "\n" + tr("CUR_LEVEL_LABEL") + ": " + get_sex_training_label(state)
+	var skill_name = code.replace('sex_training_', '')
+	if state == 'novice':
+		text += "\n\n" + tr("MASTERY_HINT_NOVICE")
+	if state == 'skilled' and SEX_TRAINING_MASTERY.has(skill_name):
+		var progress = person.get_sex_mastery_progress().get(skill_name, [])
+		text += "\n\n" + tr("MASTERY_HINT_SKILLED")
+		for group in SEX_TRAINING_MASTERY[skill_name]:
+			var labels = []
+			var group_done = false
+			for action in group:
+				labels.append(tr(SEX_ACTION_KEYS.get(action, "SEXACTION_" + action.to_upper())))
+				if action in progress:
+					group_done = true
+			var group_label = PoolStringArray(labels).join(" / ")
+			if group_done:
+				text += "\n{color=green|" + group_label + "}"
+			else:
+				text += "\n{color=gray|" + group_label + "}"
+	return text
+
+
+func build_sex_training_rows(person, node):
+	input_handler.ClearContainer(node)
+	if person == null:
+		return 0
+	var rows = 0
+	var skills = person.get_sex_training()
+	for code in skills:
+		var state = skills[code]
+		#A skill nobody could have started on is not worth a row: no tail, no penis, no pussy
+		if code == 'sex_training_tail' and state == 'novice':
+			continue
+		if code == 'sex_training_penetration' and state == 'novice' and person.get_stat('penis_size') == '':
+			continue
+		if code == 'sex_training_pussy' and state == 'novice' and person.get_stat('sex') == 'male':
+			continue
+		var row = input_handler.DuplicateContainerTemplate(node)
+		row.get_node("Label").text = tr("CHARINFO_" + code.to_upper())
+		row.get_node("ProgressBar").value = SEX_TRAINING_PROGRESS.get(state, 0)
+		row.get_node("ProgressBar/Label").text = get_sex_training_label(state)
+		connecttexttooltip(row, build_sex_training_tooltip(person, code, state))
+		rows += 1
+	return rows
+
+
+func build_sex_traits_list(person, node, capacity_label = null):
+	input_handler.ClearContainer(node)
+	if person == null:
+		return
+	var all_traits = person.get_all_sex_traits()
+	var all_traits_known = true
+	for code in all_traits:
+		if !all_traits[code]:
+			all_traits_known = false
+			break
+	if all_traits_known:
+		for code in person.get_unlocked_sex_traits():
+			var button = input_handler.DuplicateContainerTemplate(node)
+			button.pressed = person.check_trait(code)
+			button.text = tr(Traitdata.sex_traits[code].name)
+			connecttexttooltip(button, person.translate(tr(Traitdata.sex_traits[code].descript)))
+			button.connect("toggled", self, 'toggle_sex_trait', [person, code, node, capacity_label])
+	build_known_sex_traits(person, node, all_traits_known)
+	update_sex_traits_capacity(person, node, capacity_label)
+
+
+#The traits the character has met but not unlocked, plus the ones still hidden entirely. They
+#sit above the toggles and none of them answers to the capacity limit, which is what the
+#"always_disabled" mark says.
+func build_known_sex_traits(person, node, all_traits_known):
+	var traits = person.get_all_sex_traits()
+	if all_traits_known:
+		for code in person.get_unlocked_sex_traits():
+			if traits.has(code) and traits[code]:
+				traits.erase(code)
+	for code in traits:
+		var trait = Traitdata.sex_traits[code]
+		var newnode = input_handler.DuplicateContainerTemplate(node)
+		newnode.set_meta("always_disabled", true)
+		node.move_child(newnode, 0)
+		if traits[code] == true: #trait is known
+			newnode.text = tr(trait.name)
+			var traittext = person.translate(tr(trait.descript))
+			for req in trait.reqs:
+				if req.has('code') && req.code == 'action_type':
+					traittext += "\n\n" + tr("DISLIKED_ACTIONS_LABEL") + ":[color=aqua] "
+					for action in req.value:
+						sex_actions_dict[action].givers = []
+						sex_actions_dict[action].takers = []
+						traittext += sex_actions_dict[action].getname() + ", "
+					traittext = traittext.substr(0, traittext.length() - 2) + ".[/color]"
+			connecttexttooltip(newnode, traittext)
+			newnode.disabled = all_traits_known or ("Dislike" in tr(trait.name))
+		else:
+			newnode.text = tr("TRAITUNKNOWN")
+			connecttexttooltip(newnode, person.translate(tr("TRAITUNKNOWNTOOLTIP")))
+			newnode.disabled = true
+		newnode.set("custom_fonts/font", input_handler.font_size_calculator(newnode))
+
+
+func update_sex_traits_capacity(person, node, capacity_label = null):
+	var capacity = person.get_stat('sexuals_factor') + 1
+	var used = person.get_sex_traits().size()
+	if capacity_label != null:
+		capacity_label.text = tr("SIBLINGMODULECURRENTCAPACITY") + ': ' + str(used) + "/" + str(capacity)
+	for child in node.get_children():
+		if child.get_meta("always_disabled", false) == true:
+			continue
+		child.disabled = capacity - used <= 0 && child.pressed == false
+
+
+func toggle_sex_trait(trait_status, person, code, node, capacity_label):
+	match trait_status:
+		true:
+			if !person.check_trait(code):
+				person.add_sex_trait(code, true)
+		false:
+			if person.check_trait(code):
+				person.remove_sex_trait(code, false)
+	update_sex_traits_capacity(person, node, capacity_label)
 
 
 func build_buffs_for_char(person, node, mode):
@@ -701,14 +1082,41 @@ func build_buffs_for_char(person, node, mode):
 		connecttexttooltip(newnode, person.translate(i.description))
 
 
+func base_stat_text(person, code):
+	return base_stat_value_text(person, code) + "/" + base_stat_cap_text(person, code)
+
+
+func base_stat_value_text(person, code):
+	return str(int(floor(person.get_stat(code, true))))
+
+
+func base_stat_cap_text(person, code):
+	var cap = 100 if code == 'sexuals' else int(floor(person.get_stat(code + '_cap')))
+	var bonus = int(floor(person.get_stat(code + '_bonus')))
+	var text = str(cap)
+	if bonus > 0:
+		text += " +" + str(bonus)
+	elif bonus < 0:
+		text += " " + str(bonus)
+	return text
+
+
 func build_attrs_for_char(node, person):
 	node.get_node('Portrait').texture = person.get_icon()
-	node.get_node('sex').texture = images.get_icon(person.get_stat('sex'))
-	node.get_node('race').texture = races.racelist[person.get_stat('race')].icon
+	build_sex_icon(node.get_node('sex'), person)
+	build_race_icon(node.get_node('race'), person)
 	node.get_node('age').texture = images.ages[person.get_stat('age')]
-	connecttexttooltip(node.get_node('sex'), tr("MSLMSex")+": " + tr("SLAVESEX" + person.get_stat('sex').to_upper()))
 	connecttexttooltip(node.get_node('age'), tr("STATAGE")+": " + tr("SLAVEAGE" + person.get_stat("age").to_upper()))
-	connecttexttooltip(node.get_node('race'), "[center]{color=green|"+ races.racelist[person.get_stat('race')].name +"}[/center]\n\n"+ person.show_race_description())
+
+
+func build_sex_icon(icon, person):
+	icon.texture = images.get_icon(person.get_stat('sex'))
+	connecttexttooltip(icon, tr("MSLMSex")+": " + tr("SLAVESEX" + person.get_stat('sex').to_upper()))
+
+
+func build_race_icon(icon, person):
+	icon.texture = races.racelist[person.get_stat('race')].icon
+	connecttexttooltip(icon, "[center]{color=green|"+ races.racelist[person.get_stat('race')].name +"}[/center]\n\n"+ person.show_race_description())
 
 
 func build_desc_for_effect(effect_desc, mul = 1): #stub as it is
@@ -1026,17 +1434,7 @@ func ItemSelect(targetscript, type, function, requirements = null):
 			var template = Items.itemlist[item.itembase]
 			if template.code in shrine_offering_items:
 				array.append({type = 'item', code = item.itembase, amount = item.amount, item = item})
-#		if requirements != null and requirements.has("allow_alcohol_items") and requirements.allow_alcohol_items:
-#			for item in ResourceScripts.game_res.items.values():
-#				if item.owner != null:
-#					continue
-#				if item.amount <= 0:
-#					continue
-#				var template = Items.itemlist[item.itembase]
-#				if !template.has("interaction_effect"):
-#					continue
-#				if template.interaction_effect in ['alcohol', 'beer']:
-#					array.append({kind = 'item', code = item.itembase, amount = item.amount, item = item})
+
 
 	for i in array:
 		var newnode = input_handler.DuplicateContainerTemplate(node.get_node("ScrollContainer/GridContainer"))
@@ -1076,8 +1474,30 @@ func ItemSelect(targetscript, type, function, requirements = null):
 		newnode.connect('pressed', targetscript, function, [i])
 		newnode.connect('pressed',input_handler,'CloseSelection', [node])
 
+const QUICKSAVE_NAME = 'QuickSave'
+
+#both report whether they acted, so the hotkey dispatcher knows if the press was consumed
 func QuickSave():
-	SaveGame('QuickSave')
+	if input_handler.combat_node != null:
+		input_handler.SystemMessage(tr("QUICKSAVE_BLOCKED"))
+		return false
+	if ResourceScripts.game_party.get_master() == null:
+		return false
+	SaveGame(QUICKSAVE_NAME)
+	return true
+
+
+func QuickLoad():
+	if !file.file_exists(variables.userfolder + 'saves/' + QUICKSAVE_NAME + '.sav'):
+		input_handler.SystemMessage(tr("QUICKLOAD_MISSING"))
+		return false
+	if input_handler.combat_node != null:
+		input_handler.SystemMessage(tr("QUICKLOAD_BLOCKED"))
+		return false
+	gui_controller.close_all_closeable_windows()
+	gui_controller.windows_opened.clear()
+	LoadGame(QUICKSAVE_NAME)
+	return true
 
 #spread = serialize over several frames instead of one blocking call. Only safe while the
 #caller guarantees the game state is not changing in between (turn processing, input locked)
@@ -1174,70 +1594,103 @@ func _serialize_party_chunked(chunk):
 	return res
 
 
-func LoadGame(filename, direct = false):
+func LoadGame(filename):
 #	print(effects_pool.serialize())
-	var savedict
-	if direct:
-		if JSON.parse(filename).error != OK:
-			print ("wrong file format")
-			return
-		else:
-			savedict = parse_json(filename)
-	else:
-		if !file.file_exists(variables.userfolder+'saves/'+ filename + '.sav') :
-			print("no file %s" % (variables.userfolder+'saves/'+ filename + '.sav'))
-			return
-	
-	ResourceScripts.core_animations.BlackScreenTransition(1)
-	yield(get_tree().create_timer(1), 'timeout')
+	if !file.file_exists(variables.userfolder+'saves/'+ filename + '.sav') :
+		print("no file %s" % (variables.userfolder+'saves/'+ filename + '.sav'))
+		return
+
+	# Fade the current UI to black, install the loading screen at the opaque midpoint,
+	# then reveal it before doing any save parsing or state repair.
+	var loadscreen = yield(input_handler.ShowLoadScreenWithTransition(0.3), "completed")
+	yield(get_tree(), 'idle_frame')
 #	input_handler.CloseableWindowsArray.clear()
+	drop_replaced_screens()
 	gui_controller.revert_scenes_data()
 	ResourceScripts.revert_gamestate()
 	input_handler.emit_signal("clear_cashed")
-	
-	
-	if !direct:
-		file.open(variables.userfolder+'saves/'+ filename + '.sav', File.READ)
-		savedict = parse_json(file.get_as_text())
-		file.close()
+	loadscreen.set_progress(3)
+	yield(get_tree(), 'idle_frame')
+
+	file.open(variables.userfolder+'saves/'+ filename + '.sav', File.READ)
+	var save_text = file.get_as_text()
+	file.close()
+	loadscreen.set_progress(8)
+	yield(get_tree(), 'idle_frame')
+
+	var savedict = parse_json(save_text)
+	loadscreen.set_progress(14)
+	yield(get_tree(), 'idle_frame')
+
+	#anything the save owes to a mod that is no longer loaded goes here, before the first
+	#object is built out of the dictionary
+	var sanitized = sanitize_save(savedict, filename)
+	loadscreen.set_progress(15)
+	yield(get_tree(), 'idle_frame')
 
 	for faction in savedict.game_world.areas.plains.factions:
 		var current_faction = savedict.game_world.areas.plains.factions[faction]
 		if !current_faction.has("bonus_actions"):
 			savedict.game_world.areas.plains.factions[faction]["bonus_actions"] = worlddata.factiondata[faction].bonus_actions
-	
+	loadscreen.set_progress(16)
+	yield(get_tree(), 'idle_frame')
+
 #	state.deserialize(savedict)
 	effects_pool.deserialize(savedict.effpool)
+	loadscreen.set_progress(20)
+	yield(get_tree(), 'idle_frame')
 	characters_pool.deserialize(savedict.charpool)
+	loadscreen.set_progress(25)
+	yield(get_tree(), 'idle_frame')
+	var gamestate_index = 0
 	for p in ResourceScripts.gamestate:
 		ResourceScripts.set(p, dict2inst(savedict[p]))
+		gamestate_index += 1
+		loadscreen.set_progress(25 + 10.0 * gamestate_index / ResourceScripts.gamestate.size())
+		yield(get_tree(), 'idle_frame')
 	input_handler.connect("EnemyKilled", ResourceScripts.game_world, "quest_kill_receiver")
+	migrate_cheat_unlock(savedict)
 	ResourceScripts.game_globals.fix_serialization()
+	loadscreen.set_progress(36)
+	yield(get_tree(), 'idle_frame')
 	ResourceScripts.game_res.fix_serialization()
+	loadscreen.set_progress(37)
+	yield(get_tree(), 'idle_frame')
 #	ResourceScripts.game_res.fix_items_inventory(false)
 	ResourceScripts.game_party.fix_serialization()
+	loadscreen.set_progress(38.5)
+	yield(get_tree(), 'idle_frame')
 	ResourceScripts.game_world.fix_serialization()
+	loadscreen.set_progress(40)
+	yield(get_tree(), 'idle_frame')
 	ResourceScripts.game_progress.fix_serialization()
+	loadscreen.set_progress(41)
+	yield(get_tree(), 'idle_frame')
+	characters_pool.purge_stale_summons() #drops summons leaked by pre-fix saves
 	characters_pool.cleanup()
 	characters_pool.postload()
+	loadscreen.set_progress(42)
+	yield(get_tree(), 'idle_frame')
 	effects_pool.cleanup()
 	effects_pool.postload()
+	loadscreen.set_progress(43)
+	yield(get_tree(), 'idle_frame')
 #	print(effects_pool.serialize())
 	#mind! that characters_pool's fix_serialization_postload is inside game_party's
 	ResourceScripts.game_party.fix_serialization_postload()
+	input_handler.clear_portrait_cache() #cached shots belong to the session that took them
 	ResourceScripts.game_party.force_update_portraits()
-	
-	if is_instance_valid(gui_controller.mansion):
-		gui_controller.mansion.queue_free()
-	if is_instance_valid(gui_controller.current_screen):
-		gui_controller.current_screen.queue_free()
-	input_handler.ChangeScene('mansion');
+	loadscreen.set_progress(45)
+	yield(get_tree(), 'idle_frame')
+
+	loadscreen.goto_scene(ResourceScripts.scenedict.mansion, 45, 100, true, 60)
 	yield(self, "scene_changed")
 	if is_instance_valid(gui_controller.clock):
 		gui_controller.clock.update_labels()
 		gui_controller.clock.set_sky_pos()
 	
 	input_handler.SystemMessage("Game Loaded")
+	report_sanitized_save(sanitized)
 	
 	if !compare_version(ResourceScripts.game_globals.original_version, '0.9.0c'):
 		if globals.valuecheck({type = "active_quest_stage", value = 'princess_search', stage = 'stage2', state = true}):
@@ -1245,6 +1698,101 @@ func LoadGame(filename, direct = false):
 	if !compare_version(ResourceScripts.game_globals.original_version, '0.9.1'):
 		if !globals.valuecheck({type = 'location_exists', location = 'quest_mages_xari'}):
 			globals.common_effects([{code = 'make_quest_location', value = 'quest_mages_xari'}])
+	#older saves ended erdyna_quest outright on the betrayal/leave routes, locking the catacombs away for good
+	if (ResourceScripts.game_progress.completed_quests.has('erdyna_quest')
+			and !ResourceScripts.game_progress.seen_events.has('act4_3_opened_seal_after_fight')
+			and (ResourceScripts.game_progress.decisions.has('ErdynaBetrayedRedRooks')
+				or ResourceScripts.game_progress.decisions.has('ErdynaLeftForRedRooksAlone'))):
+		ResourceScripts.game_progress.completed_quests.erase('erdyna_quest')
+		globals.common_effects([
+			{code = 'progress_quest', value = 'erdyna_quest', stage = 'catacombs_opened'},
+			{code = 'make_quest_location', value = 'quest_empire_catacomb_entry'}
+		])
+
+
+#The screens of the game being replaced stay in the tree for the whole of a load, and both
+#LoadGame and ImportGame yield a frame between every step - so they keep drawing over a world
+#that is being taken apart underneath them. A mansion slave list redrawing in that window asks
+#characters of the old game for a price; that rebuilds their dynamic stats against the effects
+#pool the new save has just replaced, and walks stacks naming effects it has never heard of -
+#"Invalid get index 'is_stored' (on base: 'Nil')". They used to be freed at the very end of the
+#load, long after the window had opened. Taking them out of the tree stops them this frame;
+#queue_free() on its own only promises the node will be gone by the end of it.
+#forget the freed screen everywhere: a freed node still passes != null
+func drop_replaced_screens():
+	var screens = [gui_controller.mansion, gui_controller.current_screen]
+	gui_controller.forget_nodes(screens)
+	for node in screens:
+		if !is_instance_valid(node):
+			continue
+		if node.is_inside_tree():
+			node.get_parent().remove_child(node)
+		node.queue_free()
+
+
+#A save written with mods loaded names classes and data that only that mod could supply. With
+#the mod gone the classes cannot be loaded at all - dict2inst() returns null and the load dies
+#on the first character - and the data has nothing left to describe it. Both are taken out of
+#the parsed dictionary here, before anything is built from it. See save_sanitizer.gd.
+func sanitize_save(savedict, filename = ""):
+	#Dev builds only. The sweep throws away whatever the save owes to a mod, and a player who
+	#merely forgot to re-enable one would lose their gear, craft orders and guild quests for
+	#good the moment the next autosave wrote the stripped state back to disk. A shipped game
+	#therefore refuses the save exactly as it did before; here it is the thing that lets a
+	#modded save be opened at all.
+	if !OS.has_feature('editor'):
+		return null
+	var report = SaveSanitizer.sanitize(savedict, _save_sanitizer_context())
+	if !SaveSanitizer.is_clean(report):
+		print("save %s carried mod data the game no longer has: %s" % [
+			filename, SaveSanitizer.describe(report)])
+	return report
+
+
+#A popup rather than a system message: this only ever fires in a dev build, where the save has
+#just been altered on the way in and whoever opened it has to see that before they play on and
+#save the stripped state back. sanitize_save() returns null when the gate is shut, so a shipped
+#game never reaches this. The headline is localised; the tally under it is diagnostic text.
+func report_sanitized_save(report):
+	if report == null or SaveSanitizer.is_clean(report):
+		return
+	var text = tr("SAVEMODDATASTRIPPED")
+	var tally = SaveSanitizer.describe_short(report)
+	if tally != "":
+		text += "\n\n" + tally
+	input_handler.get_spec_node(input_handler.NODE_ALERT_PANEL, [self, text, "MODOK", '', '', ''])
+
+
+#The sanitizer takes every table it reads as an argument so it stays a pure script, out of the
+#preload chain. scriptdict holds Scripts once load_scripts() has run and paths before that, and
+#its values are the live answer to "what class does this slot use", mods loaded or not.
+func _save_sanitizer_context():
+	var script_paths = {}
+	var script_files = {}
+	for key in ResourceScripts.scriptdict:
+		var entry = ResourceScripts.scriptdict[key]
+		var path = entry if entry is String else entry.resource_path
+		if !(path is String) or path == "":
+			continue
+		script_paths[key] = path
+		script_files[path.get_file().get_basename()] = key
+	return {
+		script_paths = script_paths,
+		script_files = script_files,
+		gamestate_keys = ResourceScripts.gamestate,
+		itemlist = Items.itemlist,
+		materiallist = Items.materiallist,
+		recipes = Items.recipes,
+		enchantments = Items.enchantments,
+		curses = Items.curses,
+	}
+
+
+#saves made before the password moved to progress data kept the unlock in game_globals
+func migrate_cheat_unlock(savedict):
+	if !savedict.has('game_globals'): return
+	if savedict.game_globals.get('cheats_active') == true:
+		input_handler.unlock_cheats()
 
 
 func compare_version(v1:String, v2:String):
@@ -1266,6 +1814,7 @@ func ImportGame(filename):
 	ResourceScripts.core_animations.BlackScreenTransition(1)
 	yield(get_tree().create_timer(1), 'timeout')
 #	input_handler.CloseableWindowsArray.clear()
+	drop_replaced_screens()
 	ResourceScripts.revert_gamestate()
 	gui_controller.revert_scenes_data()
 	input_handler.emit_signal("clear_cashed")
@@ -1273,6 +1822,7 @@ func ImportGame(filename):
 	file.open(variables.userfolder+'saves/'+ filename + '.sav', File.READ)
 	var savedict = parse_json(file.get_as_text())
 	file.close()
+	var sanitized = sanitize_save(savedict, filename)
 
 	input_handler.connect("EnemyKilled", ResourceScripts.game_world, "quest_kill_receiver")
 	ResourceScripts.game_res = dict2inst(savedict.game_res)
@@ -1283,6 +1833,7 @@ func ImportGame(filename):
 	ResourceScripts.game_party.fix_serialization()
 	ResourceScripts.game_party.fix_import()
 	ResourceScripts.game_globals = dict2inst(savedict.game_globals)
+	migrate_cheat_unlock(savedict)
 	ResourceScripts.game_globals.fix_import()
 	#temporally removed
 #	ResourceScripts.game_progress = dict2inst(savedict.game_progress)
@@ -1295,16 +1846,13 @@ func ImportGame(filename):
 	
 	ResourceScripts.game_party.fix_serialization_postload()
 
-	if is_instance_valid(gui_controller.mansion):
-		gui_controller.mansion.queue_free()
-	if is_instance_valid(gui_controller.current_screen):
-		gui_controller.current_screen.queue_free()
 	input_handler.ChangeScene('mansion');
 	yield(self, "scene_changed")
 	if is_instance_valid(gui_controller.clock):
 		gui_controller.clock.update_labels()
 		gui_controller.clock.set_sky_pos()
 	input_handler.SystemMessage("Game Imported")
+	report_sanitized_save(sanitized)
 	common_effects([
 			{code = 'add_timed_event', value = "loan_event1",
 				args = [
@@ -1463,7 +2011,12 @@ func impregnate_check(father,mother):
 		result.value = false
 		if variables.pregduration/1.5 > mother.get_stat('pregnancy_duration'):
 			result.already_preg_visible = true
-	
+	#A birth is not over until the baby is kept or given up: the scene reads pregnancy_baby when the
+	#player answers it. The master's bed night runs later in the same turn as the birth, and a
+	#conception there put the new embryo in pregnancy_baby, so it took the newborn's name and place.
+	elif mother.get_stat('pregnancy_baby') != null:
+		result.value = false
+
 	if result.no_womb || result.preg_disabled || result.male_contraceptive || result.female_contraceptive || result.father_undead || result.mother_undead:
 		result.value = false
 	
@@ -1474,6 +2027,11 @@ func impregnate(father, mother, skip_check = false):
 		return
 	mother.add_stat('metrics_pregnancy',  1)
 	father.add_stat("metrics_impregnation", 1)
+	#A conception means she was taken vaginally, so a mother still a virgin at this moment loses it
+	#to the father. Sex scenes already take it when the act starts - this is a no-op there - but the
+	#master's bed night, brothel service and the event effect never asked.
+	if mother.get_stat('has_pussy'):
+		mother.take_virginity('vaginal', father.id)
 	var baby = ResourceScripts.scriptdict.class_slave.new("baby")
 	baby.setup_baby(mother, father)
 
@@ -1492,7 +2050,7 @@ func calculate_travel_time(location1, location2): #2remade to new mechanic
 		if !(adata1.code in ['forests', 'beastkin_tribe']) or !(adata2.code in ['forests', 'beastkin_tribe']):
 			time += adata1.travel_time + adata2.travel_time
 	
-	time = max(1, time - variables.stable_boost_per_level * ResourceScripts.game_res.upgrades.stables)
+	time = max(1, time - variables.stable_boost_per_level * ResourceScripts.game_res.findupgradelevel('stables'))
 	return {time = time}
 
 
@@ -1508,6 +2066,344 @@ func text_log_add(label, text):
 	log_storage.append(message)
 	if log_node != null && weakref(log_node).get_ref():
 		log_node.add_log_message(message)
+
+
+#The clock an entry is stamped with. Turn results are produced before game_globals advances its
+#clock, so store the time the player will see after the turn rather than the hour that just ended.
+func mansion_activity_stamp():
+	var date = ResourceScripts.game_globals.date
+	var hour = ResourceScripts.game_globals.hour
+	if gui_controller.clock != null && is_instance_valid(gui_controller.clock):
+		if gui_controller.clock.get("turn_in_progress"):
+			hour += 1
+			if hour > variables.HoursPerDay:
+				hour = 1
+				date += 1
+	return {date = date, hour = hour}
+
+
+#`extra` is merged in before the row is built, so anything the entry is later found by - the
+#character a folded entry belongs to - is already on the message the log node sees.
+func mansion_activity_log_add(event_type, text, extra = {}):
+	var stamp = mansion_activity_stamp()
+	var message = {type = event_type, text = text, date = stamp.date, hour = stamp.hour}
+	for key in extra:
+		message[key] = extra[key]
+	ResourceScripts.game_globals.mansion_activity_log.append(message)
+	while ResourceScripts.game_globals.mansion_activity_log.size() > 50:
+		ResourceScripts.game_globals.mansion_activity_log.pop_front()
+	if mansion_activity_log_node != null && weakref(mansion_activity_log_node).get_ref():
+		mansion_activity_log_node.add_log_message(message)
+	return message
+
+
+#One entry per person per hour, however many stats an event moves. A scene paying out four
+#changes at once used to write four lines about the same person in the same breath; the first
+#change makes the entry and the rest are folded into it in place. Folding is keyed on
+#(person, stamp), so an entry from an earlier hour is never appended to and nothing is redated.
+func mansion_activity_stat_change(character, part):
+	var stamp = mansion_activity_stamp()
+	var entries = ResourceScripts.game_globals.mansion_activity_log
+	for i in range(entries.size() - 1, -1, -1):
+		var entry = entries[i]
+		if entry.get('type') != 'stat_change' or entry.get('char_id') != character.id:
+			continue
+		if entry.date != stamp.date or entry.hour != stamp.hour:
+			continue
+		entry.parts.append(part)
+		entry.text = _stat_change_text(character, entry.parts)
+		if mansion_activity_log_node != null && weakref(mansion_activity_log_node).get_ref():
+			mansion_activity_log_node.update_log_message(entry)
+		return
+	mansion_activity_log_add('stat_change', _stat_change_text(character, [part]),
+		{char_id = character.id, parts = [part]})
+
+
+#The row a turn-wide report folds into: the newest entry of that type carrying this very stamp.
+#A report is keyed on the stamp alone and not on a person, so an entry from an earlier hour is
+#never appended to and nothing is redated - a report the turn has moved past simply is not found
+#and the next one starts its own row.
+func _mansion_activity_turn_report(report_type, stamp):
+	var entries = ResourceScripts.game_globals.mansion_activity_log
+	for i in range(entries.size() - 1, -1, -1):
+		var entry = entries[i]
+		if entry.get('type') != report_type:
+			continue
+		if entry.date != stamp.date or entry.hour != stamp.hour:
+			continue
+		return entry
+	return null
+
+
+#One entry per turn for everything the service task brought in - the estate cares about the
+#coin, not about who carried it in. Each worker is folded into the row that is already on screen
+#as they are processed, the same way mansion_activity_stat_change() folds a person's stat
+#changes.
+#
+#`details` - the line per worker behind that total - is deliberately turn-local:
+#game_globals.serialize() drops it, so a report read back from a save is a total with nothing
+#left to unfold, and MansionLogModule hides the fold when it finds none.
+func mansion_activity_service(gold, detail_text):
+	var stamp = mansion_activity_stamp()
+	var entry = _mansion_activity_turn_report('service', stamp)
+	if entry == null:
+		mansion_activity_log_add('service', _service_report_text(int(gold), 1),
+			{total = int(gold), workers = 1, details = [detail_text]})
+		return
+	entry.total = int(entry.get('total', 0)) + int(gold)
+	entry.workers = int(entry.get('workers', 0)) + 1
+	if !entry.has('details'):
+		entry.details = []
+	entry.details.append(detail_text)
+	entry.text = _service_report_text(entry.total, entry.workers)
+	if mansion_activity_log_node != null && weakref(mansion_activity_log_node).get_ref():
+		mansion_activity_log_node.update_log_message(entry)
+
+
+#A settlement's clients have spent what they had for service this week. Written once per weekly
+#refill, by game_world.pay_service_gold(), on the payout that empties the pool - a row of its own
+#rather than a line in the service report, which folds every later payout of the turn into itself.
+func mansion_activity_service_exhausted(location_name):
+	mansion_activity_log_add('service_exhausted',
+		_report_text("MANSION_ACTIVITY_SERVICE_EXHAUSTED", [location_name]))
+
+
+#One entry per turn for everything the benches finished, folded exactly like the service report
+#above. A single recipe can come off the bench several times in one turn and several people can
+#be working at once, so the row counts the products and the hands behind them; who made what,
+#and in what quality, is the line kept behind the fold.
+#
+#The colour on a product name is put there by the caller - see game_res.make_item() and
+#colorize_item_quality() - so the breakdown reads in the same quality colours the inventory uses.
+func mansion_activity_craft(character, detail_text):
+	var stamp = mansion_activity_stamp()
+	var entry = _mansion_activity_turn_report('craft', stamp)
+	if entry == null:
+		mansion_activity_log_add('craft', _craft_report_text(1, 1),
+			{total = 1, crafter_ids = [character.id], details = [detail_text]})
+		return
+	entry.total = int(entry.get('total', 0)) + 1
+	if !entry.has('crafter_ids'):
+		entry.crafter_ids = []
+	if !(character.id in entry.crafter_ids):
+		entry.crafter_ids.append(character.id)
+	if !entry.has('details'):
+		entry.details = []
+	entry.details.append(detail_text)
+	entry.text = _craft_report_text(entry.total, entry.crafter_ids.size())
+	if mansion_activity_log_node != null && weakref(mansion_activity_log_node).get_ref():
+		mansion_activity_log_node.update_log_message(entry)
+
+
+#One entry per turn for everything the estate's work pulled out of the ground, the water and the
+#fields - who dug it up is not what the storehouse cares about, so no worker is named at all.
+#Folded on the stamp like the service and craft reports above, and written from the one place
+#every production payout passes through: game_res._grant_production_res().
+#
+#`amounts` - material code to units, in the order the turn first saw each - is small and bounded
+#by the number of materials that exist, so unlike the per-worker breakdowns it is kept through a
+#save and a loaded report can still be unfolded. Insertion order never changes, only grows, which
+#is what lets MansionLogModule patch the icons already on screen instead of rebuilding them.
+func mansion_activity_production(res, amount):
+	amount = int(amount)
+	if amount <= 0:
+		return
+	var stamp = mansion_activity_stamp()
+	var entry = _mansion_activity_turn_report('production', stamp)
+	if entry == null:
+		mansion_activity_log_add('production', _production_report_text(amount, 1),
+			{total = amount, amounts = {res: amount}})
+		return
+	entry.total = int(entry.get('total', 0)) + amount
+	if !entry.has('amounts'):
+		entry.amounts = {}
+	entry.amounts[res] = int(entry.amounts.get(res, 0)) + amount
+	entry.text = _production_report_text(entry.total, entry.amounts.size())
+	if mansion_activity_log_node != null && weakref(mansion_activity_log_node).get_ref():
+		mansion_activity_log_node.update_log_message(entry)
+
+
+#One entry per turn for everybody who reached the end of a road. The log used to write a row per
+#person, and a party of five walking in together read as five rows of the same news. Folded on the
+#stamp like the reports above, but it does not start out as a report: a lone arrival reads the way
+#it always did, a name and a place. Only a second arrival in the same turn makes it a report, and
+#the report names the travel groups that came in rather than the people in them.
+#
+#`details` - one line per travel group, under the name the map gives it, with the people in it - is
+#rebuilt from `arrivals` on every arrival rather than appended to, since a newcomer usually joins a
+#line that is already there. The lines keep the order the turn first saw each group, which is what
+#lets MansionLogModule patch the rows already on screen. Unlike the other breakdowns this one is
+#kept through a save: see game_globals._drop_turn_local_breakdown().
+func mansion_activity_arrival(character, location):
+	var record = {name = character.get_short_name(), location = location,
+		group = str(character.get_loc_group())}
+	var stamp = mansion_activity_stamp()
+	var entry = _mansion_activity_turn_report('arrival', stamp)
+	#a row written before arrivals were folded has no records to add this one to
+	if entry == null or !entry.has('arrivals'):
+		mansion_activity_log_add('arrival', _arrival_report_text([record]),
+			{arrivals = [record], details = []})
+		return
+	entry.arrivals.append(record)
+	entry.text = _arrival_report_text(entry.arrivals)
+	entry.details = _arrival_detail_lines(entry.arrivals)
+	if mansion_activity_log_node != null && weakref(mansion_activity_log_node).get_ref():
+		mansion_activity_log_node.update_log_message(entry)
+
+
+#A cleared location finally leaving the map. The sweep runs inside the turn, where
+#mansion_activity_stamp() would push the row an hour ahead, so the hour that just ended is
+#stamped instead - the same thing the bed-night report does.
+func mansion_activity_location_removed(report):
+	var text = _report_text("MANSION_ACTIVITY_LOCATION_REMOVED", [tr(report.name)])
+	if report.sold > 0:
+		text += "\n" + _report_text("MANSION_ACTIVITY_LOCATION_REMOVED_SOLD", [report.sold, report.gold])
+	if report.freed > 0:
+		text += "\n" + _report_text("MANSION_ACTIVITY_LOCATION_REMOVED_FREED", [report.freed])
+	mansion_activity_log_add('location', text,
+		{date = ResourceScripts.game_globals.date, hour = ResourceScripts.game_globals.hour})
+
+
+#One row a week for the estate's standing costs, written from game_res.subtract_taxes() once the
+#whole bill is known. Unlike the service, craft and production reports it needs no folding: the
+#week's charges are collected in one pass by game_res.collect_weekly_expenses() and arrive here
+#complete, ledger and all.
+#
+#The lines behind the fold are built here rather than by the collectors so that every one of them
+#goes through the _report_text() guard below - a source that formatted its own key would take the
+#whole row down in any locale that has not caught up with it. `details` is turn-local like every
+#other breakdown: game_globals.serialize() drops it, so a report read back from a save is a total
+#with nothing left to unfold.
+#
+#A week that costs nothing writes nothing - a household of slaves would otherwise get a row
+#saying so every seven days.
+func mansion_activity_upkeep(ledger):
+	if ledger.total <= 0:
+		return
+	var lines = []
+	for record in ledger.entries:
+		lines.append(_report_text(record.key, record.values))
+	mansion_activity_log_add('upkeep', _upkeep_report_text(ledger.total, lines.size()),
+		{total = ledger.total, details = lines})
+
+
+#A locale that has not caught up with a new string gets the key itself back from tr(), and a key
+#carries no format specifiers: `%` on it does not fall back, it aborts the function outright. The
+#entry would then be stored with no text at all and the log could not draw the row - a whole
+#category of the turn's news would go missing rather than merely read badly. So an untranslated
+#key is shown as itself with its numbers after it, which is ugly and unmistakable, and the row
+#survives.
+func _report_text(key, values):
+	var line = tr(key)
+	if line == key:
+		for value in values:
+			line += " " + str(value)
+		return line
+	return line % values
+
+
+func _service_report_text(total, workers):
+	return _report_text("MANSION_ACTIVITY_SERVICE_REPORT", [total, workers])
+
+
+func _craft_report_text(total, crafters):
+	return _report_text("MANSION_ACTIVITY_CRAFT_REPORT", [total, crafters])
+
+
+func _production_report_text(total, kinds):
+	return _report_text("MANSION_ACTIVITY_PRODUCTION_REPORT", [total, kinds])
+
+
+func _upkeep_report_text(total, charges):
+	return _report_text("MANSION_ACTIVITY_UPKEEP_REPORT", [total, charges])
+
+
+#A lone arrival keeps the sentence it always had. More than one is named by the travel groups they
+#came in, and the place is named only while they all got to the same one - otherwise the places are
+#on the lines behind the fold.
+func _arrival_report_text(arrivals):
+	var mansion = ResourceScripts.game_world.mansion_location
+	if arrivals.size() == 1:
+		var single_key = "MANSION_ACTIVITY_ARRIVAL_MANSION_LINK" if arrivals[0].location == mansion else "MANSION_ACTIVITY_ARRIVAL_LOCATION"
+		return _report_text(single_key, [arrivals[0].name, _arrival_link(arrivals[0].location)])
+	var groups = _arrival_group_names(arrivals)
+	var destinations = _arrival_destinations(arrivals)
+	if destinations.size() > 1:
+		return _report_text("MANSION_ACTIVITY_ARRIVAL_REPORT_SPREAD", [groups, destinations.size()])
+	var report_key = "MANSION_ACTIVITY_ARRIVAL_REPORT_MANSION" if destinations[0] == mansion else "MANSION_ACTIVITY_ARRIVAL_REPORT"
+	return _report_text(report_key, [groups, _arrival_link(destinations[0])])
+
+
+#One line per travel group, in the order the turn first saw each: the group's name, where it got to
+#when the turn's arrivals went to more than one place, and who is in it. A group is keyed on its
+#place as well as its name, because two places can each hold a group of the same name until the
+#map next tidies them up.
+func _arrival_detail_lines(arrivals):
+	var several_places = _arrival_destinations(arrivals).size() > 1
+	var groups = {}
+	for record in arrivals:
+		var key = "%s|%s" % [record.location, record.group]
+		if !groups.has(key):
+			groups[key] = {location = record.location, group = record.group, names = []}
+		groups[key].names.append(record.name)
+	var lines = []
+	for key in groups:
+		var group = groups[key]
+		var names = PoolStringArray(group.names).join(", ")
+		if several_places:
+			lines.append(_report_text("MANSION_ACTIVITY_ARRIVAL_GROUP_AT",
+				[_arrival_group_label(group.group), _arrival_link(group.location), names]))
+		else:
+			lines.append(_report_text("MANSION_ACTIVITY_ARRIVAL_GROUP", [_arrival_group_label(group.group), names]))
+	return lines
+
+
+#Every travel group among the turn's arrivals, named once however many places it got to, in the
+#order the turn first saw them.
+func _arrival_group_names(arrivals):
+	var labels = []
+	for record in arrivals:
+		input_handler.append_not_duplicate(labels, _arrival_group_label(record.group))
+	return PoolStringArray(labels).join(", ")
+
+
+#A group's name as the log shows it, the same on the row and behind the fold. It goes through tr()
+#the way the map's own group label does.
+func _arrival_group_label(group):
+	return "[color=#72c8d9]%s[/color]" % tr(group)
+
+
+func _arrival_destinations(arrivals):
+	var destinations = []
+	for record in arrivals:
+		input_handler.append_not_duplicate(destinations, record.location)
+	return destinations
+
+
+#The place an arrival names, as a link MansionLogModule._on_meta_clicked() can follow.
+func _arrival_link(location):
+	if location == ResourceScripts.game_world.mansion_location:
+		return "[url=mansion][color=#72c8d9]%s[/color][/url]" % tr("MANSION_LABEL")
+	var loc_data = ResourceScripts.world_gen.get_location_from_code(location)
+	var loc_name = tr(loc_data.name) if loc_data != null else str(location)
+	return "[url=loc:%s][color=#72c8d9]%s[/color][/url]" % [location, loc_name]
+
+
+func _stat_change_text(character, parts):
+	return tr("MANSION_ACTIVITY_STAT_CHANGES") % [character.get_short_name(),
+		PoolStringArray(parts).join(", ")]
+
+
+#The activity log names items, and the log entries are bbcode. Gear carries a quality, so its
+#name reads there in the same colour the inventory and tooltips give it; materials and usables
+#have no quality and stay plain.
+func colorize_item_quality(text, quality):
+	if quality == null || quality == '':
+		return text
+	var color = variables.hexcolordict.get("quality_" + quality)
+	if color == null:
+		return text
+	return "[color=%s]%s[/color]" % [color, text]
 
 #quite ugly method to stop manifest befor main viewport is ready
 #it's probably useful only for test, but still seems "normal" problem for get_spec_node()
@@ -1525,22 +2421,37 @@ func manifest_and_log(label, text, person = null):
 	manifest(text, person)
 	text_log_add(label, text)
 
+#Stat changes an event hands out. The direction is coloured rather than spelled out, because
+#these arrive several at a time and read as a list - see mansion_activity_stat_change().
 func character_stat_change(character, data):
-	var text = "%s: %s" % [character.get_short_name(), get_stat_name(data.code)]
+	var part = get_stat_name(data.code)
 	if data.operant == '+':
-		text += " + "
 		character.add_stat(data.code, data.value)
+		part += " [color=%s]+%s[/color]" % [variables.hexcolordict.k_green, data.value]
 	elif data.operant == '=':
-		text += " = "
 		character.set_stat(data.code, data.value)
+		part += " [color=%s]= %s[/color]" % [variables.hexcolordict.k_gray, data.value]
 	else:
-		text += " - "
 		character.add_stat(data.code, -data.value)
-
-	text += str(data.value)
-	text_log_add('char', text)
+		part += " [color=%s]-%s[/color]" % [variables.hexcolordict.k_red, data.value]
+	mansion_activity_stat_change(character, part)
 #	manifest(text, character)
 #	character.set(data.code, input_handler.math(data.operant, character.get(data.code), data.value))
+
+func get_active_location_races():
+	var locdata = input_handler.active_location
+	if locdata != null and locdata.has('character_data'):
+		var chardata = locdata.character_data
+		if chardata.has('races') and !chardata.races.empty():
+			return chardata.races
+	var areadata = input_handler.active_area
+	if areadata != null:
+		if areadata.has('races') and !areadata.races.empty():
+			return areadata.races
+		if areadata.has('code') and worlddata.lands.has(areadata.code) and worlddata.lands[areadata.code].has('races'):
+			return worlddata.lands[areadata.code].races
+	return [['random', 1]]
+
 
 func make_local_recruit(args):
 	var newchar = ResourceScripts.scriptdict.class_slave.new("local_recruit")
@@ -1552,6 +2463,8 @@ func make_local_recruit(args):
 		var difficulty = 0
 		if args.has('races'):
 			race = input_handler.weightedrandom(args.races)
+			if race == 'dungeon':
+				race = input_handler.weightedrandom(get_active_location_races())
 			if race == 'local':
 				race = input_handler.weightedrandom(input_handler.active_area.races)
 			elif race == 'beast':
@@ -1891,12 +2804,23 @@ func makerandomgroup(enemygroup, quest = false):
 	return combatparty
 
 
-func complete_location(locationid):
+#The one way a location is marked as done with - by the story, by a quest, or by the death of a
+#dungeon's last boss. It is not removed here: game_world.sweep_cleared_locations() does that once
+#the place has stood empty long enough. `abandoned` only picks the label: a quest given up on
+#leaves its dungeon behind rather than cleared.
+func declare_location_cleared(locationid, abandoned = false):
 	var location = ResourceScripts.world_gen.get_location_from_code(locationid)
-	if location == null: return
-	var area = ResourceScripts.world_gen.get_area_from_location_code(locationid)
-	return_characters_from_location(locationid)
-	ResourceScripts.game_progress.completed_locations[location.id] = {name = location.name, id = location.id, area = area.code}
+	if location == null: return false
+	if !ResourceScripts.game_world.can_clear_location(location): return false
+	if !location.get('cleared', false):
+		location.cleared = true
+		location.removal_hours = 0
+		location.abandoned = abandoned
+	elif !abandoned:
+		#a boss put down in a dungeon left behind earns it the honest label
+		location.abandoned = false
+	refresh_location_status_ui(location)
+	return true
 
 
 func Reward(selectedquest, suspend_rep = false):
@@ -1923,7 +2847,7 @@ func Reward(selectedquest, suspend_rep = false):
 			* variables.master_charm_quests_gold_bonus[int(ResourceScripts.game_party.get_master().get_stat('charm_factor'))])
 	if selectedquest.rewards.has('materials'):
 		for i in selectedquest.rewards.materials:
-			ResourceScripts.game_res.materials[i] += selectedquest.rewards.materials[i]
+			ResourceScripts.game_res.gain_material(i, selectedquest.rewards.materials[i])
 	if selectedquest.rewards.has('items'):
 		for i in selectedquest.rewards.items:
 			AddItemToInventory(i)
@@ -1975,33 +2899,79 @@ func Reward(selectedquest, suspend_rep = false):
 
 
 
-func remove_location(locationid):
+#Erases a location for good. Nobody is ever dragged home by it: an occupied place is only marked
+#as cleared instead, so no character is ever left pointing at a location that is no longer there.
+#`keep_characters` is for make_quest_location replacing a place under the people parked in it.
+#Returns what was left behind, for the activity log, or null when nothing was removed.
+func remove_location(locationid, keep_characters = false):
 	var location = ResourceScripts.world_gen.get_location_from_code(locationid)
-	if location == null: return
-	if location.type == 'capital':
+	if location == null: return null
+	if location.type in ['capital', 'settlement']:
 		print('WARNING - incorrect location removal')
-		return
-	var area = ResourceScripts.world_gen.get_area_from_location_code(locationid)
+		return null
+	if !keep_characters and ResourceScripts.game_world.is_location_occupied(locationid):
+		declare_location_cleared(locationid)
+		return null
+	var report = {name = location.name, sold = 0, freed = 0, gold = 0}
 	ResourceScripts.game_res.remove_tasks_for_location(location.id)
-	return_characters_from_location(locationid)
-	if location.has('captured_characters'):
-		for id in location.captured_characters:
-			var tchar = characters_pool.get_char_by_id(id)
-			var val = tchar.calculate_price(true) / 2
-			ResourceScripts.game_res.money += int(val)
-			tchar.is_active = false
-#	area.locations.erase(location.id)
-#	area.questlocations.erase(location.id)
-#	ResourceScripts.game_world.location_links.erase(location.id)
+	#the same split the captives panel's Quick Sell makes: the ones taken in a fight are sold,
+	#anybody else is let go
+	for id in location.get('captured_characters', []):
+		var tchar = characters_pool.get_char_by_id(id)
+		if tchar == null: continue
+		if tchar.src == 'random_combat':
+			var val = int(tchar.calculate_price(true) / 2)
+			ResourceScripts.game_res.money += val
+			report.gold += val
+			report.sold += 1
+		else:
+			report.freed += 1
+		tchar.is_active = false
 	ResourceScripts.game_world.remove_location(locationid)
-	
-	input_handler.update_slave_list()
-	gui_controller.nav_panel.build_accessible_locations()
+	refresh_ui_after_location_removal(locationid)
+	return report
+
+
+#A removal can land during a day tick or in the middle of loading a save, where half the screens
+#do not exist yet, so every node here is checked before it is touched.
+func refresh_ui_after_location_removal(locationid):
+	if gui_controller.nav_panel != null and is_instance_valid(gui_controller.nav_panel):
+		gui_controller.nav_panel.build_accessible_locations()
+	if gui_controller.mansion != null and is_instance_valid(gui_controller.mansion):
+		var rooms = gui_controller.mansion.get_node_or_null("MansionRoomsModule")
+		if rooms != null and rooms.get("place") == locationid:
+			rooms.set_place('aliron')
+
+
+func refresh_location_status_ui(location):
+	for screen in [gui_controller.exploration_dungeon, gui_controller.exploration]:
+		if screen == null or !is_instance_valid(screen) or !screen.is_visible_in_tree():
+			continue
+		if screen.active_location == null or screen.active_location.id != location.id:
+			continue
+		screen.build_location_description()
+		if screen.has_method("open_location_actions"):
+			screen.open_location_actions()
+
+
+func is_location_on_screen(locationid):
 	if gui_controller.current_screen == gui_controller.mansion:
-		gui_controller.mansion.mansion_state_set("default")
-		return
-	if input_handler.active_location == location and gui_controller.exploration != null and gui_controller.exploration.is_visible_in_tree():
-		gui_controller.nav_panel.select_location('aliron')
+		return false
+	for screen in [gui_controller.exploration_dungeon, gui_controller.exploration]:
+		if screen == null or !is_instance_valid(screen) or !screen.is_visible_in_tree():
+			continue
+		if screen.active_location != null and screen.active_location.id == locationid:
+			return true
+	return false
+
+
+func get_location_cleared_tooltip(location):
+	var state = ResourceScripts.game_world.get_location_removal_state(location)
+	if !state.cleared:
+		return ""
+	var lines = [tr("LOC_ABANDONED_TOOLTIP") if state.abandoned else tr("LOC_CLEARED_TOOLTIP")]
+	lines.append(_report_text("LOC_REMOVAL_TIMER_LEFT", [state.left]))
+	return PoolStringArray(lines).join("\n")
 
 
 func unquest_location(locationid):
@@ -2035,6 +3005,7 @@ func return_characters_from_location(locationid):
 		if person.check_location(location.id):
 			if ResourceScripts.game_globals.instant_travel:
 				person.travel.location = ResourceScripts.game_world.mansion_location
+				person.travel.travel_origin = ''
 				person.return_to_task()
 			else:
 				person.return_to_mansion() 
@@ -2084,6 +3055,12 @@ func get_rolled_diff(): #excluding event bonus
 	return t_diff
 
 
+#The ceiling the captives of this fight are rolled against. Keyed by the dungeon's difficulty tier,
+#so a rare enemy or a boss - which raise the difficulty, not the tier - stays under the same roof
+#as the rest of the floor. The endless tower ('infinite') and hard dungeons are not capped.
+func get_rolled_factor_cap():
+	return variables.dungeon_factor_caps.get(char_roll_data.diff, variables.maximum_factor_value)
+
 
 func roll_characters():
 	var res = []
@@ -2108,6 +3085,7 @@ func roll_characters():
 	var t_diff = get_rolled_diff()
 	if char_roll_data.event: t_diff += variables.dungeon_character_chances.event_diff_bonus
 	if char_roll_data.mboss: t_diff += variables.dungeon_character_chances.mboss_diff_bonus
+	var t_cap = get_rolled_factor_cap()
 	
 	var t_race = 'random'
 	var areadata = input_handler.active_area
@@ -2124,7 +3102,7 @@ func roll_characters():
 	for ch_id in input_handler.active_location.group.values():
 		var scout = characters_pool.get_char_by_id(ch_id)
 		if scout != null:
-			manhunt_values.push_back(scout.get_stat('manhunt') + scout.get_fame_bonus('manhunt_bonus'))
+			manhunt_values.push_back(scout.get_stat('manhunt'))#fame included
 	manhunt_values.sort()
 	var manhunt_bonus = 0.0
 	for i in range(max(manhunt_values.size() - 2, 0), manhunt_values.size()):
@@ -2150,9 +3128,10 @@ func roll_characters():
 			else:
 				print("ERROR - no racedata for %s" % areadata.code)
 		var newslave = ResourceScripts.scriptdict.class_slave.new("random_combat")
-		newslave.generate_random_character_from_data(t_race, null, t_diff)
+		newslave.generate_random_character_from_data(t_race, null, t_diff, [], [], t_cap)
 		newslave.is_active = true
 #		newslave.set_slave_category('servant')
+		remember_local_race(newslave)
 		res.push_back(newslave.id)
 		n += 1
 		while rng.randf() < chance2 and n < char_roll_data.max_amount:
@@ -2161,13 +3140,47 @@ func roll_characters():
 			if t_race == 'local':
 				t_race = input_handler.weightedrandom(areadata.races)
 			newslave = ResourceScripts.scriptdict.class_slave.new("random_combat")
-			newslave.generate_random_character_from_data(t_race, null, t_diff)
+			newslave.generate_random_character_from_data(t_race, null, t_diff, [], [], t_cap)
 			newslave.is_active = true
 #			newslave.set_slave_category('servant')
+			remember_local_race(newslave)
 			res.push_back(newslave.id)
 			n += 1
-	
+
 	reset_roll_data()
+	return res
+
+
+#What the player has actually turned up at this location. The dungeon tooltip shows only these, so a race
+#stays hidden until one of its own has stood in the captives list.
+func remember_local_race(person):
+	var location = input_handler.active_location
+	if person == null or !(location is Dictionary):
+		return
+	if !location.has('seen_races'):
+		location.seen_races = []
+	var code = person.get_stat('race')
+	if code != null and code != '' and !location.seen_races.has(code):
+		location.seen_races.append(code)
+
+
+#The location's own race table in its own order, each entry marked with whether one has been taken here.
+#Beastkin collapse to Halfkin when furry is off, the same way ch_stats does when it builds the character -
+#otherwise the tooltip promises a race the player can never get.
+func location_race_slots(location):
+	var res = []
+	if !(location is Dictionary) or !location.has('character_data'):
+		return res
+	var seen = location.get('seen_races', [])
+	var listed = []
+	for entry in location.character_data.get('races', []):
+		var code = str(entry[0] if entry is Array else entry)
+		if !input_handler.globalsettings.furry and code.find("Beastkin") >= 0:
+			code = code.replace("Beastkin", "Halfkin")
+		if !races.racelist.has(code) or listed.has(code):
+			continue
+		listed.append(code)
+		res.append({race = code, known = seen.has(code)})
 	return res
 
 
@@ -2188,7 +3201,7 @@ func roll_hirelings(loc, recruiter = null):
 		if locdata1.has('diff_roll'):
 			t_diff = locdata1.diff_roll
 	if recruiter != null:
-		t_diff += recruiter.get_stat('manhunt') + recruiter.get_fame_bonus('manhunt_bonus')
+		t_diff += recruiter.get_stat('manhunt')#fame included
 	
 	
 	if racedata is Array and !racedata.empty():
@@ -2204,6 +3217,7 @@ func roll_hirelings(loc, recruiter = null):
 		locdata.captured_characters = []
 	locdata.captured_characters.push_back(newslave.id)
 	input_handler.emit_signal("LocationSlavesUpdate")
+	return newslave
 
 
 var yes
@@ -2254,10 +3268,17 @@ func common_effects(effects, from_event = false):
 							var newreq = [{type = 'date', operant = 'eq', value = k.date}, {type = 'hour', operant = 'eq', value = k.hour}]
 							newevent.reqs += newreq
 						'add_to_hour':
+							#the day used to roll over when the CURRENT hour was the last of the
+							#day rather than when the sum actually ran past it. Anything landing
+							#more than one turn ahead was therefore dated to an hour of today
+							#that had already gone by - a schedule the tick could never match.
+							#Every use in the data today asks for a single hour, which is the one
+							#case the old arithmetic got right, so this only ever mattered to
+							#whoever wrote the next one
 							var date = ResourceScripts.game_globals.date
-							var hour = ResourceScripts.game_globals.hour + round(rand_range(k.hour[0], k.hour[1]))
-							if hour > 4: hour = hour - 4
-							if ResourceScripts.game_globals.hour == 4:
+							var hour = int(ResourceScripts.game_globals.hour) + int(round(rand_range(k.hour[0], k.hour[1])))
+							while hour > variables.HoursPerDay:
+								hour -= variables.HoursPerDay
 								date += 1
 							var newreq = [{type = 'date', operant = 'eq', value = date}, {type = 'hour', operant = 'eq', value = hour}]
 							newevent.reqs += newreq
@@ -2356,6 +3377,10 @@ func common_effects(effects, from_event = false):
 				input_handler.active_character = input_handler.scene_characters[i.value]
 			'affect_active_character':
 				input_handler.active_character.affect_char(i, true)
+			'take_virginity':
+				#the same loss the brothel's own act writes, for a client who bought it outright
+				input_handler.active_character.take_virginity(i.value,
+					i.partner if i.has('partner') else 'brothel_customer')
 			'affect_master':
 				ResourceScripts.game_party.get_master().affect_char(i, true)
 			'make_loot':
@@ -2364,6 +3389,11 @@ func common_effects(effects, from_event = false):
 				var loot_name = input_handler.weightedrandom(i.pool)
 				#mind, that "chest" can be lockless, therefore just loot
 				input_handler.scene_loot = ResourceScripts.world_gen.make_chest_loot(loot_name)
+				#whatever the floor generator sealed into this subroom. Taken and cleared
+				#here, so a chest left unopened cannot hand its ore to the next scene
+				if !input_handler.scene_bonus_materials.empty():
+					input_handler.AddOrIncrementDict(input_handler.scene_loot.materials, input_handler.scene_bonus_materials)
+					input_handler.scene_bonus_materials = {}
 			'open_loot':
 				# input_handler.get_spec_node(input_handler.NODE_LOOTTABLE).open(input_handler.scene_loot, '[center]Acquired Items:[/center]')
 					var loot_win = input_handler.get_spec_node(input_handler.ANIM_LOOT)
@@ -2394,6 +3424,10 @@ func common_effects(effects, from_event = false):
 								input_handler.active_location.captured_characters = []
 							input_handler.active_location.captured_characters.push_back(newcharacter.id)
 							newcharacter.is_active = true
+							#the captives panel gates enslaving and quickselling on src == 'random_combat'.
+							#a scene character handed over as a captive is in the same position as one
+							#taken in a fight, so mark it likewise or the player can only recruit it freely.
+							newcharacter.src = 'random_combat'
 						number -= 1
 			'update_guild':
 				if gui_controller.exploration_city == null:
@@ -2506,23 +3540,22 @@ func common_effects(effects, from_event = false):
 				ResourceScripts.game_progress.completed_quests.append(i.value)
 				input_handler.achievements.try_add_quest_achimnt(i.value)
 			'complete_active_location':
-				complete_location(input_handler.active_location.id)
+				declare_location_cleared(input_handler.active_location.id)
 #			'set_completed_quest_location':
 #				var data = ResourceScripts.world_gen.get_faction_from_code(i.id)
 #				data.completed = true
 #				data.active = false
 			'set_completed_active_location':
-				#input_handler.active_location.progress.level = input_handler.active_location.levels.size()
-#				input_handler.active_location.progress.stage = input_handler.active_location.levels["L" + str(input_handler.active_location.levels.size())].stages
-				if gui_controller.exploration_dungeon != null and gui_controller.exploration_dungeon.visible:
-					gui_controller.exploration_dungeon.active_location.completed = true
-					gui_controller.exploration_dungeon.active_location.active = false
-				if gui_controller.exploration != null and gui_controller.exploration.visible:
-					gui_controller.exploration.active_location.completed = true
-					gui_controller.exploration.active_location.active = false
-					gui_controller.exploration.open_location_actions()
+				#deliberately the visible screen rather than input_handler.active_location: scenes
+				#firing this from elsewhere have always been no-ops and stay that way
+				for screen in [gui_controller.exploration_dungeon, gui_controller.exploration]:
+					if screen == null or !screen.visible or screen.active_location == null:
+						continue
+					screen.active_location.completed = true
+					declare_location_cleared(screen.active_location.id)
 			'remove_active_location':
-				remove_location(input_handler.active_location.id)
+				ResourceScripts.game_res.remove_tasks_for_location(input_handler.active_location.id, ['special'])
+				declare_location_cleared(input_handler.active_location.id)
 			'reputation':
 				var data = ResourceScripts.world_gen.get_faction_from_code(i.name)
 				var guild = ResourceScripts.game_world.areas[data.area].factions[data.code]
@@ -2559,7 +3592,10 @@ func common_effects(effects, from_event = false):
 			'make_quest_location':
 				ResourceScripts.world_gen.make_quest_location(i.value)
 			'remove_quest_location':
-				remove_location(i.value)
+				#the story tasks standing on the place go at once, the gathering it still offers
+				#lives until the location itself is removed
+				ResourceScripts.game_res.remove_tasks_for_location(i.value, ['special'])
+				declare_location_cleared(i.value)
 			'return_characters_from_location':
 				return_characters_from_location(i.value)
 			'set_music':
@@ -2735,6 +3771,9 @@ func common_effects(effects, from_event = false):
 			'plan_loc_event':
 				ResourceScripts.game_progress.plan_loc_event(i.loc, i.event)
 			'add_special_task_for_location':
+				#the story wants the place again, so it stops waiting to be removed
+				ResourceScripts.game_world.revive_location(
+					ResourceScripts.world_gen.get_location_from_code(i.location))
 				ResourceScripts.game_res.add_special_job(i)
 			'remove_special_task_for_location':
 				for task_id in ResourceScripts.game_res.active_tasks.special.duplicate():
@@ -2775,7 +3814,7 @@ func common_effects(effects, from_event = false):
 						res = gui_controller.exploration_dungeon.pay_stamina(i.value, i.modified) 
 					else:
 						res = gui_controller.exploration_dungeon.pay_stamina(i.value)
-					manifest_and_log("dungeon", "%s stamina spent in %s" %
+					text_log_add("dungeon", "%s stamina spent in %s" %
 						[res, tr(gui_controller.exploration_dungeon.active_location.name)])
 			'add_stamina':
 				if gui_controller.exploration_dungeon != null:
@@ -2823,6 +3862,10 @@ func common_effects(effects, from_event = false):
 						rdata.xp_mod = i.xp_mod
 			'unlock_upgrade':
 				ResourceScripts.game_res.unlock_upgrade(i.upgrade, i.level)
+			#A room the estate is given: the room code goes in 'name', the same field every
+			#other effect that names a thing uses.
+			'grant_room':
+				ResourceScripts.game_res.grant_room(i.name)
 			'change_relationship':
 				if input_handler.scene_characters.size() == 2:
 					ResourceScripts.game_party.change_relationship_status(input_handler.scene_characters[0].id, input_handler.scene_characters[1].id, i.value, true)
@@ -2915,6 +3958,22 @@ func valuecheck(dict):
 			return ResourceScripts.game_globals.newgame
 		"has_upgrade":
 			return ResourceScripts.game_res.if_has_upgrade(dict.name, dict.value)
+		#a room on the plan improved to at least this level - what widens what the estate's
+		#outdoor buildings bring up, see the prod_task_* tables in loot_data.gd
+		"has_room_upgrade":
+			return ResourceScripts.game_res.room_upgrade_level(dict.name, dict.code) >= int(dict.value)
+		#a craft room good enough for this recipe - built, and with tools enough. This replaced
+		#the global 'forge'/'tailor'/'alchemy' upgrades, which were the same three steps bought
+		#from a menu instead of stood up on the plan.
+		#the estate has a room of this kind at all
+		"has_mansion_room":
+			return ResourceScripts.game_res.count_rooms(dict.name) >= int(dict.get('value', 1))
+		#the master has a bath of his own - the Private Bath on his room, which is what the retired
+		#'resting' upgrade and then the bathhouse became; see game_res.has_bath()
+		"has_bath":
+			return ResourceScripts.game_res.has_bath() == bool(dict.get('check', true))
+		"has_craft_room":
+			return ResourceScripts.game_res.craft_room_level(dict.name) >= int(dict.value)
 		"area_progress":
 			return ResourceScripts.game_progress.if_has_area_progress(dict.value, dict.operant, dict.area)
 		"decision":
@@ -3204,6 +4263,48 @@ func check_shop_record(item, code, dict):
 		return false
 	return true
 
+#Splits one line of a localization file into the part the parser sees as code (everything before
+#an unquoted '#') and reports whether the line leaves a """ string open. update_localization_file
+#needs this to tell a line that OPENS a multi-line value from one that ENDS an entry: they both
+#end in """, and inserting after an opening line cuts the value in half.
+func scan_localization_line(line: String, in_multiline: bool) -> Dictionary:
+	var i = 0
+	var quote = ""
+	while i < line.length():
+		var c = line[i]
+		if in_multiline:
+			if c == "\\": #escapes are processed inside """ strings too, so \" is not a delimiter
+				i += 2
+				continue
+			if line.substr(i, 3) == '"""':
+				in_multiline = false
+				i += 3
+				continue
+			i += 1
+			continue
+		if quote == "":
+			if line.substr(i, 3) == '"""':
+				in_multiline = true
+				i += 3
+				continue
+			if c == '"' or c == "'":
+				quote = c
+				i += 1
+				continue
+			if c == "#": #a comment - the rest of the line is not code, quotes in it do not count
+				break
+			i += 1
+		else:
+			if c == "\\":
+				i += 2
+				continue
+			if c == quote:
+				quote = ""
+			i += 1
+	if i > line.length():
+		i = line.length()
+	return {code = line.substr(0, i), in_multiline = in_multiline}
+
 #MIND! This func writes file to "res://", so it wouldn't (and shouldn't) work in exported version
 func update_localization_file(update_loc: String, primary_loc = "en"):
 	# find all main.gd files
@@ -3259,29 +4360,46 @@ func update_localization_file(update_loc: String, primary_loc = "en"):
 		# iterate through main.gd file
 		var key = ""
 		var inserted_anchors = {}
+		var in_multiline = false #inside a """ value that spans several lines
 		while loc_file.get_position() < loc_file.get_len():
 			var line = loc_file.get_line()
-			var cleared_line = line.replace(" ", "").replace("	", "")
-			var is_commented_line = cleared_line.length() > 0 and cleared_line[0] == "#"
-			var regex_result = regex.search(line)
-			tmp_file.store_line(line)
-			
-			# if found a key in a line and it's not commented out
-			if regex_result and cleared_line.length() > 0 and !is_commented_line: 
-				key = regex_result.get_string()
-			
-			# if it's a missing key, insert keys
-			if key in missing_keys.keys():
-				var check_line = cleared_line
-				if check_line.ends_with("#MISSINGTRANSLATION"):
-					check_line = check_line.substr(0, check_line.length() - "#MISSINGTRANSLATION".length())
-				if !is_commented_line and check_line.length() > 0 and check_line[check_line.length() - 1] == ',':
-					if inserted_anchors.has(key):
-						continue
+			var was_in_multiline = in_multiline
+			var scanned = scan_localization_line(line, in_multiline)
+			in_multiline = scanned.in_multiline
+
+			# a line in the middle of a multi-line value is plain text, copy it untouched
+			if was_in_multiline and in_multiline:
+				tmp_file.store_line(line)
+				continue
+
+			var code = scanned.code
+			if !was_in_multiline:
+				# a key can only be declared on a line that starts outside a string.
+				# search the code part so a word in a trailing comment is never taken for a key
+				var regex_result = regex.search(code)
+				if regex_result:
+					key = regex_result.get_string()
+				# the line only opens the value - its entry ends on the closing line below
+				if in_multiline:
+					tmp_file.store_line(line)
+					continue
+
+			# here `line` holds the last line of a complete entry: comments, blank lines and the
+			# closing brace all reduce to code that ends in neither a quote nor a comma
+			if key in missing_keys.keys() and !inserted_anchors.has(key):
+				var check_line = code.strip_edges()
+				# last entry of a file may have no trailing comma, add it or nothing gets inserted after it
+				if check_line.ends_with('"') or check_line.ends_with("'"):
+					line = code + "," + line.substr(code.length())
+					check_line += ","
+				if check_line.ends_with(","):
+					tmp_file.store_line(line)
 					inserted_anchors[key] = true
 					for i in missing_keys[key].size():
 						var insert_line = "	%s = \"\"\"%s\"\"\", # MISSING TRANSLATION"
 						tmp_file.store_line(insert_line % [missing_keys[key][i].key, missing_keys[key][i].text])
+					continue
+			tmp_file.store_line(line)
 		tmp_file.close()
 		loc_file.close()
 		
@@ -3369,27 +4487,7 @@ func ProcessSfxTarget(sfxtarget, caster, target):
 
 
 func calculate_hit_sound(skill, caster, target):
-	var rval
-	var hitsound
-	if skill.sounddata.strike == 'weapon':
-		hitsound = caster.get_weapon_sound()
-	else:
-		hitsound = skill.sounddata.strike
-	
-	match hitsound:
-		'dodge':
-			match target.bodyhitsound:
-				'flesh':pass
-				'wood':pass
-				'stone':pass
-		'blade':
-			match target.bodyhitsound:
-				'flesh':pass
-				'wood':pass
-				'stone':pass
-	rval = 'fleshhit'
-	
-	return rval
+	return audio.get_combat_hit_sound(skill.sounddata, target)
 
 
 func show_buttons(container):
@@ -3398,10 +4496,17 @@ func show_buttons(container):
 			continue
 		ResourceScripts.core_animations.UnfadeAnimation(button, 0.3)
 		yield(get_tree().create_timer(0.3), "timeout")
+		#the container is rebuilt from under this loop whenever the panel refreshes while the
+		#options are still fading in - the buttons held here are freed by then
+		if !is_instance_valid(button):
+			return
 		button.set("modulate", Color(1, 1, 1, 1))
 
+#Every entry in statdata was generated with name = '' and the STAT<CODE> keys written instead,
+#so reading the field gives back nothing at all. Fall through to the key whenever the entry has
+#no name of its own - otherwise the caller prints a blank where a stat should be.
 func get_stat_name(stat):
-	if statdata.statdata.has(stat):
+	if statdata.statdata.has(stat) and statdata.statdata[stat].name != '':
 		return statdata.statdata[stat].name
 	return tr("STAT%s" % stat.to_upper())
 
@@ -3435,30 +4540,37 @@ func get_tr_src(src, src_val):
 		'masteries_points':
 			return ["", tr("STATMASTERY_POINT_%s" % src_val.to_upper())]
 		'upgrade':
-			return ["", tr("UPGRADERESTING")]
+			#the one bonus with this source is the master's bath - see ch_dyn_stats
+			return ["", tr("MANSIONUPG_PRIVATE_BATH")]
+		'fame':
+			return [tr("STATFAME"), tr(variables.fame_tiers[src_val].name)]
 		_:
 			print("get_tr_src() can't decipher %s %s" % [src, src_val])
 			return [src, src_val]
 
 
-func calculate_lux_rooms():
-	var res = 0
-	for p in ResourceScripts.game_party.characters.values():
-		if p.check_work_rule("luxury"):
-			res += 1
-	return res
 
+#The keys that address an sfx entry rather than describe its animation. They never reach
+#the animation function; the last two are consumed by the transforms below.
+const SFX_ENTRY_ADDRESS = ['code', 'target', 'period', 'code_repeat', 'is_cast', 'no_repeat_delays']
+
+#Every other key of an sfx entry reaches the animation function that plays it, in a fresh
+#dictionary. Nothing is invented here: several functions test key PRESENCE rather than
+#value, so writing a default for an absent key would change what they do. Three keys are
+#turned into something else on the way:
+#   is_cast            -> queue_duration = 0.0 (unless the entry sets queue_duration): a
+#                         cast never holds the queue, the receiving side waits instead
+#   no_repeat_delays   -> no_delays = true on every iteration but the last
+#   target == 'caster' -> reverse_flip = true: FighterNode.get_flip() answers for the card
+#                         the sprite is drawn on, and a caster sprite faces the other way
 func make_sfx_params(anim_dict, last_iteration = false):
 	var params = {}
-	if anim_dict.has('duration'): params.duration = anim_dict.duration
-	if anim_dict.has('queue_duration'):
-		params.queue_duration = anim_dict.queue_duration
-	elif anim_dict.has("is_cast") and anim_dict.is_cast:
+	for key in anim_dict:
+		if key in SFX_ENTRY_ADDRESS: continue
+		params[key] = anim_dict[key]
+	if !anim_dict.has('queue_duration') and anim_dict.has('is_cast') and anim_dict.is_cast:
 		params.queue_duration = 0.0
-	if anim_dict.has('no_delays'): params.no_delays = anim_dict.no_delays
 	if anim_dict.has('no_repeat_delays') and anim_dict.no_repeat_delays and !last_iteration:
 		params.no_delays = true
-	if anim_dict.has('alt_slot'): params.alt_slot = anim_dict.alt_slot
-	if anim_dict.has('force_flip'): params.force_flip = anim_dict.force_flip
-	if anim_dict.has("target") and anim_dict.target == 'caster': params.reverse_flip = true
+	if anim_dict.has('target') and anim_dict.target == 'caster': params.reverse_flip = true
 	return params

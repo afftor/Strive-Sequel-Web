@@ -530,72 +530,89 @@ func get_background(id, cash = false):
 			backgrounds[id] = res
 	return res
 
-func get_background_async(id):
-	if !backgrounds.has(id):
-		yield(get_tree(), "idle_frame")
+
+const CARD_BACKGROUND_SIZE = Vector2(226, 160)
+var card_backgrounds = {}
+
+
+func get_card_background(id):
+	if card_backgrounds.has(id):
+		return card_backgrounds[id]
+	card_backgrounds[id] = null #a missing or unreadable background is remembered too
+	var full = get_background(id)
+	if full == null:
 		return null
-	var res = backgrounds[id]
-	if res is String:
-		if WebCgAssets.is_streamed_path(res):
-			return yield(WebCgAssets.load_texture(res), "completed")
-		yield(get_tree(), "idle_frame")
-		return load(res)
-	yield(get_tree(), "idle_frame")
-	return res
+	var img = full.get_data()
+	if img == null:
+		return null
+	if img.is_compressed():
+		if img.decompress() != OK:
+			return null
+	var size = img.get_size()
+	var aspect = CARD_BACKGROUND_SIZE.x / CARD_BACKGROUND_SIZE.y
+	var crop = Vector2(min(size.x, size.y * aspect), min(size.y, size.x / aspect)).floor()
+	if crop.x < 1 or crop.y < 1:
+		return null
+	img = img.get_rect(Rect2(((size - crop) * 0.5).floor(), crop))
+	img.resize(int(CARD_BACKGROUND_SIZE.x), int(CARD_BACKGROUND_SIZE.y), Image.INTERPOLATE_BILINEAR)
+	var tex = ImageTexture.new()
+	tex.create_from_image(img)
+	card_backgrounds[id] = tex
+	return tex
 
 
 var scenes = {
-	no_image = "res://assets/images/scenes/image_wip.png",
-	abuse = "res://assets/images/scenes/abuse.png",
-	bosscapturefemale = "res://assets/images/scenes/bosscapturefemale.png",
-	bosscapturemale = "res://assets/images/scenes/bosscapturemale.png",
-	cell = "res://assets/images/scenes/cell.png",
-	charm = "res://assets/images/scenes/charm.png",
-	chest = "res://assets/images/scenes/chest.png",
-	childbirth = "res://assets/images/scenes/childbirth.png",
+	no_image = load("res://assets/images/scenes/image_wip.png"),
+	abuse = load("res://assets/images/scenes/abuse.png"),
+	bosscapturefemale = load("res://assets/images/scenes/bosscapturefemale.png"),
+	bosscapturemale = load("res://assets/images/scenes/bosscapturemale.png"),
+	cell = load("res://assets/images/scenes/cell.png"),
+	charm = load("res://assets/images/scenes/charm.png"),
+	chest = load("res://assets/images/scenes/chest.png"),
+	childbirth = load("res://assets/images/scenes/childbirth.png"),
 	daisyconfess = "res://assets/images/scenes/daisyconfession.png",
 	daisyevent = "res://assets/images/scenes/daisyevent.png",
 	daisystart = "res://assets/images/scenes/daisystart.png",
 	daisy_hostage = "res://assets/images/scenes/daisy_hostage.png",
-	dungeonclear = "res://assets/images/scenes/dungeonclear.png",
-	execution = "res://assets/images/scenes/execution.png",
-	exotic_slaver = "res://assets/images/scenes/exotic_slaver.png",
-	fear = "res://assets/images/scenes/fear.png",
-	handshake = "res://assets/images/scenes/handshake.png",
-	locationpurchase = "res://assets/images/scenes/locationpurchase.png",
-	mindcontrol = "res://assets/images/scenes/mindcontrol.png",
-	noevent = "res://assets/images/scenes/noevent.png",
-	pot = "res://assets/images/scenes/pot.png",
-	potmaj = "res://assets/images/scenes/potmaj.png",
-	potmin = "res://assets/images/scenes/potmin.png",
-	potused = "res://assets/images/scenes/potused.png",
-	praise = "res://assets/images/scenes/praise.png",
-	public_punish = "res://assets/images/scenes/public_punish.png",
-	public_sex = "res://assets/images/scenes/public_sex.png",
-	punish = "res://assets/images/scenes/punish.png",
-	rebels_furry = "res://assets/images/scenes/rebels_furry.png",
-	recruit = "res://assets/images/scenes/recruit.png",
-	sedation = "res://assets/images/scenes/sedation.png",
-	seduce = "res://assets/images/scenes/seduce.png",
-	serve = "res://assets/images/scenes/serve.png",
-	sexreward = "res://assets/images/scenes/sexreward.png",
-	shackles = "res://assets/images/scenes/shackles.png",
-	performance = "res://assets/images/scenes/performance.png",
+	dungeonclear = load("res://assets/images/scenes/dungeonclear.png"),
+	execution = load("res://assets/images/scenes/execution.png"),
+	exotic_slaver = load("res://assets/images/scenes/exotic_slaver.png"),
+	fear = load("res://assets/images/scenes/fear.png"),
+	handshake = load("res://assets/images/scenes/handshake.png"),
+	locationpurchase = load("res://assets/images/scenes/locationpurchase.png"),
+	mindcontrol = load("res://assets/images/scenes/mindcontrol.png"),
+	noevent = load("res://assets/images/scenes/noevent.png"),
+	pot = load("res://assets/images/scenes/pot.png"),
+	potmaj = load("res://assets/images/scenes/potmaj.png"),
+	potmin = load("res://assets/images/scenes/potmin.png"),
+	potused = load("res://assets/images/scenes/potused.png"),
+	praise = load("res://assets/images/scenes/praise.png"),
+	public_punish = load("res://assets/images/scenes/public_punish.png"),
+	public_sex = load("res://assets/images/scenes/public_sex.png"),
+	punish = load("res://assets/images/scenes/punish.png"),
+	rebels_furry = load("res://assets/images/scenes/rebels_furry.png"),
+	recruit = load("res://assets/images/scenes/recruit.png"),
+	sedation = load("res://assets/images/scenes/sedation.png"),
+	seduce = load("res://assets/images/scenes/seduce.png"),
+	serve = load("res://assets/images/scenes/serve.png"),
+	sexreward = load("res://assets/images/scenes/sexreward.png"),
+	shackles = load("res://assets/images/scenes/shackles.png"),
+	performance = load("res://assets/images/scenes/performance.png"),
 	slaveescape = "res://assets/images/scenes/slaveescape.png",
-	slavers_elf = "res://assets/images/scenes/slavers_elf.png",
-	slave_decision = "res://assets/images/scenes/slave_decision.png",
-	souleat = "res://assets/images/scenes/souleat.png",
-	succubuslust = "res://assets/images/scenes/succubuslust.png",
-	trap = "res://assets/images/scenes/trap.png",
-	warn = "res://assets/images/scenes/warn.png",
+	slavers_elf = load("res://assets/images/scenes/slavers_elf.png"),
+	slave_decision = load("res://assets/images/scenes/slave_decision.png"),
+	souleat = load("res://assets/images/scenes/souleat.png"),
+	succubuslust = load("res://assets/images/scenes/succubuslust.png"),
+	trap = load("res://assets/images/scenes/trap.png"),
+	warn = load("res://assets/images/scenes/warn.png"),
 	wolves_skirmish = "res://assets/images/scenes/wolves_skirmish.png",
 	fairy = "res://assets/images/scenes/fairy.png",
 	avermik = "res://assets/images/scenes/avermik.png",
-	armory = "res://assets/images/scenes/armory.png",
-	goblin_encounter = "res://assets/images/scenes/goblin_encounter.png",
-	fairy_encounter = "res://assets/images/scenes/fairy_encounter.png",
-	chest_mimic = "res://assets/images/scenes/chest_mimic.png",
-	battlefield = "res://assets/images/scenes/battlefield.png",
+	armory = load("res://assets/images/scenes/armory.png"),
+	goblin_encounter = load("res://assets/images/scenes/goblin_encounter.png"),
+	fairy_encounter = load("res://assets/images/scenes/fairy_encounter.png"),
+	chest_mimic = load("res://assets/images/scenes/chest_mimic.png"),
+	battlefield = load("res://assets/images/scenes/battlefield.png"),
 	city_guards = "res://assets/images/scenes/city_guards.png",
 	empire_gates = "res://assets/images/scenes/empire_gate.png",
 	dome = "res://assets/images/scenes/dome.png",
@@ -603,9 +620,9 @@ var scenes = {
 	fred_mercs = "res://assets/images/scenes/fred_mercs.png",
 	refugees = "res://assets/images/scenes/refugees.png",
 	spring = "res://assets/images/scenes/spring.png",
-	tribal_elves = "res://assets/images/scenes/tribal_elves.png",
-	letter = "res://assets/images/scenes/letter.png",
-	kobold = "res://assets/images/scenes/kobold.png",
+	tribal_elves = load("res://assets/images/scenes/tribal_elves.png"),
+	letter = load("res://assets/images/scenes/letter.png"),
+	kobold = load("res://assets/images/scenes/kobold.png"),
 	mines_quest = 'res://assets/images/scenes/mines_quest.png',
 	aire_death = 'res://assets/images/scenes/aire_death.png',
 	aire_wound = 'res://assets/images/scenes/aire_wound.png',
@@ -617,6 +634,7 @@ var scenes = {
 	deer = 'res://assets/images/scenes/deer.png',
 	leon = 'res://assets/images/scenes/leon.png',
 	ritual = 'res://assets/images/scenes/ritual.png',
+	ritual_room = 'res://assets/images/scenes/ritual_room.png',
 	
 	prey = "res://assets/images/scenes/prey.png",
 	slave_sex = "res://assets/images/scenes/slave sex.png",
@@ -723,26 +741,26 @@ var scenes = {
 	elf_druid = "res://assets/images/scenes/elven druid.png",
 	dwarf_alchemist = "res://assets/images/scenes/dwarf_alchemist.png",
 	
-	hire = "res://assets/images/scenes/hire.png",
+	hire = load("res://assets/images/scenes/hire.png"),
 	
-	dungeon_door = "res://assets/images/scenes/dungeon_door.png",
-	dungeon_broken_bridge = "res://assets/images/scenes/dungeon_broken_bridge.png",
-	dungeon_cavein = "res://assets/images/scenes/dungeon_cavein.png",
-	dungeon_forest_bridge = "res://assets/images/scenes/dungeon_forest_bridge.png",
-	dungeon_enemies = "res://assets/images/scenes/dungeon_enemies.png",
-	dungeon_gate = "res://assets/images/scenes/dungeon_gate.png",
-	dungeon_fountain = "res://assets/images/scenes/dungeon_fountain.png",
-	dungeon_magic_barrier = "res://assets/images/scenes/dungeon_magic_barrier.png",
+	dungeon_door = load("res://assets/images/scenes/dungeon_door.png"),
+	dungeon_broken_bridge = load("res://assets/images/scenes/dungeon_broken_bridge.png"),
+	dungeon_cavein = load("res://assets/images/scenes/dungeon_cavein.png"),
+	dungeon_forest_bridge = load("res://assets/images/scenes/dungeon_forest_bridge.png"),
+	dungeon_enemies = load("res://assets/images/scenes/dungeon_enemies.png"),
+	dungeon_gate = load("res://assets/images/scenes/dungeon_gate.png"),
+	dungeon_fountain = load("res://assets/images/scenes/dungeon_fountain.png"),
+	dungeon_magic_barrier = load("res://assets/images/scenes/dungeon_magic_barrier.png"),
 	
-	day_off = "res://assets/images/scenes/day off.png",
-	grope = "res://assets/images/scenes/grope.png",
-	kneel = "res://assets/images/scenes/kneel.png",
-	mindread = "res://assets/images/scenes/mindread.png",
-	public_use = "res://assets/images/scenes/publicuse.png", 
-	reward = "res://assets/images/scenes/reward.png",
-	slap = "res://assets/images/scenes/slap.png",
-	spank = "res://assets/images/scenes/spank.png",
-	strip = "res://assets/images/scenes/strip.png",
+	day_off = load("res://assets/images/scenes/day off.png"),
+	grope = load("res://assets/images/scenes/grope.png"),
+	kneel = load("res://assets/images/scenes/kneel.png"),
+	mindread = load("res://assets/images/scenes/mindread.png"),
+	public_use = load("res://assets/images/scenes/publicuse.png"), 
+	reward = load("res://assets/images/scenes/reward.png"),
+	slap = load("res://assets/images/scenes/slap.png"),
+	spank = load("res://assets/images/scenes/spank.png"),
+	strip = load("res://assets/images/scenes/strip.png"),
 	
 	#act 3
 	dwarf_king_palace = "res://assets/images/scenes/dwarf_king_palace.png",
@@ -873,6 +891,7 @@ var sprites = {
 	rakar = load("res://assets/images/sprites/rakar.png"),
 	ramont = load("res://assets/images/sprites/ramont.png"),
 	rilu = load("res://assets/images/sprites/rilu.png"),
+	rilu2 = load("res://assets/images/sprites/rilu_2.png"),
 	
 	cali_halloween = load("res://assets/images/sprites/cali_halloween.png"),
 	cali_halloween_body = load("res://assets/images/sprites/cali_halloween_body.png"),
@@ -964,10 +983,14 @@ var sprites = {
 	rouge_wed = load("res://assets/images/sprites/rouge_wed.png"),
 	rouge_wed_body = load("res://assets/images/sprites/rouge_wed_body.png"),
 	grotus = load("res://assets/images/sprites/grotus.png"),
+	grotus_evil = load("res://assets/images/sprites/grotus_evil.png"),
+	grotus_king = load("res://assets/images/sprites/grotus_king.png"),
+	grotus_fear = load("res://assets/images/sprites/grotus_fear.png"),
 	bolthar = load("res://assets/images/sprites/gnome.png"),
 	keeper = load("res://assets/images/sprites/keeper.png"),
 	alise = load("res://assets/images/sprites/alise.png"),
 	sebastian = load("res://assets/images/sprites/sebastian.png"),
+	sebastian2 = load("res://assets/images/sprites/sebastian_2.png"),
 	
 	emperor = load("res://assets/images/sprites/emperor.png"),
 	chancellor = load("res://assets/images/sprites/advisor.png"),
@@ -975,6 +998,8 @@ var sprites = {
 	erdyna_body = load("res://assets/images/sprites/dragongirl_body.png"),
 	erdyna_nude = load("res://assets/images/sprites/dragongirl_nude_fhd.png"),
 	erdyna_nude_body = load("res://assets/images/sprites/dragongirl_nude_body.png"),
+	erdyna_wed = load("res://assets/images/sprites/dragongirl_wed_fhd.png"),
+	erdyna_wed_body = load("res://assets/images/sprites/dragongirl_wed_body.png"),
 	senerus = load("res://assets/images/sprites/senerus.png"),
 	vaeloria = load("res://assets/images/sprites/vaeloria.png"),
 	
@@ -1239,84 +1264,6 @@ var icons = {
 	resist_light = "res://assets/images/iconsstats/light.png",
 	resist_dark = "res://assets/images/iconsstats/dark.png",
 	resist_mind = "res://assets/images/iconsstats/mind.png",
-#	TO COMPLETE AND USE IN DATA TABLES
-#	NEED TO GET RID OF ALL LOAD FUNCTIONS
-#	skill_abuse = "res://assets/images/iconsskills/abuse.png",
-#	"res://assets/images/iconsskills/Acid-spit.png",
-#	"res://assets/images/iconsskills/AcidBomb.png",
-#	"res://assets/images/iconsskills/Aimed-strike.png",
-#	"res://assets/images/iconsskills/arrowshower.png",
-#	"res://assets/images/iconsskills/Attack.png",
-#	skill_attract = "res://assets/images/iconsskills/Attract.png",
-#	"res://assets/images/iconsskills/Barrier.png",
-#	"res://assets/images/iconsskills/BloodMagic.png",
-#	skill_charm = "res://assets/images/iconsskills/Charm.png",
-#	skill_double_attack = "res://assets/images/iconsskills/comboattack.png",
-#	skill_command = "res://assets/images/iconsskills/Command.png",
-#	"res://assets/images/iconsskills/cripple.png",
-#	"res://assets/images/iconsskills/Debilitate.png",
-#	skill_attack = "res://assets/images/iconsskills/defaultattack.png",
-#	skill_discipline = "res://assets/images/iconsskills/Discipline2.png",
-#	skill_hardwork = "res://assets/images/iconsskills/Discipline.png",
-#	skill_distract = "res://assets/images/iconsskills/distract.png",
-#	skill_dragon_might = "res://assets/images/iconsskills/Drain.png",
-#	"res://assets/images/iconsskills/Escape.png",
-#	skill_publicexecution = "res://assets/images/iconsskills/Execution.png",
-#	skill_fear = "res://assets/images/iconsskills/Fear.png",
-#	"res://assets/images/iconsskills/firebolt.png",
-#	"res://assets/images/iconsskills/FireBomb.png",
-#	"res://assets/images/iconsskills/firestorm.png",
-#	skill_greatseduce = "res://assets/images/iconsskills/Great_Seduce.png",
-#	skill_lesser_heal = "res://assets/images/iconsskills/Heal.png",
-#	skill_first_aid = "res://assets/images/iconsskills/HealBandage.png",
-#	"res://assets/images/iconsskills/Heavy-Strike.png",
-#	skill_ranged_attack = "res://assets/images/iconsskills/heavyshot.png",
-#	skill_rserrated_shot = "res://assets/images/iconsskills/heavyshot.png",
-#	"res://assets/images/iconsskills/icon_arrow_explode.png",
-#	"res://assets/images/iconsskills/icon_dark.png",
-#	"res://assets/images/iconsskills/icon_earth.png",
-#	"res://assets/images/iconsskills/icon_eyes.png",
-#	"res://assets/images/iconsskills/icon_ice.png",
-#	"res://assets/images/iconsskills/icon_light.png",
-#	"res://assets/images/iconsskills/icon_lightning.png",
-#	"res://assets/images/iconsskills/icon_plant.png",
-#	"res://assets/images/iconsskills/icon_tiny.png",
-#	skill_innervate = "res://assets/images/iconsskills/Innervate.png",
-#	skill_inspire = "res://assets/images/iconsskills/Inspire.png",
-#	skill_mass_lesser_heal = "res://assets/images/iconsskills/lesserheal.png",
-#	"res://assets/images/iconsskills/Lich-strike.png",
-#	skill_drain = "res://assets/images/iconsskills/LifeDrain.png",
-#	skill_shackles = "res://assets/images/iconsskills/Magic Shackles.png",
-#	skill_drain_mana = "res://assets/images/iconsskills/ManaDrain.png",
-#	"res://assets/images/iconsskills/meditate.png",
-#	"res://assets/images/iconsskills/Mindblast.png",
-#	"res://assets/images/iconsskills/Mindread.png",
-#	skill_mindcontrol = "res://assets/images/iconsskills/Mind_Control.png",
-#	skill_praise = "res://assets/images/iconsskills/Praise.png",
-#	skill_protect = "res://assets/images/iconsskills/Protect.png",
-#	skill_publichumiliation = "res://assets/images/iconsskills/PublicPunish.png",
-#	skill_publicsexhumiliation = "res://assets/images/iconsskills/PublicSex.png",
-#	skill_punish = "res://assets/images/iconsskills/Punish.png",
-#	skill_stopmindcontrol = "res://assets/images/iconsskills/RemoveMindcontrol.png",
-#	skill_reward = "res://assets/images/iconsskills/Reward.png",
-#	skill_rewardsex = "res://assets/images/iconsskills/Reward_with_sex 3.png",
-#	skill_sedate = "res://assets/images/iconsskills/Sedate.png",
-#	"res://assets/images/iconsskills/Sedation.png",
-#	skill_seduce = "res://assets/images/iconsskills/Seduce.png",
-#	skill_serve = "res://assets/images/iconsskills/Serve2.png",
-#	"res://assets/images/iconsskills/Serve.png",
-#	skill_slash = "res://assets/images/iconsskills/Shackle.png",
-#	"res://assets/images/iconsskills/slash.png",
-#	skill_consume_soul = "res://assets/images/iconsskills/soulconsume.png",
-#	skill_greatshavkles = "res://assets/images/iconsskills/Strong Magic Shackles.png",
-#	skill_fire_attack = "res://assets/images/iconsskills/strongattack.png",
-#	"res://assets/images/iconsskills/tackle.png",
-#	"res://assets/images/iconsskills/taunt.png",
-#	skill_trap = "res://assets/images/iconsskills/Trap.png",
-#	skill_make_undead = "res://assets/images/iconsskills/TurnUndead.png",
-#	skill_warn = "res://assets/images/iconsskills/Warn.png",
-#	skill_weaponrefine = "res://assets/images/iconsskills/WeaponRefine.png",
-#	"res://assets/images/iconsskills/windarrow.png"
 }
 
 func get_icon(id):
@@ -1505,6 +1452,7 @@ var GFX_sprites = {
 	aura_firearr = "res://assets/sfx/hit_animation/aura_firearr.tscn",
 	aura_arcaneblade = "res://assets/sfx/hit_animation/aura_arcaneblade.tscn",
 	bite = "res://assets/sfx/hit_animation/bite.tscn",
+	at_bite = "res://assets/sfx/hit_animation/at_bite.tscn",
 	trap_snare = "res://assets/sfx/hit_animation/trap_snare.tscn",
 	dark_swril = "res://assets/sfx/hit_animation/dark_swirl.tscn",
 	shadow_spike = "res://assets/sfx/hit_animation/shadow_spike.tscn",
@@ -1525,16 +1473,26 @@ var GFX_sprites = {
 	cast_fire = "res://assets/sfx/hit_animation/cast_fire.tscn",
 	cast_light = "res://assets/sfx/hit_animation/cast_light.tscn",
 	cast_mind = "res://assets/sfx/hit_animation/cast_mind.tscn",
+	talisman_ticket_apply = "res://assets/sfx/hit_animation/talisman_ticket_apply.tscn",
+	talisman_ticket_burn = "res://assets/sfx/hit_animation/talisman_ticket_burn.tscn",
+	inferno = "res://assets/sfx/hit_animation/inferno.tscn",
+	hailstorm = "res://assets/sfx/hit_animation/hailstorm.tscn",
+	blizzard = "res://assets/sfx/hit_animation/blizzard.tscn",
+	abyss_gaze = "res://assets/sfx/hit_animation/abyss_gaze.tscn",
+	meteor_strike = "res://assets/sfx/hit_animation/meteor_strike.tscn",
+	charge_fire = "res://assets/sfx/hit_animation/charge_fire.tscn",
+	charge_frost = "res://assets/sfx/hit_animation/charge_frost.tscn",
+	charge_abyss = "res://assets/sfx/hit_animation/charge_abyss.tscn",
 	}
 
 var GFX_particles = {
-#	heal = "res://assets/sfx/HealEffect.tscn",
 	heal = "res://assets/sfx/heal.tscn",
 	buff = "res://assets/sfx/buff.tscn",
 	debuff = "res://assets/sfx/debuff.tscn",
 	snow = "res://assets/sfx/snow.tscn",
 	sparks = "res://assets/sfx/spark.tscn",
 	arrowhail = "res://assets/sfx/arrowhail.tscn",
+	bonemeal_spray = "res://assets/sfx/bonemeal_spray.tscn",
 }
 
 var GFX_video = {
@@ -1543,18 +1501,6 @@ var GFX_video = {
 
 
 func loadimages(): 
-#	for i in icons:
-#		icons[i] = input_handler.loadimage(icons[i])
-#	for i in backgrounds:
-#		backgrounds[i] = input_handler.loadimage(backgrounds[i])
-#	for i in scenes:
-#		scenes[i] = input_handler.loadimage(scenes[i])
-#	for i in shades:
-#		shades[i] = input_handler.loadimage(shades[i])
-#	for i in portraits:
-#		portraits[i] = input_handler.loadimage(portraits[i])
-#	for i in sprites:
-#		sprites[i] = input_handler.loadimage(sprites[i])
 	for i in cursors:
 		cursors[i] = input_handler.loadimage(cursors[i])
 	for i in GFX:
@@ -1606,40 +1552,3 @@ var upgrade_tiers = {
 
 }
 
-#var statsicons = {#not used at all O_o
-#lub1 = load("res://assets/images/sexicons/lub1.png"),
-#lub2 = load("res://assets/images/sexicons/lub2.png"),
-#lub3 = load("res://assets/images/sexicons/lub3.png"),
-#lub4 = load("res://assets/images/sexicons/lub4.png"),
-#lub5 = load("res://assets/images/sexicons/lub5.png"),
-#lust1 = load("res://assets/images/sexicons/lust1.png"),
-#lust2 = load("res://assets/images/sexicons/lust2.png"),
-#lust3 = load("res://assets/images/sexicons/lust3.png"),
-#lust4 = load("res://assets/images/sexicons/lust4.png"),
-#lust5 = load("res://assets/images/sexicons/lust5.png"),
-#sens1 = load("res://assets/images/sexicons/sens1.png"),
-#sens2 = load("res://assets/images/sexicons/sens2.png"),
-#sens3 = load("res://assets/images/sexicons/sens3.png"),
-#sens4 = load("res://assets/images/sexicons/sens4.png"),
-#sens5 = load("res://assets/images/sexicons/sens5.png"),
-#stress1 = load("res://assets/images/gui/obed_bad.png"),
-#stress2 = load("res://assets/images/gui/obed_med.png"),
-#stress3 = load("res://assets/images/gui/obed_good.png")
-#}
-#var combatfullpictures = { #not used
-#	rat = load("res://assets/images/enemies/RatFull.png"),
-#	ent = load("res://assets/images/enemies/EntFull.png"),
-#	bigent = load("res://assets/images/enemies/BigEntFull.png"),
-#	golem = load("res://assets/images/enemies/Golem.png"),
-#	golemalt = load("res://assets/images/enemies/GolemAlt.png"),
-#	spider = load("res://assets/images/enemies/Spider.png"),
-#}
-#var combatportraits = {
-#	##enemies
-#	rat = load("res://assets/images/enemies/RatIcon2.png"),
-#	ent = load("res://assets/images/enemies/EntIcon.png"),
-#	bigent = load("res://assets/images/enemies/BigEntIcon.png"),
-#	golem = load("res://assets/images/enemies/GolemIcon.png"),
-#	golemalt = load("res://assets/images/enemies/GolemAltIcon.png"),
-#	spider = load("res://assets/images/enemies/SpiderIcon.png"),
-#	}

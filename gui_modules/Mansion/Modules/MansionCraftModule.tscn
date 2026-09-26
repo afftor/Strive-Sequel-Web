@@ -1,4 +1,4 @@
-[gd_scene load_steps=101 format=2]
+[gd_scene load_steps=102 format=2]
 
 [ext_resource path="res://assets/Fonts_v2/FontThemes/MainBig.tres" type="DynamicFont" id=1]
 [ext_resource path="res://assets/Textures_v2/CLASS_INFO/Panels/divider_2.png" type="Texture" id=2]
@@ -126,6 +126,8 @@ region_rect = Rect2( 0, 0, 554, 754 )
 [sub_resource type="StyleBoxFlat" id=9]
 bg_color = Color( 0.0705882, 0.0588235, 0.145098, 1 )
 
+[sub_resource type="StyleBoxEmpty" id=11]
+
 [node name="MansionCraftModule" type="TextureRect"]
 anchor_right = 1.0
 anchor_bottom = 1.0
@@ -161,12 +163,16 @@ margin_right = -648.0
 margin_bottom = -82.0
 texture = ExtResource( 32 )
 
-[node name="QueueFrame" type="TextureRect" parent="frame"]
+[node name="QueueFrame" type="NinePatchRect" parent="frame"]
 margin_left = 1319.22
 margin_top = 42.0
 margin_right = 1884.22
-margin_bottom = 517.0
+margin_bottom = 998.067
 texture = ExtResource( 62 )
+patch_margin_left = 22
+patch_margin_top = 64
+patch_margin_right = 22
+patch_margin_bottom = 22
 
 [node name="Label2" type="Label" parent="frame/QueueFrame"]
 anchor_right = 1.0
@@ -174,23 +180,7 @@ margin_top = 2.0
 margin_bottom = 53.0
 custom_colors/font_color = Color( 0.976471, 0.882353, 0.505882, 1 )
 custom_fonts/font = ExtResource( 48 )
-text = "CRAFTORDERMATERIALS"
-align = 1
-
-[node name="QueueFrame2" type="TextureRect" parent="frame"]
-margin_left = 1319.22
-margin_top = 523.067
-margin_right = 1884.22
-margin_bottom = 998.067
-texture = ExtResource( 62 )
-
-[node name="Label2" type="Label" parent="frame/QueueFrame2"]
-anchor_right = 1.0
-margin_top = 2.0
-margin_bottom = 53.0
-custom_colors/font_color = Color( 0.976471, 0.882353, 0.505882, 1 )
-custom_fonts/font = ExtResource( 48 )
-text = "CRAFTORDERITEMS"
+text = "CRAFTORDER"
 align = 1
 
 [node name="HSeparator" type="HSeparator" parent="frame"]
@@ -419,7 +409,7 @@ __meta__ = {
 margin_left = 1336.0
 margin_top = 107.0
 margin_right = 1877.0
-margin_bottom = 494.0
+margin_bottom = 979.0
 
 [node name="ScrollContainer" type="ScrollContainer" parent="CraftSchedule"]
 anchor_right = 1.0
@@ -501,103 +491,6 @@ texture_pressed = ExtResource( 5 )
 texture_hover = ExtResource( 6 )
 
 [node name="VScrollBar" type="VScrollBar" parent="CraftSchedule"]
-visible = false
-margin_left = 1055.0
-margin_top = 338.0
-margin_right = 1067.0
-margin_bottom = 916.0
-custom_styles/grabber = SubResource( 1 )
-custom_styles/scroll = SubResource( 2 )
-__meta__ = {
-"_edit_use_anchors_": false
-}
-
-[node name="CraftSchedule2" type="Control" parent="."]
-margin_left = 1336.0
-margin_top = 592.0
-margin_right = 1877.0
-margin_bottom = 979.0
-
-[node name="ScrollContainer" type="ScrollContainer" parent="CraftSchedule2"]
-anchor_right = 1.0
-anchor_bottom = 1.0
-theme = ExtResource( 3 )
-scroll_horizontal_enabled = false
-
-[node name="VBoxContainer" type="VBoxContainer" parent="CraftSchedule2/ScrollContainer"]
-margin_right = 416.0
-rect_min_size = Vector2( 416, 0 )
-custom_constants/separation = 4
-
-[node name="Button" type="TextureButton" parent="CraftSchedule2/ScrollContainer/VBoxContainer"]
-visible = false
-margin_right = 503.0
-margin_bottom = 52.0
-rect_min_size = Vector2( 440, 0 )
-mouse_default_cursor_shape = 2
-toggle_mode = true
-texture_normal = ExtResource( 67 )
-texture_pressed = ExtResource( 49 )
-texture_hover = ExtResource( 40 )
-script = ExtResource( 56 )
-
-[node name="icon" type="TextureRect" parent="CraftSchedule2/ScrollContainer/VBoxContainer/Button"]
-margin_left = 6.0
-margin_top = 8.0
-margin_right = 45.0
-margin_bottom = 44.0
-texture = ExtResource( 11 )
-expand = true
-stretch_mode = 6
-__meta__ = {
-"_edit_use_anchors_": false
-}
-
-[node name="Label" type="Label" parent="CraftSchedule2/ScrollContainer/VBoxContainer/Button"]
-margin_left = 59.0
-margin_top = 8.0
-margin_right = 327.0
-margin_bottom = 44.0
-custom_colors/font_color = Color( 0.878431, 0.878431, 0.878431, 1 )
-custom_fonts/font = ExtResource( 12 )
-text = "Item Name"
-valign = 1
-__meta__ = {
-"_edit_use_anchors_": false
-}
-
-[node name="progress" type="Label" parent="CraftSchedule2/ScrollContainer/VBoxContainer/Button"]
-margin_left = 334.0
-margin_top = 8.0
-margin_right = 458.0
-margin_bottom = 44.0
-custom_fonts/font = ExtResource( 55 )
-text = "100/500"
-align = 1
-valign = 1
-__meta__ = {
-"_edit_use_anchors_": false
-}
-
-[node name="ProgressBar" type="ProgressBar" parent="CraftSchedule2/ScrollContainer/VBoxContainer/Button"]
-visible = false
-margin_top = 52.0
-margin_right = 440.0
-margin_bottom = 76.0
-__meta__ = {
-"_edit_use_anchors_": false
-}
-
-[node name="DeleteButton" type="TextureButton" parent="CraftSchedule2/ScrollContainer/VBoxContainer/Button"]
-margin_left = 458.0
-margin_top = 6.0
-margin_right = 498.0
-margin_bottom = 46.0
-texture_normal = ExtResource( 7 )
-texture_pressed = ExtResource( 5 )
-texture_hover = ExtResource( 6 )
-
-[node name="VScrollBar" type="VScrollBar" parent="CraftSchedule2"]
 visible = false
 margin_left = 1055.0
 margin_top = 338.0
@@ -1436,7 +1329,7 @@ margin_right = 519.0
 margin_bottom = 151.0
 custom_colors/font_color = Color( 0.976471, 0.882353, 0.505882, 1 )
 custom_fonts/font = ExtResource( 13 )
-text = "Quantity"
+text = "CRAFTQUANTITY"
 align = 1
 
 [node name="HBoxContainer1" type="HBoxContainer" parent="NumberSelect2/VBoxContainer"]
@@ -1502,14 +1395,17 @@ patch_margin_top = 15
 patch_margin_right = 15
 patch_margin_bottom = 15
 
-[node name="Amount" type="Label" parent="NumberSelect2/VBoxContainer/HBoxContainer1/pt2"]
+[node name="Amount" type="LineEdit" parent="NumberSelect2/VBoxContainer/HBoxContainer1/pt2"]
 anchor_right = 1.0
 anchor_bottom = 1.0
 custom_colors/font_color = Color( 0.878431, 0.878431, 0.878431, 1 )
 custom_fonts/font = ExtResource( 78 )
+custom_styles/focus = SubResource( 11 )
+custom_styles/normal = SubResource( 11 )
+custom_styles/read_only = SubResource( 11 )
 text = "10"
 align = 1
-valign = 1
+select_all_on_focus = true
 
 [node name="pt3" type="NinePatchRect" parent="NumberSelect2/VBoxContainer/HBoxContainer1"]
 margin_left = 344.0
@@ -1591,9 +1487,22 @@ margin_right = 339.0
 margin_bottom = 48.0
 custom_colors/font_color = Color( 0.878431, 0.878431, 0.878431, 1 )
 custom_fonts/font = ExtResource( 78 )
-text = "Make Continuously"
+text = "CRAFTCONTINUOUS"
 align = 1
 valign = 1
+
+[node name="InfinityToggle" type="CheckBox" parent="NumberSelect2/VBoxContainer/AdvOption/HBoxContainer"]
+visible = false
+margin_left = 343.0
+margin_top = 2.0
+margin_right = 411.0
+margin_bottom = 52.0
+rect_min_size = Vector2( 68, 50 )
+custom_colors/font_color = Color( 0.878431, 0.878431, 0.878431, 1 )
+custom_fonts/font = ExtResource( 78 )
+custom_icons/checked = ExtResource( 85 )
+custom_icons/unchecked = ExtResource( 84 )
+text = "∞"
 
 [node name="label2" type="Label" parent="NumberSelect2/VBoxContainer"]
 margin_top = 267.0
@@ -1601,7 +1510,7 @@ margin_right = 519.0
 margin_bottom = 297.0
 custom_colors/font_color = Color( 0.976471, 0.882353, 0.505882, 1 )
 custom_fonts/font = ExtResource( 13 )
-text = "Stop at"
+text = "CRAFTSTOPAT"
 align = 1
 
 [node name="HBoxContainer2" type="HBoxContainer" parent="NumberSelect2/VBoxContainer"]
@@ -1667,14 +1576,17 @@ patch_margin_top = 15
 patch_margin_right = 15
 patch_margin_bottom = 15
 
-[node name="Amount" type="Label" parent="NumberSelect2/VBoxContainer/HBoxContainer2/pt2"]
+[node name="Amount" type="LineEdit" parent="NumberSelect2/VBoxContainer/HBoxContainer2/pt2"]
 anchor_right = 1.0
 anchor_bottom = 1.0
 custom_colors/font_color = Color( 0.878431, 0.878431, 0.878431, 1 )
 custom_fonts/font = ExtResource( 78 )
+custom_styles/focus = SubResource( 11 )
+custom_styles/normal = SubResource( 11 )
+custom_styles/read_only = SubResource( 11 )
 text = "10"
 align = 1
-valign = 1
+select_all_on_focus = true
 
 [node name="pt3" type="NinePatchRect" parent="NumberSelect2/VBoxContainer/HBoxContainer2"]
 margin_left = 344.0
@@ -1728,7 +1640,7 @@ margin_right = 519.0
 margin_bottom = 386.0
 custom_colors/font_color = Color( 0.976471, 0.882353, 0.505882, 1 )
 custom_fonts/font = ExtResource( 13 )
-text = "Restart at"
+text = "CRAFTRESTARTAT"
 align = 1
 
 [node name="HBoxContainer3" type="HBoxContainer" parent="NumberSelect2/VBoxContainer"]
@@ -1794,14 +1706,17 @@ patch_margin_top = 15
 patch_margin_right = 15
 patch_margin_bottom = 15
 
-[node name="Amount" type="Label" parent="NumberSelect2/VBoxContainer/HBoxContainer3/pt2"]
+[node name="Amount" type="LineEdit" parent="NumberSelect2/VBoxContainer/HBoxContainer3/pt2"]
 anchor_right = 1.0
 anchor_bottom = 1.0
 custom_colors/font_color = Color( 0.878431, 0.878431, 0.878431, 1 )
 custom_fonts/font = ExtResource( 78 )
+custom_styles/focus = SubResource( 11 )
+custom_styles/normal = SubResource( 11 )
+custom_styles/read_only = SubResource( 11 )
 text = "10"
 align = 1
-valign = 1
+select_all_on_focus = true
 
 [node name="pt3" type="NinePatchRect" parent="NumberSelect2/VBoxContainer/HBoxContainer3"]
 margin_left = 344.0

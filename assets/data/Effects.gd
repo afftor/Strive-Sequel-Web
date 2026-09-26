@@ -1,7 +1,10 @@
 extends Node
 
 
-var effect_nolog = ['commander', 'atkpass', 'atkpass_remove', 'hide', 'default', 'warlock', 'manasiphon', 'thorns', 'vampirism', 'ench_commander', 'spell_mastery', 'flight_upkeep', 'max_stats','sanguine_instinct_listener','environmental_object'] #2add more
+var effect_nolog = ['commander', 'atkpass', 'atkpass_remove', 'hide', 'default', 'warlock', 'manasiphon', 'thorns', 'vampirism', 'ench_commander', 'spell_mastery', 'flight_upkeep', 'max_stats','sanguine_instinct_listener','environmental_object', 'food','grotus_hit_mark','lost_in_darkness','ts_underwatched','melchor_session','melchor_authority_buff',
+	'coal_gnomes_wit_eff','coal_gnomes_wit_bane_eff','coal_bead_watch_eff','coal_kobold_treasure_eff','coal_toxic_salt_eff','coal_ratkin_gift_eff','coal_lit_wick_eff','coal_goblin_invention_eff','coal_assist_watch_eff','coal_dwarf_penance_eff',
+	'coal_button_pressed','coal_crumble_used','coal_eruption_lock','coal_spread_lock','coal_recovered','coal_fuse_1','coal_fuse_2','coal_fuse_3',
+	'jd_unsilenced','jd_ward'] #2add more
 #to fix EFFECT TAGS TO TEMPLATE,
 #'positive'/'negative' - the widest classification (to most global cleaning like bard2 skill effect)
 #'buff'/'debuff' - additional markings for common effect removal effects (like purge) (and maybe add two more for a state effects)
@@ -299,9 +302,66 @@ var effect_table = {
 	e_s_nostun = rebuild_stat_bonus('resist_stun_set', 200),
 	# i think we need to display those statuses as buffs
 	
+	#The bed equivalent of e_food_demand: somebody used to better has been put somewhere
+	#ordinary. Same shape, same reason - a standing effect gated by its own condition, so
+	#there is one source of truth and nothing to apply or remove by hand.
+	#A night on the floor. The condition is answered from the snapshot game_res takes at the top
+	#of the turn, so the penalty is already on the character while the day's work is counted.
+	#The health half of it cannot be said here - hp_reg takes 'add' bonuses after 'mul', so a
+	#multiplier of zero does not hold healing down - CharacterClass.hp_regen_allowed does that.
+	slept_rough = {
+		type = 'base',
+		descript = '',
+		conditions = [{code = 'slept_rough', check = true}],
+		statchanges = {productivity_mul = 0.34, mp_reg_mul = 0},
+		tags = ['slept_rough'],
+		buffs = [
+			{
+				icon = "res://assets/images/gui/gui icons/food_hate.png",
+				description = "SLEPTROUGH",
+				tags = ['mansion_only'],
+			}
+		],
+	},
+	sleep_demand_unmet = {
+		type = 'base',
+		descript = '',
+		conditions = [{code = 'sleep_demand', check = false}],
+		statchanges = {hpmax_mul = 0.8, exp_gain_mod = -0.2},
+		tags = ['sleep_demand_unmet'],
+		buffs = [
+			{
+				icon = "res://assets/images/gui/gui icons/food_hate.png",
+				description = "SLEEPDEMANDUNMET",
+				tags = ['mansion_only'],
+			}
+		],
+	},
+	#Sharing the master's bed. The master sleeps there too, so he is excluded by name -
+	#without that he would sit there growing fond of himself.
+	room_masters_bed = {
+		type = 'base',
+		conditions = [
+			{code = 'lives_in_room', check = true, value = 'master_bed'},
+			{code = 'has_profession', value = 'master', check = false},
+			],
+		sub_effects = [rebuild_simple_dot(['affection'], [4], variables.TR_TICK),],
+	},
+	#Granted by the estate having the room at all rather than by anybody living in it, which
+	#is what the 'has_room' condition is for - see game_res.has_room_with_tag().
+	#No buff icon: the office helps everybody in the house at once, so the picture said the same
+	#thing on every portrait in the estate and told the player nothing about the character they
+	#were looking at. The room's own card is where a room's doing is read.
+	room_office_exp = {
+		type = 'base',
+		conditions = [{code = 'has_room', check = true, value = 'office'}],
+		statchanges = {exp_gain_mod = 0.05},
+	},
+	#used to be the 'luxury' work rule, a flag the player set per character against a
+	#global count of allowed rooms. It is now simply where they sleep.
 	work_rule_luxury = {
 		type = 'base',
-		conditions = [{code = 'workrule', check = true, value = 'luxury'}],
+		conditions = [{code = 'lives_in_room', check = true, value = 'luxury'}],
 		statchanges = {exp_gain_mod = 0.05, productivity = 0.05},
 		sub_effects = [rebuild_simple_dot(['loyalty'], [0.5], variables.TR_DAY),],
 	},
@@ -356,6 +416,38 @@ var effect_table = {
 		rem_event = [variables.TR_DEATH],
 		tags = ['no_job', 'no_combat'],
 		buffs = ['b_dayoff'],
+	},
+	# Legacy food effects are kept as load-time compatibility templates. Current food
+	# logic does not apply them; effects_pool retires saved instances after deserializing
+	# them so old saves can migrate to the meal-specific effects below.
+	e_food_like = {
+		type = 'temp_s',
+		stack = 'food',
+		tick_event = variables.TR_TICK,
+		duration = 4,
+		statchanges = {productivity = 0.05, exp_gain_mod = 0.05},
+		buffs = [
+			{
+				icon = "res://assets/images/gui/gui icons/food_love.png",
+				description = "TRAITEFFECTFAVFOOD",
+				tags = ['mansion_only'],
+			}
+		],
+	},
+	e_food_dislike = {
+		type = 'temp_s',
+		stack = 'food',
+		tick_event = variables.TR_TICK,
+		duration = 4,
+		statchanges = {productivity = -0.1},
+		tags = ['food_dislike'],
+		buffs = [
+			{
+				icon = "res://assets/images/gui/gui icons/food_hate.png",
+				description = "TRAITEFFECTHATEDFOOD",
+				tags = ['mansion_only'],
+			}
+		],
 	},
 	#food buffs. 
 	e_food_meat = {
@@ -971,7 +1063,7 @@ var effect_table = {
 		tick_event = [variables.TR_TURN_F],
 		rem_event = [variables.TR_COMBAT_F, variables.TR_DEATH],
 		duration = 'arg',
-		statchanges = {mdef_add_part = -0.5},
+		statchanges = {mdef_add_part = -0.25},
 	},
 	
 	e_s_sleep = {
@@ -1941,9 +2033,31 @@ var status_desc = {
 		text = "STATUSDESC_SHATTER",
 		icon = "res://assets/images/iconsskills/icon_elemental_protection.png"
 	},
+	jd_deep_sleep = {
+		text = "STATUSDESC_JD_DEEP_SLEEP",
+		icon = "res://assets/images/iconsskills/Sedation.png"
+	},
+	jd_comatose = {
+		text = "STATUSDESC_JD_COMATOSE",
+		icon = "res://assets/images/iconsskills/icon_eyes.png"
+	},
+	jd_quicksand = {
+		text = "STATUSDESC_JD_QUICKSAND",
+		icon = "res://assets/images/iconsskills/skill_ensnare.png"
+	},
+	paralysis = {
+		text = "STATUSDESC_PARALYSIS",
+		icon = "res://assets/images/iconsskills/Magic Shackles.png"
+	},
+	contagious_calamity = {
+		text = "STATUSDESC_CONTAGIOUS_CALAMITY",
+		icon = "res://assets/images/iconsskills/skill_vapors.png"
+	},
 }
 
 var status_desc_match = {
+	coal_paralysis = "paralysis",
+	coal_calamity = "contagious_calamity",
 	e_s_shred = "shred",
 	e_s_silence = "silence",
 	e_s_stonewall = "stonewall",
@@ -2313,12 +2427,15 @@ func get_effect_for_status(status):
 func fix_eff_data():
 	for eid in effect_table:
 		var eff = effect_table[eid]
+		#tags go on every entry, not just the simple ones. Readers like StatsPanel.select_stat()
+		#look tags up on this shared table, while base_effect.fix_template() only patches the
+		#duplicate that each effect instance carries.
+		if !eff.has('tags'):
+			eff.tags = []
 		if eff.type == 'simple':
 			eff.name = eid
 			if !eff.has('buffs'):
 				eff.buffs = []
-			if !eff.has('tags'):
-				eff.tags = []
 			if !eff.has('statchanges'):
 				eff.statchanges = {}
 		if eff.type == 'trigger':

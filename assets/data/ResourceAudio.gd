@@ -104,12 +104,23 @@ var sounds = {
 	button_clank = load("res://assets/sounds/sounds/gui_button_clank.wav"),
 
 	morning = load("res://assets/sounds/sounds/morning_rooster.wav"),
-
-	gameover = load("res://assets/sounds/sounds/GameOver.wav"),
+	mansion_morning_rooster = load("res://assets/sounds/sounds/mansion_morning_rooster.wav"),
+	mansion_morning_rooster_alt = load("res://assets/sounds/sounds/mansion_morning_rooster_alt.wav"),
+	mansion_day_birds = load("res://assets/sounds/sounds/mansion_day_birds.wav"),
+	mansion_day_birds_alt = load("res://assets/sounds/sounds/mansion_day_birds_alt.wav"),
+	mansion_evening_crow_01 = load("res://assets/sounds/sounds/mansion_evening_crow_01.wav"),
+	mansion_evening_crow_02 = load("res://assets/sounds/sounds/mansion_evening_crow_02.wav"),
+	mansion_night_owl = load("res://assets/sounds/sounds/mansion_night_owl.wav"),
+	mansion_night_crickets = load("res://assets/sounds/sounds/mansion_night_crickets.wav"),
 
 	blade = load("res://assets/sounds/sounds/fx knife body hit.wav"),
 	blunt_hit = load("res://assets/sounds/sounds/blunt_hit.wav"),
 	fleshhit = load("res://assets/sounds/sounds/fx knife body hit.wav"),
+	combat_hit_soft_contact = load("res://assets/sounds/sounds/combat_hit_soft_contact.wav"),
+	combat_hit_soft_clean = load("res://assets/sounds/sounds/combat_hit_soft_clean.wav"),
+	combat_hit_body_subtle = load("res://assets/sounds/sounds/combat_hit_body_subtle.wav"),
+	combat_hit_body_warm = load("res://assets/sounds/sounds/combat_hit_body_warm.wav"),
+	combat_hit_body_soft_wet = load("res://assets/sounds/sounds/combat_hit_body_soft_wet.wav"),
 	bow = load("res://assets/sounds/sounds/ArrowShot.wav"),
 	arrow = load("res://assets/sounds/sounds/arrow_shot.wav"),
 	skill_scene = load("res://assets/sounds/sounds/healeffect.wav"),
@@ -121,7 +132,6 @@ var sounds = {
 
 	#combat
 	victory = load("res://assets/sounds/sounds/victory.wav"),
-	defeat = load('res://assets/sounds/sounds/defeat.wav'),
 	combatmiss = load('res://assets/sounds/sounds/dodge.wav'),
 	dodge = load("res://assets/sounds/sounds/dodge.wav"),
 	melee_attack = load("res://assets/sounds/sounds/dodge.wav"),
@@ -143,11 +153,11 @@ var sounds = {
 	spell_explosion = load("res://assets/sounds/sounds/spell_explosion.wav"),
 	spell_dark = load("res://assets/sounds/sounds/spell_explosion.wav"),
 	spell_lightning = load("res://assets/sounds/sounds/spell_explosion.wav"),
+	combat_electric_charge_strike = load("res://assets/sounds/sounds/combat_electric_charge_strike.wav"),
 	spell2 = load("res://assets/sounds/sounds/spell2.wav"),
 	spell_void = load("res://assets/sounds/sounds/spell_void.wav"),
 
 	#skills
-	arrowshower = load("res://assets/sounds/sounds/arrowshower.wav"),
 	firebolt = load("res://assets/sounds/sounds/firebolt.wav"),
 	firehit = load("res://assets/sounds/sounds/firedamage.wav"),
 	avalanche = load("res://assets/sounds/sounds/avalanche.wav"),
@@ -170,6 +180,11 @@ var random_pitch_sounds = {
 	blade = 0.4,
 	blunt_hit = 0.4,
 	fleshhit = 0.4,
+	combat_hit_soft_contact = 0.08,
+	combat_hit_soft_clean = 0.08,
+	combat_hit_body_subtle = 0.2,
+	combat_hit_body_warm = 0.08,
+	combat_hit_body_soft_wet = 0.08,
 	bow = 0.4,
 	arrow = 0.4,
 	punch = 0.4,
@@ -178,6 +193,7 @@ var random_pitch_sounds = {
 	dodge = 0.4,
 	melee_attack = 0.4,
 	firehit = 0.4,
+	combat_electric_charge_strike = 0.06,
 	skill_scene = 0.2,
 	speech = 0.2,
 	#these fire on every pickup and sale, so a fixed pitch turns mechanical fast
@@ -227,3 +243,80 @@ func get_equip_sound(item):
 	if equip_sound_rules.itemtypes.has(itemtype):
 		return equip_sound_rules.itemtypes[itemtype]
 	return null
+
+
+# Combat hit-sound data: sounddata.hittype picks one of three policies.
+# {hittype = 'none'}: no impact sound.
+# {hittype = 'dynamic'}: choose from the target's hit_sound_profile metadata.
+# Targets without that metadata use the body profile.
+# {hittype = 'static', hit = 'sound_id'}: always use that sound.
+# No hittype, or a null one: a damage skill gets the dynamic sound at the hit roll (see
+# uses_default_combat_hit_sound); anything else is silent.
+# Older spellings still play, for mods and older data: hittype 'bodyarmor' is dynamic,
+# 'absolute' is static, and a hit_mode key counts when there is no hittype.
+var combat_hit_sound_profiles = {
+	# The selected subtle-body impact is the fallback for targets with no explicit
+	# hit_sound_profile metadata. Other profiles remain material-specific.
+	body = 'combat_hit_body_subtle',
+	body_wet = 'combat_hit_body_soft_wet',
+	cloth = 'combat_hit_soft_contact',
+	leather = 'combat_hit_soft_clean',
+	armor = 'blunt_hit',
+	wood = 'hitwood',
+	stone = 'blunt_hit',
+}
+
+
+func get_combat_hit_sound(sounddata, target):
+	if sounddata == null or sounddata.empty():
+		return null
+	match combat_hittype(sounddata):
+		'dynamic':
+			return get_dynamic_combat_hit_sound(target)
+		'static':
+			var sound = sounddata.get('hit', null)
+			if sound != null and sounds.has(sound):
+				return sound
+	return null
+
+
+# 'none', 'dynamic' or 'static'; null when the data leaves the hit sound to the default.
+func combat_hittype(sounddata):
+	var value = sounddata.get('hittype', null)
+	if value == null:
+		value = sounddata.get('hit_mode', null)
+	if value == null:
+		return null
+	match str(value):
+		'dynamic', 'bodyarmor':
+			return 'dynamic'
+		'static', 'absolute':
+			return 'static'
+	return 'none'
+
+
+func uses_default_combat_hit_sound(sounddata):
+	if sounddata == null or sounddata.empty():
+		return true
+	# A skill that sets a hittype owns its hit sound; a regular damage skill without one
+	# resolves through the target's dynamic profile.
+	return combat_hittype(sounddata) == null
+
+
+func get_default_combat_hit_sound(target):
+	return get_dynamic_combat_hit_sound(target)
+
+
+func get_dynamic_combat_hit_sound(target):
+	var profile = get_dynamic_combat_hit_profile(target)
+	if combat_hit_sound_profiles.has(profile):
+		return combat_hit_sound_profiles[profile]
+	return null
+
+
+func get_dynamic_combat_hit_profile(target):
+	if target == null:
+		return 'body'
+	if target.hit_sound_profile != null:
+		return target.hit_sound_profile
+	return 'body'

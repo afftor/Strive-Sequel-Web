@@ -36,6 +36,11 @@ func advance_hour():
 func is_same_location(char1_id, char2_id):
 	var person1 = characters_pool.get_char_by_id(char1_id)
 	var person2 = characters_pool.get_char_by_id(char2_id)
+	#Being away is not a place two people can share. game_party._in_same_location() refuses a
+	#pair with anyone on a quest in it, and the romance events read location through here, so
+	#leaving it out let a couple meet while one of them was off learning or away on a job.
+	if person1.is_on_quest() or person2.is_on_quest():
+		return false
 	return person1.get_location() == person2.get_location()
 	
 
@@ -55,10 +60,17 @@ func try_start_event():
 
 	if event_reqs and event_reqs.has('global_reqs'):
 		for req in event_reqs.global_reqs:
+			#Every kind of global condition is asked, the way scenes ask theirs. Only 'has_upgrade'
+			#used to be read here and anything else was skipped without a word - which is how the
+			#event that wants a bath played in houses that had none.
+			var met = false
 			if req.type == 'has_upgrade':
-				if !ResourceScripts.game_res.if_has_upgrade(req.name, req.value):
-					return_events.append(event_id)
-					return false
+				met = ResourceScripts.game_res.if_has_upgrade(req.name, req.value)
+			else:
+				met = globals.valuecheck(req)
+			if !met:
+				return_events.append(event_id)
+				return false
 
 	var list_by_loc = {}
 	#get_romance_pair made unique solution. I can't come up with any universal idea
@@ -82,14 +94,21 @@ func try_start_event():
 		for id in party.characters:
 			var party_char = party.characters[id]
 			#char_reqs_precise rule should be added here somewhere
-			if !party_char.has_profession("master"):
-				if (!event_reqs
-						or !event_reqs.has('char_reqs')
-						or party_char.checkreqs(event_reqs.char_reqs)):
-					var loc = party_char.get_location()
-					if !list_by_loc.has(loc):
-						list_by_loc[loc] = []
-					list_by_loc[loc].append(id)
+			if party_char.has_profession("master"):
+				continue
+			#Nobody who is not living the household's day: a child still away at their
+			#tutelage, somebody sent off on a work quest, somebody shut away. is_on_quest()
+			#is what every other screen reads as "not here", and an event that has them
+			#wandering the mansion is an event about somebody who is not in it.
+			if party_char.is_on_quest():
+				continue
+			if (!event_reqs
+					or !event_reqs.has('char_reqs')
+					or party_char.checkreqs(event_reqs.char_reqs)):
+				var loc = party_char.get_location()
+				if !list_by_loc.has(loc):
+					list_by_loc[loc] = []
+				list_by_loc[loc].append(id)
 	
 	var char_count = 1
 	if event_reqs and event_reqs.has('char_count'):

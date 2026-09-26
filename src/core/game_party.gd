@@ -238,6 +238,157 @@ func _in_same_location(char1, char2):
 		return true
 
 
+func _build_daily_relationship_cache():
+	var result = {}
+	for char_id in characters:
+		var person = characters[char_id]
+		if person == null:
+			continue
+		result[char_id] = {
+			person = person,
+			master = person.is_master(),
+			on_quest = person.is_on_quest(),
+			location = person.get_location(),
+			work = person.xp_module.work,
+			unique = person.get_stat('unique'),
+			thrall_master = person.get_stat('thrall_master'),
+		}
+	return result
+
+
+func _daily_relationships_in_same_location(meta1, meta2):
+	if meta1.on_quest or meta2.on_quest:
+		return false
+	if meta1.location != meta2.location:
+		return false
+	if meta1.location == ResourceScripts.game_world.mansion_location:
+		return meta1.work == meta2.work
+	return true
+
+
+func _check_daily_locked_relationship(char1, char2, key, meta1, meta2):
+	var data = relationship_data[key]
+	if meta1.thrall_master == char2 or meta2.thrall_master == char1:
+		data.status = 'lovers'
+		data.value = variables.relationship_base[data.status]
+
+	var unique1 = meta1.unique
+	var unique2 = meta2.unique
+	# Match check_locked_relationship: fixed relations only apply when both
+	# characters are unique.
+	if unique1 == null or unique2 == null:
+		return false
+	if worlddata.fixed_relations.has(unique1):
+		if worlddata.fixed_relations[unique1].has(unique2):
+			for rec in worlddata.fixed_relations[unique1][unique2]:
+				if globals.valuecheck(rec.condition):
+					if data.status != rec.status:
+						data.status = rec.status
+						data.value = variables.relationship_base[data.status]
+					return true
+	if worlddata.fixed_relations.has(unique2):
+		if worlddata.fixed_relations[unique2].has(unique1):
+			for rec in worlddata.fixed_relations[unique2][unique1]:
+				if globals.valuecheck(rec.condition):
+					if data.status != rec.status:
+						data.status = rec.status
+						data.value = variables.relationship_base[data.status]
+					return true
+	return false
+
+
+func _add_daily_relationship_value(char1, char2, value, key, cache):
+	if char1 == char2 or !cache.has(char1) or !cache.has(char2):
+		return
+	var meta1 = cache[char1]
+	var meta2 = cache[char2]
+	if meta1.master or meta2.master:
+		return
+
+	var data
+	if relationship_data.has(key):
+		data = relationship_data[key]
+		if data.status in ['friends', 'lovers', 'freelovers'] and value < 0:
+			value *= 0.5
+	else:
+		data = {value = variables.relationship_base.default, status = 'acquaintances'}
+		relationship_data[key] = data
+
+	if _check_daily_locked_relationship(char1, char2, key, meta1, meta2):
+		return
+	data.value = clamp(data.value + value, 0, 100)
+	update_relationship_status(data, char1, char2)
+
+
+func _daily_relationship_change_same_loc(char1, char2, cache):
+	var meta1 = cache[char1]
+	var meta2 = cache[char2]
+	if meta1.master or meta2.master:
+		return
+	var key = _get_key(char1, char2)
+	if !relationship_data.has(key):
+		_add_daily_relationship_value(char1, char2, 0, key, cache)
+	var base_value = relationship_data[key].value
+	var positive_weight = 66
+	var negative_weight = 33
+
+	if base_value >= 50:
+		if base_value > 65:
+			negative_weight = 1
+		else:
+			negative_weight = 33 - int(32 * (base_value - 50) / 15)
+	elif base_value < 50:
+		if base_value < 35:
+			positive_weight = 1
+		else:
+			positive_weight = 66 - int(65 * (50 - base_value) / 15)
+
+	# Same random roll as weightedrandom(), without allocating two temporary
+	# arrays for every character pair.
+	var positive = positive_weight >= rand_range(0, positive_weight + negative_weight)
+	var value = int(rand_range(3, 7)) if positive else int(rand_range(-3, -7))
+	_add_daily_relationship_value(char1, char2, value, key, cache)
+
+
+func _advance_daily_relationships(managed = false):
+	if managed: #always return a coroutine to the managed caller
+		yield(globals.get_tree(), 'idle_frame')
+	var cache = _build_daily_relationship_cache()
+	var cleanup = []
+	var slice = OS.get_ticks_msec()
+	for key in relationship_data.keys():
+		var chars = key.split("_")
+		if chars.size() < 2 or !cache.has(chars[0]) or !cache.has(chars[1]):
+			cleanup.push_back(key)
+		else:
+			var meta1 = cache[chars[0]]
+			var meta2 = cache[chars[1]]
+			if !_daily_relationships_in_same_location(meta1, meta2):
+				var value = 0
+				if relationship_data[key].value > 51:
+					value = -4
+				elif relationship_data[key].value < 50:
+					value = 4
+				_add_daily_relationship_value(chars[0], chars[1], value, key, cache)
+		if managed and OS.get_ticks_msec() - slice >= variables.turn_frame_budget_msec:
+			yield(globals.get_tree(), 'idle_frame')
+			slice = OS.get_ticks_msec()
+	for key in cleanup:
+		relationship_data.erase(key)
+
+	for i in range(character_order.size() - 1):
+		var char1 = character_order[i]
+		if !cache.has(char1) or cache[char1].master:
+			continue
+		for j in range(i + 1, character_order.size()):
+			var char2 = character_order[j]
+			if cache.has(char2) and _daily_relationships_in_same_location(cache[char1], cache[char2]):
+				_daily_relationship_change_same_loc(char1, char2, cache)
+			if managed and OS.get_ticks_msec() - slice >= variables.turn_frame_budget_msec:
+				yield(globals.get_tree(), 'idle_frame')
+				slice = OS.get_ticks_msec()
+
+
 func relation_daily_change_same_loc(char1, char2):
 	if characters[char1].is_master(): 
 		return 
@@ -312,6 +463,20 @@ func check_lover_possibility(data, char1, char2):
 	return endvalue
 
 
+#Which status changes reach the estate's activity log, and what colour the status word is given
+#there. They all share one log entry type, so the colour is the only thing telling a new friendship
+#from a new feud - see the "relationship" entry in EVENT_CONFIG (MansionLogModule.gd).
+#Sliding back to 'acquaintances' is deliberately absent: a rivalry sits at value <= 25 and lapses
+#the moment it ticks to 26, so logging that pair would let one wavering couple flood the log.
+const RELATIONSHIP_LOG_TYPE = "relationship"
+const RELATIONSHIP_LOG = {
+	friends = "#8fd3f4",
+	lovers = "#f08fb4",
+	freelovers = "#f08fb4",
+	rivals = "#e0625f",
+}
+
+
 func change_relationship_status(char1, char2, new_status, forced = false):
 	if check_locked_relationship(char1, char2):
 		return
@@ -328,17 +493,26 @@ func change_relationship_status(char1, char2, new_status, forced = false):
 	
 	if babies.has(char1) or babies.has(char2):
 		return
-	if new_status in ['friends', 'rivals'] and f:
+	if RELATIONSHIP_LOG.has(new_status) and f:
 		var ch1 = characters[char1]
 		var ch2 = characters[char2]
-		var log_text = tr("LOG_RELATIONSHIP_STATUS") % [ch1.get_short_name(), ch2.get_short_name(), tr("RELATIONSHIP" + new_status.to_upper()).to_lower()]
-		globals.text_log_add('char', log_text)
+		var status_word = "[color=%s]%s[/color]" % [
+			RELATIONSHIP_LOG[new_status],
+			tr("RELATIONSHIP" + new_status.to_upper()).to_lower(),
+		]
+		var log_text = tr("LOG_RELATIONSHIP_STATUS") % [ch1.get_short_name(), ch2.get_short_name(), status_word]
+		globals.mansion_activity_log_add(RELATIONSHIP_LOG_TYPE, log_text)
 #		globals.manifest(log_text, ch1)
 
 func check_relationship_status(char1, char2, status):
-	if characters[char1].is_master():
+	#chars may be already moved out of the party (i.e. removed slave), so no direct dict access here
+	var ch_1 = characters_pool.get_char_by_id(char1)
+	var ch_2 = characters_pool.get_char_by_id(char2)
+	if ch_1 == null or ch_2 == null:
 		return false
-	if characters[char2].is_master():
+	if ch_1.is_master():
+		return false
+	if ch_2.is_master():
 		return false
 	var key = _get_key(char1, char2)
 	if !relationship_data.has(key):
@@ -447,12 +621,10 @@ func advance_day(managed = false):
 		if managed and OS.get_ticks_msec() - slice >= variables.turn_frame_budget_msec:
 			yield(globals.get_tree(), 'idle_frame')
 			slice = OS.get_ticks_msec()
-	relationship_decay()
-	for i in range(character_order.size() - 1):
-		if characters[character_order[i]].is_master() == true:
-			continue
-		for j in range(i + 1, character_order.size()):
-			if _in_same_location(character_order[i],character_order[j]): relation_daily_change_same_loc(character_order[i],character_order[j])
+	if managed:
+		yield(_advance_daily_relationships(true), 'completed')
+	else:
+		_advance_daily_relationships()
 
 func serialize_base(): #everything but the characters, shared with globals._serialize_party_chunked
 	var res = inst2dict(self).duplicate(true)
@@ -491,6 +663,10 @@ func fix_serialization_postload():
 		babies[p].fix_serialization_postload()
 	for p in characters_pool.characters:
 		characters_pool.characters[p].fix_serialization_postload()
+	#the household is real from here on, so the repairs game_res.fix_serialization() attempted
+	#with nobody to work on - housing the bedless, moving the old farm hands onto farms - get
+	#their turn now. Both are idempotent, so a save that needed neither pays only the walk.
+	ResourceScripts.game_res.ensure_mansion_layout()
 	check_masters_story_fame(false)#better leave it here till game finished, as story conditions may vary
 
 
@@ -524,12 +700,16 @@ func add_slave(person, child = false):
 	person.training.acquired_turn = ResourceScripts.game_globals.get_turn()
 	globals.text_log_add("char","New character acquired: " + person.get_short_name() + ". ")
 	globals.emit_signal("slave_added")
+	#a new arrival takes a free bed on their own - nobody should have to place them by
+	#hand before the turn will run
+	ResourceScripts.game_res.autohouse_character(person)
 	gui_controller.nav_panel.build_accessible_locations()
 	for prof in person.get_professions():
 		input_handler.achievements.try_add_prof_achimnt(prof)
 
 
 func remove_slave(tempslave, permanent = false):
+	if !has_char(tempslave.id): return #already removed, i.e. a scene effect firing after the char was let go
 	check_breakdown_on_char_loss(tempslave)#not sure, if it should be done only on permanent=true
 	if !tempslave.is_unavaliable():
 		tempslave.remove_from_travel()
@@ -539,6 +719,9 @@ func remove_slave(tempslave, permanent = false):
 	tempslave.clear_enthrall()
 	tempslave.process_event(variables.TR_REMOVE)
 	characters_pool.move_to_pool(tempslave.id)
+	#out of the household means out of the bed: every way of leaving that funnels through here
+	#- sold, released, given away, banished - used to leave the room holding their id
+	ResourceScripts.game_res.unhouse_character(tempslave.id)
 	tempslave.is_players_character = false
 	if permanent: 
 		clear_relations(tempslave.id)
@@ -567,10 +750,29 @@ func get_weekly_tax():
 	return tax
 
 
-func subtract_taxes():
-	var tax = get_weekly_tax()
-#	ResourceScripts.game_res.money -= int (3 * tax / 100)#old math
-	ResourceScripts.game_res.money -= tax
+#The household's share of the week's bill, one record per person the estate actually pays for.
+#The same walk as get_weekly_tax() above with the names kept - that one stays as the cheap total
+#the clock tooltip and the character card ask for several times a frame, and it stays the only
+#place that decides whether somebody is paid for at all, so the two can never name a different
+#roster. The parts behind the sum cost a second calculate_price() per servant, once a week.
+#
+#Biggest charge first: this is read as a bill, and the line worth acting on is the top one.
+#Folded into the ledger, and from there into the log, by game_res.collect_weekly_expenses().
+func collect_weekly_upkeep():
+	var records = []
+	for ch in characters.values():
+		var amount = ch.get_weekly_tax()
+		if amount <= 0:
+			continue
+		records.append({amount = amount, key = "MANSION_ACTIVITY_UPKEEP_CHARACTER",
+			values = [ch.get_short_name(), amount, ch.get_upkeep(), ch.get_value_upkeep()]})
+	records.sort_custom(self, "_sort_by_expense")
+	return records
+
+
+func _sort_by_expense(a, b):
+	return a.amount > b.amount
+
 
 #arguable here
 func update_global_cooldowns():
@@ -579,9 +781,22 @@ func update_global_cooldowns():
 		if global_skills_used[i] <= 0:
 			global_skills_used.erase(i)
 
+#A save being loaded drops the dictionaries straight out of the file into characters and only
+#turns them back into characters later, in fix_serialization(). game_res.fix_serialization()
+#runs before that one and emits 'update_clock'/'rooms_changed' on the way, and globals.LoadGame()
+#yields a frame between the two - so the clock, which survives the load, gets to read the party
+#while it is still a pile of dictionaries. The conversion pass never yields, so either everybody
+#is a character or nobody is: the first entry answers for the whole roster.
+func is_deserialized():
+	for i in characters.values():
+		return i is Object
+	return true
+
+
 #food items the party is expected to get through in a day, assuming everyone keeps
 #eating their current first choice
 func get_food_consumption():
+	if !is_deserialized(): return 0 #a save is still being unpacked
 	var counter = 0.0
 	for i in characters.values():
 		for food in i.predict_food().values():
@@ -591,6 +806,7 @@ func get_food_consumption():
 
 func predict_char_event():
 	var res = 1000
+	if !is_deserialized(): return res
 	for i in characters.values():
 		var tmp = i.predict_preg_time()
 		if tmp != null and tmp < res:
@@ -676,6 +892,7 @@ func get_characters_for_task(tsk):
 #per food item, keyed by item code
 func calculate_food_consumption():
 	var res = {}
+	if !is_deserialized(): return res
 	for i in characters.values():
 		var tmp = i.predict_food()
 		for food in tmp:
@@ -698,7 +915,7 @@ func get_farm():
 		if !person.is_active:
 			farming_slots[slot] = null
 			continue
-		if person.get_work() != 'farming':
+		if !ResourceScripts.game_res.is_farming_work(person.get_work()):
 			farming_slots[slot] = null
 			continue
 	return farming_slots

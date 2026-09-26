@@ -60,6 +60,7 @@ func deserialize(savedict):
 
 func fix_serialize():
 	.fix_serialize()
+	_repair_core_trait_effects()
 	if !(statlist.speed is Array):
 		statlist.speed = [statlist.speed]
 	for tr in traits_stored.duplicate():
@@ -78,6 +79,28 @@ func fix_serialize():
 		else:
 			professions.erase(prof)
 	generate_data(variables.DYN_STATS_FULL, true)
+
+
+func _repair_core_trait_effects():
+	if !traits_stored.has('core_trait'):
+		return
+	var person = parent.get_ref()
+	if person == null:
+		return
+	var present = {}
+	for effect_record in effects_stored:
+		if effect_record is Dictionary and effect_record.has('id'):
+			present[effect_record.id] = true
+	for effect in effects_pool.get_effects_for_char(person.id, true):
+		if effect.template_id != null:
+			present[effect.template_id] = true
+	for effect_id in Traitdata.traits.core_trait.effects:
+		if present.has(effect_id):
+			continue
+		if !Effectdata.effect_table.has(effect_id):
+			print("core trait effect %s is missing from effect data" % effect_id)
+			continue
+		add_stored_effect(effect_id)
 
 
 #dyn_bonuses
@@ -102,8 +125,16 @@ func generate_data(stop_at = variables.DYN_STATS_FULL, forced = false):
 	#stored effects_duplicating
 	effects_real = effects_stored.duplicate()
 	effects_temp_real.clear()
-	for stack in effects_temp_stored:
-		effects_temp_real[stack] = effects_pool.clone_stack(effects_temp_stored[stack])
+	#Where a dangling stack id is finally dropped. Storing the failed clone would have put a null
+	#into effects_temp_real, and everything below reads that dictionary unguarded - add_eff_to_stack,
+	#process_effects_expand, has_status, clear_nonstored_effs all called straight into it.
+	for stack in effects_temp_stored.keys():
+		var clone = effects_pool.clone_stack(effects_temp_stored[stack])
+		if clone == null:
+			print("stack %s of %s is gone from the pool and was dropped" % [effects_temp_stored[stack], stack])
+			effects_temp_stored.erase(stack)
+			continue
+		effects_temp_real[stack] = clone
 	effects_temp_globals_real = effects_temp_globals.duplicate()
 	
 	var race = parent.get_ref().get_stat('race')
@@ -556,6 +587,17 @@ func fix_stat_data(stat, data):
 			if !data.bonuses.has('add'):
 				data.bonuses.add = []
 			data.bonuses.add.push_back({value = min(get_stat('growth_factor') - 1, get_prof_number()) * 5, src_type = 'factor', src_value = 'growth', timestamp = 0})
+			#A household that eats together works better, wherever on the estate the work is
+			#done. A part added rather than points: points were worth less to somebody who had
+			#already earned bonuses of their own, and a tenth more work should be a tenth for
+			#everybody. 'add_part' is this stat's own channel (statdata.productivity) and one of
+			#the few the combiner applies by default - 'mul2' is not, and did nothing at all.
+			#Counted from the room the way the bath and the master bed are: it is a fact
+			#about the estate, not about the person.
+			if stat == 'productivity' and ResourceScripts.game_res.has_room_with_tag('dining'):
+				if !data.bonuses.has('add_part'):
+					data.bonuses.add_part = []
+				data.bonuses.add_part.push_back({value = 0.1, src_type = 'room', src_value = 'dining_room', timestamp = 0})
 		'speed':
 			if !data.bonuses.has('add'):
 				data.bonuses.add = []
@@ -585,14 +627,27 @@ func fix_stat_data(stat, data):
 				data.bonuses.add = []
 			data.base_value = variables.basic_max_mp + variables.max_mp_per_magic_factor * get_stat('magic_factor')
 			data.bonuses.add.push_back({value = min(get_stat('growth_factor') - 1, get_prof_number()) * 5, src_type = 'factor', src_value = 'growth', timestamp = 0})
+		'hp_reg':
+			#company in the master's own bed, one step of health per bedmate
+			if parent.get_ref().is_master():
+				if !data.bonuses.has('add'):
+					data.bonuses.add = []
+				data.bonuses.add.push_back({value = ResourceScripts.game_res.master_bed_partners(), src_type = 'room', src_value = 'master_bedroom', timestamp = 0})
 		'mp_reg':
 			if !data.bonuses.has('add'):
 				data.bonuses.add = []
 			data.bonuses.add.push_back({value = get_stat('magic_factor') * variables.mp_regen_per_magic, src_type = 'factor', src_value = 'magic', timestamp = 0})
-			if ResourceScripts.game_res.upgrades.has('resting') and ResourceScripts.game_res.upgrades.resting > 0:
-				if !data.bonuses.has('mul2'):
-					data.bonuses.mul2 = []
-				data.bonuses.mul2.push_back({value = 1.2, src_type = 'upgrade', src_value = 'resting', timestamp = 0})
+			#company in the master's own bed. Counted here rather than through an effect
+			#because it is a fact about the room, not about him - see master_bed_partners().
+			if parent.get_ref().is_master():
+				data.bonuses.add.push_back({value = ResourceScripts.game_res.master_bed_partners() * 0.5, src_type = 'room', src_value = 'master_bedroom', timestamp = 0})
+			#The master's bath, a fifth faster. On 'mul', which this stat's combiner applies: it was
+			#pushed onto 'mul2', which mp_reg's order does not include (its custom_order is commented
+			#out in statdata), so the bath's mana bonus never reached anybody.
+			if ResourceScripts.game_res.has_bath():
+				if !data.bonuses.has('mul'):
+					data.bonuses.mul = []
+				data.bonuses.mul.push_back({value = 1.2, src_type = 'upgrade', src_value = 'private_bath', timestamp = 0})
 		'upgrade_points_total':
 			data.base_value = get_stat('growth_factor') * variables.body_upgrade_points_per_growth_factor
 #		'lustmax':
@@ -615,6 +670,16 @@ func fix_stat_data(stat, data):
 			if !data.bonuses.has('add'):
 				data.bonuses.add = []
 			data.bonuses.add.push_back({value = -get_used_mastery_points('magic'), src_type = 'used', src_value = '', timestamp = 0})
+		#fame tier bonuses
+		'manhunt', 'trainer_loyalty_bonus':
+			var fame_key = 'manhunt_bonus'
+			if stat == 'trainer_loyalty_bonus':
+				fame_key = 'loyalty_bonus'
+			var fame_value = parent.get_ref().get_fame_bonus(fame_key)
+			if fame_value != 0:
+				if !data.bonuses.has('add'):
+					data.bonuses.add = []
+				data.bonuses.add.push_back({value = fame_value, src_type = 'fame', src_value = parent.get_ref().get_stat('fame'), timestamp = 0})
 
 
 #setters
@@ -903,7 +968,10 @@ func roll_growth(diff):
 	set_default_value('growth_factor', tmp)
 
 
-func generate_random_character_from_data(desired_class = null, adjust_difficulty = 0, guaranteed_classes = []):
+#factor_cap is the ceiling this character's factors are cut to once every random step is done -
+#the dungeon tiers in variables.dungeon_factor_caps pass one in. It lands before the classes are
+#handed out on purpose: a captive capped at 4 physics cannot then roll paladin, which asks for 5.
+func generate_random_character_from_data(desired_class = null, adjust_difficulty = 0, guaranteed_classes = [], factor_cap = variables.maximum_factor_value):
 	roll_growth(adjust_difficulty)
 	
 	var slaveclass = desired_class
@@ -931,11 +999,15 @@ func generate_random_character_from_data(desired_class = null, adjust_difficulty
 			statlist[array] += globals.rng.randi_range(-1, 1)
 		difficulty -= 1
 		bonus_counter += 1
-	for st in ['physics_factor', 'magic_factor', 'wits_factor','sexuals_factor', 'charm_factor', 'tame_factor', 'authority_factor']:
-		if statlist[st] < 1:
-			statlist[st] = 1
-		if statlist[st] > 6:
-			statlist[st] = 6
+	#int(), because min() hands back a float and these stats are stored as whole numbers
+	var factor_ceiling = int(min(factor_cap, variables.maximum_factor_value))
+	#growth_factor rides along although no bonus touched it: roll_growth() can hand out a 6 on its
+	#own, and a capped dungeon that still yields 6 growth reads as a broken cap to the player.
+	for st in ['physics_factor', 'magic_factor', 'wits_factor','sexuals_factor', 'charm_factor', 'tame_factor', 'authority_factor', 'growth_factor']:
+		if statlist[st] < variables.minimum_factor_value:
+			statlist[st] = variables.minimum_factor_value
+		if statlist[st] > factor_ceiling:
+			statlist[st] = factor_ceiling
 	
 	#assign classes
 	while classcounter > 0:
@@ -1099,6 +1171,16 @@ func get_used_mastery_points(category):
 	return res
 
 
+#Stats that decide a contest between two fighters rather than add to one of them.
+#The hit roll is accuracy minus evasion and the turn order is speed against speed,
+#so the monster rate does not make these bigger, it makes the contest one-sided:
+#the difference outruns anything a character can reach, the hit roll pins to its
+#5% floor and the enemy simply moves first every round. Speed is not in the depth
+#multiplier's lists at all, so nothing bounds it from the other side.
+#Granted at the player rate; every other passive keeps the monster one.
+const MASTERY_STATS_AT_PLAYER_RATE = ['hitrate', 'evasion', 'speed']
+
+
 func _add_mastery_as_bonuses(category, lv, mul = 2.5):
 	if lv <= 0:
 		return
@@ -1107,7 +1189,10 @@ func _add_mastery_as_bonuses(category, lv, mul = 2.5):
 	var mas_data = Skilldata.masteries[category]
 	for i in range(lv):
 		for stat in mas_data.passive:
-			process_bonus_record(stat, mas_data.passive[stat] * mul, 'innate', category, 0) 
+			var stat_mul = mul
+			if stat in MASTERY_STATS_AT_PLAYER_RATE:
+				stat_mul = 1.0
+			process_bonus_record(stat, mas_data.passive[stat] * stat_mul, 'innate', category, 0)
 		if i < mas_data.maxlevel:
 			var lvdata = mas_data['level%d' % (i + 1)]
 			for trait in lvdata.traits:

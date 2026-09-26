@@ -68,10 +68,28 @@ func has_wed_achimnt(unique_name):
 	return achi_name != null and has_achimnt(achi_name)
 
 func try_add_upgrade_achimnt(upgrade_id):
+	#The upgrade tree is retired and its list is empty; an old save or an old effect can still
+	#name a code, and indexing the list on one brought the game down rather than simply
+	#finding no achievement to award.
+	if !upgradedata.upgradelist.has(upgrade_id):
+		return
 	var level = ResourceScripts.game_res.findupgradelevel(upgrade_id)
 	var data = upgradedata.upgradelist[upgrade_id]
 	if data.has("levels") and data.levels.has(level) and data.levels[level].has("achievement"):
 		try_add_achimnt(data.levels[level].achievement)
+
+#The workshop achievements, asked of the mansion rather than of the retired upgrade tree.
+#Every entry naming a 'room' is checked at once rather than one being looked up by the upgrade
+#that finished: the caller has a build record, an upgrade code is offered by more than one kind
+#of room, and the estate may hold several of that kind - so the code alone does not say which
+#room to ask about. Four rooms with two rows each is nothing to walk.
+func check_room_achimnts():
+	for achi_name in data.achievements:
+		var achi = data.achievements[achi_name]
+		if !achi.has("room") or has_achimnt(achi_name):
+			continue
+		if ResourceScripts.game_res.has_fully_upgraded_room(achi.room):
+			try_add_achimnt(achi_name)
 
 func try_add_dungeon_achimnt(dungeon_id):
 	if DungeonData.dungeons.has(dungeon_id) and DungeonData.dungeons[dungeon_id].has("achievement"):
@@ -265,13 +283,17 @@ func prep_talent_points():
 func prep_master_factor_points():
 	ResourceScripts.game_progress.master_starting_factor_bonus = 4
 
+#The three workshops, standing. This used to buy a level of each of the forge, tailor and
+#alchemy upgrades - the tree those belonged to is gone, and the rooms are what replaced them.
 func prep_craftsman():
-	ResourceScripts.game_res.level_up_upgrade("forge", 1)
-	ResourceScripts.game_res.level_up_upgrade("tailor", 1)
-	ResourceScripts.game_res.level_up_upgrade("alchemy", 1)
+	for room in ['forge', 'tailor_workshop', 'alchemy_room']:
+		ResourceScripts.game_res.grant_room(room)
 
+#used to buy the first level of the 'rooms' upgrade. That upgrade was six abstract places;
+#this is the room those places were standing in for, built and ready to be moved about.
 func prep_rooms():
-	ResourceScripts.game_res.level_up_upgrade("rooms", 1)
+	ResourceScripts.game_res.ensure_mansion_layout()
+	ResourceScripts.game_res.build_starting_bedroom()
 
 func prep_literate():
 	var character = ResourceScripts.game_party.get_master()

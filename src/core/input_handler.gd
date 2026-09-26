@@ -3,6 +3,8 @@ extends Node
 #This script handles inputs, sounds, closes windows and plays animation
 #warning-ignore-all:unused_signal
 #warning-ignore-all:return_value_discarded
+const BuildValidator = preload("res://src/core/build_validator.gd")
+
 var file = File.new()
 var dir = Directory.new()
 
@@ -47,6 +49,10 @@ signal fighter_changed
 signal clear_cashed
 signal SpellUsed
 signal animatedbackground_changed
+#one of the doll options changed; a doll on screen re-reads them
+signal doll_settings_changed
+#the player put an item on a character; a doll showing them may pull a face at it
+signal character_item_equipped(character, item)
 
 #animations queue
 signal animation_finished
@@ -69,6 +75,7 @@ var exploration_node
 var active_character
 var scene_characters = []
 var scene_loot
+var scene_bonus_materials = {} #materials a subroom was generated holding, merged into scene_loot once
 var active_area
 var selected_area
 var active_location
@@ -142,6 +149,7 @@ enum {
 	NODE_HARD_TUTORIAL_PANEL,
 	NODE_HARD_TUTORIAL_LIST,
 	NODE_ACHI_UNLOCK,
+	NODE_NUMBERSELECT,
 	#Animations
 	ANIM_TASK_AQUARED,
 	ANIM_BATTLE_START,
@@ -152,9 +160,10 @@ enum {
 	ANIM_TASK_COMPLETED,
 	ANIM_LOOT,
 	ANIM_SKILL_UNLOCKED,
-	ANIM_GROWTHF,
 	ANIM_MASTER_POINT,
 	ANIM_ITEM_FLIGHT,
+	ANIM_FACTOR_UPGRADE,
+	NODE_RACETOOLTIP,
 } #, NODE_TWEEN, NODE_REPEATTWEEN}
 
 
@@ -177,7 +186,15 @@ var globalsettings = {
 	show_full_consent = false,
 	disable_paperdoll = false,
 	no_damage_shake = false,
-	no_item_flight = false,
+	#combat animations and delays play four times faster; damage numbers keep their pace
+	fast_combat = false,
+	item_flight_animation = false,
+	#the frame counter in the corner, off unless it is asked for
+	fps_meter = false,
+	#the doll breathes on its own unless it is asked not to, and a heavily
+	#pregnant character darkens - both on by default, both only about the doll
+	doll_idle_animation = true,
+	darker_pregnancy_nipples = true,
 
 	textspeed = 60,
 	skipread = false,
@@ -231,6 +248,9 @@ var progress_data = {
 	achi_bonuses = [],
 	achi_points = 0,
 	seen_skills = [],
+	cheat_password = "", # password entered by the player, unlocks cheats on every save
+	supporter_prompt_dismissed = false, # player pressed "Don't show again" on the main menu notice
+	ngplus_unlocked = false, # cheat menu opened New Game+ without the act1 achievement
 	update_check_consent = null # null = not asked yet, true/false = player's answer
 } setget save_progress_data
 
@@ -291,7 +311,7 @@ func load_progress_data():
 		parse_result = JSON.parse(text).result
 		for key in parse_result:
 			var value = parse_result[key]
-			if progress_data.has(key) and progress_data[key] is int:
+			if progress_data[key] is int:
 				value = int(value)
 			progress_data[key] = value
 #		progress_data = parse_result.result
@@ -325,6 +345,12 @@ func update_progress_data(field, value):
 			return
 	elif field == 'achi_points':
 		progress_data[field] += value
+	elif typeof(progress_data[field]) == TYPE_STRING:
+		if typeof(value) != TYPE_STRING:
+			return
+		if progress_data[field] == value:
+			return
+		progress_data[field] = value
 	else:
 		if typeof(value) != TYPE_STRING:
 			return
@@ -341,6 +367,35 @@ func store_progress():
 	text = JSON.print(progress_data)
 	file.store_string(text)
 	file.close()
+
+func cheats_unlocked():
+	return progress_data.cheat_password == BuildValidator.CHECKSUM
+
+
+#stores the checksum if the password is correct, returns whether cheats are unlocked now
+func try_cheat_password(text):
+	if BuildValidator.validate(text):
+		unlock_cheats()
+	return cheats_unlocked()
+
+
+func unlock_cheats():
+	update_progress_data('cheat_password', BuildValidator.CHECKSUM)
+
+
+#New Game+ normally waits on the act1 achievement; this is the cheat menu's way past it.
+#The password is asked for again on every read, so a hand-edited progress file cannot turn
+#the flag on by itself, and revoking the code takes the bonus panel back with it.
+func ngplus_cheat_active():
+	return cheats_unlocked() and progress_data.ngplus_unlocked
+
+
+#update_progress_data only knows how to append to lists and replace strings, so the flag is
+#written the way supporter_prompt_dismissed is - straight into the dictionary, then stored.
+func unlock_ngplus():
+	progress_data.ngplus_unlocked = true
+	store_progress()
+
 
 func is_unique_sprite_unlocked(chara, sprite):
 	return progress_data['unique_sprites'].has(chara) and progress_data['unique_sprites'][chara].has(sprite)
@@ -410,6 +465,19 @@ func _ready():
 	connect("animation_finished", self, "animation_queue_start_force")
 	achievements = load("res://src/core/achievements.gd").new()
 	achievements.prepare_data()
+	start_anim_autopilot()
+
+
+#Scripted animation run, only when --anim-plan is on the command line. See
+#src/combat/anim_autopilot.gd; does nothing in a normal launch.
+func start_anim_autopilot():
+	var script = load("res://src/combat/anim_autopilot.gd")
+	var path = script.plan_path()
+	if path == null: return
+	var pilot = script.new()
+	pilot.name = 'anim_autopilot'
+	add_child(pilot)
+	pilot.setup(path)
 
 
 func gather_skills_effects():
@@ -427,8 +495,22 @@ func gather_skills_effects():
 			Effectdata.stacks[id] = tlib.stacks[id].duplicate(true)
 
 
+#CurrentScene keeps pointing at a screen that is already out of the tree while one
+#screen is being swapped for another, and get_focus_owner() errors out on a node
+#that is not in a tree. Nothing has focus at that point anyway.
+func text_field_focused():
+	if CurrentScene == null or !is_instance_valid(CurrentScene):
+		return false
+	if !(CurrentScene is Control) or !CurrentScene.is_inside_tree():
+		return false
+	var focused = CurrentScene.get_focus_owner()
+	return focused is LineEdit or focused is TextEdit
+
 #func _unhandled_input(event):
 func _input(event):
+	#the options panel is waiting for a key to bind - let it through untouched
+	if hotkeys.capturing:
+		return
 	#a turn is processed across several frames now, so gameplay input has to stay out until
 	#it finishes. gui_disable_input only covers Control input - ESC (menu -> save/load) and
 	#the dialogue number keys arrive here, and would otherwise run against a half-ticked party
@@ -441,44 +523,54 @@ func _input(event):
 			if event.is_action_pressed("ESC") and hard_tutorial.can_open_menu():
 				hard_tutorial.tutorial_menu()
 			pass_event = event is InputEventMouseMotion
-			if event.is_action_released("RMB"):
+			if event.is_action("RMB"):
+				#The whole gesture, not only its end. Nodes that close on a right click do it
+				#from their own _input, which runs ahead of this one, so passing the release
+				#alone was enough for them - but a context menu is opened from gui_input, and
+				#the GUI is only dispatched after this. Swallowed here, a step that teaches
+				#right clicking a portrait could never show the menu it is about.
 				if hard_tutorial.is_RMB_pass():
 					pass_event = true
-					#this is not right, as such signal should be emited per action, not event passing
-					#but for now it will do
-					hard_tutorial.emit_signal("close_by_RMB")
+					if event.is_action_released("RMB"):
+						#this is not right, as such signal should be emited per action, not event passing
+						#but for now it will do
+						hard_tutorial.emit_signal("close_by_RMB")
 			elif event.is_action("LMB"):
 				var action
 				if event.is_pressed(): action = "pressed"
 				else: action = "released"
+				var banned = false
 				for btn_name in hard_tutorial.active_btns:
 					hard_tutorial.validate_btn(btn_name)
 					if hard_tutorial.get_true_rect(btn_name).has_point(event.position):
+						#a barred button wins over every other rect covering the same point -
+						#it is usually inside one of them, which is the whole reason it is
+						#named
+						if hard_tutorial.is_btn_banned(btn_name):
+							banned = true
 						pass_event = pass_event or hard_tutorial.is_action_pass(btn_name, action)
+				if banned:
+					pass_event = false
 		if !pass_event:
 			get_tree().set_input_as_handled()
 			return
 	if event.is_echo() == true && !event.is_action_type():
 		return
+	#rebindable keys (quicksave, mansion categories, combat skills, ...) all go through the
+	#hotkeys singleton, which picks the handler by the active context. Runs ahead of the
+	#current_screen guard so the global ones still work outside a loaded game
+	if hotkeys.dispatch(event):
+		get_tree().set_input_as_handled()
+		return
 	if gui_controller.current_screen == null:
 		return
 	for action in ['ui_accept', 'ui_left', 'ui_right']:
-		if event.is_action(action) and !(CurrentScene.get_focus_owner() is LineEdit or CurrentScene.get_focus_owner() is TextEdit):
+		if event.is_action(action) and !text_field_focused():
 			get_tree().set_input_as_handled()
 	for action in ['ui_cancel', 'ui_up', 'ui_down']:
 		if event.is_action(action):
 			get_tree().set_input_as_handled()
-	if event.is_action_released("F1") \
-		&& gui_controller.current_screen == gui_controller.mansion:
-		if gui_controller.mansion_tutorial_panel == null || !gui_controller.mansion_tutorial_panel.is_visible():
-			gui_controller.mansion.show_tutorial()
-		else:
-			gui_controller.mansion_tutorial_panel.hide()
-	if event.is_action_released("F9"):
-		OS.window_fullscreen = !OS.window_fullscreen
-		input_handler.globalsettings.fullscreen = OS.window_fullscreen
-		if input_handler.globalsettings.fullscreen == false:
-			OS.window_position = Vector2(0,0)
+	#ESC/RMB are not rebindable - they are the generic 'close whatever is on top'
 	if (event.is_action_pressed("ESC") || event.is_action_released("RMB")):
 #		get_tree().get_root().print_tree_pretty()
 		for i in get_tree().get_nodes_in_group("disable_rmb_esc"):
@@ -493,12 +585,9 @@ func _input(event):
 				continue
 		if ignore_rightclick == false:
 			if gui_controller.windows_opened.size() > 0:
+				#close_top_window() asks for the screen sweep itself now, so the panel's own X
+				#button reaches the same refresh this path always had
 				gui_controller.close_top_window()
-				for subscene in gui_controller.current_screen.get_children():
-					if subscene.get_class() == "Tween":
-						continue
-					if subscene.has_method('update'):#stub
-						subscene.update()
 				return
 			else:
 				match gui_controller.current_screen:
@@ -515,9 +604,6 @@ func _input(event):
 							gui_controller.mansion.mansion_state_set("default")
 						gui_controller.clock.raise()
 					gui_controller.inventory:
-						if gui_controller.inventory.list_mode == "tattoo":
-							gui_controller.inventory.change_list_mode()
-							return
 						gui_controller.inventory.hide()
 						gui_controller.current_screen = gui_controller.previous_screen
 						if gui_controller.previous_screen == gui_controller.slavepanel:
@@ -558,17 +644,15 @@ func _input(event):
 					gui_controller.clock.show()
 		gui_controller.update_modules()
 #	if !text_field_input:
-	if  CurrentScene is Control and !(CurrentScene.get_focus_owner() is LineEdit or CurrentScene.get_focus_owner() is TextEdit):
+	#dialogue options are positional ("the Nth answer"), not commands, so they stay on the
+	#plain number row instead of going through the rebindable hotkey table
+	if CurrentScene is Control and !text_field_focused():
 		if str(event.as_text().replace("Kp ",'')) in str(range(1,9)):
 			var num = event.as_text().replace("Kp ",'')
 #			var tnode = get_tree().get_root().get_node_or_null("dialogue")
 			var tnode = gui_controller.dialogue
 			if tnode != null and tnode.visible:
 				tnode.select_option(int(num) - 1)
-			else:
-				if gui_controller.clock != null and gui_controller.clock.is_visible_in_tree():
-					if str(int(event.as_text())) in str(range(1,4)) && !event.is_pressed():
-						gui_controller.clock.hotkey_pressed(int(num))
 
 	if mass_select_client != null:
 		if (mass_select_client.get_ref() == null
@@ -668,13 +752,37 @@ func Open(node):
 	ResourceScripts.core_animations.OpenAnimation(node)
 	CloseableWindowsArray.append(node)
 
-func ChangeScene(name):
-	ResourceScripts.core_animations.BlackScreenTransition(0.3)
+func ShowLoadScreen():
 	CloseableWindowsArray.clear()
 	dialogue_array.clear()
+	#the dialogue node is destroyed by the swap and will never call event_finished(), so the
+	#flag has to be dropped here or nothing ever drains the queue again
+	event_is_active = false
+	active_event_code = ''
 	var loadscreen = load(ResourceScripts.scenedict.loadscreen).instance()
 	get_tree().get_root().add_child(loadscreen)
 	CurrentScene = loadscreen
+	return loadscreen
+
+
+func ShowLoadScreenWithTransition(duration = 0.3):
+	# Swap screens at the opaque midpoint. Adding LoadScreen immediately after the old
+	# BlackScreenTransition() put it above the black overlay and made the fade invisible.
+	var blackscreen = load(ResourceScripts.scenedict.black).instance()
+	var root = get_tree().get_root()
+	root.add_child(blackscreen)
+	yield(ResourceScripts.core_animations.UnfadeAnimation(blackscreen, duration), "completed")
+	var loadscreen = ShowLoadScreen()
+	loadscreen.prepare_loading(0)
+	root.move_child(blackscreen, root.get_child_count() - 1)
+	ResourceScripts.core_animations.FadeAnimation(blackscreen, duration)
+	yield(get_tree().create_timer(duration + 0.05), "timeout")
+	blackscreen.queue_free()
+	return loadscreen
+
+
+func ChangeScene(name):
+	var loadscreen = yield(ShowLoadScreenWithTransition(0.3), "completed")
 	loadscreen.goto_scene(ResourceScripts.scenedict[name])
 
 func GetTweenNode(node): #not compartible with get_spec_node due to not linking new node to root
@@ -958,6 +1066,10 @@ func open_shell(string):
 			path = 'https://strive4power.itch.io/strive-conquest'
 		'Patreon':
 			path = 'https://www.patreon.com/maverik'
+		'PatreonCode':
+			path = 'https://www.patreon.com/posts/new-password-18830450'
+		'SubscribestarCode':
+			path = "https://subscribestar.adult/posts/1394420"
 		'Discord':
 			path = "https://discord.gg/VXSx9Zk"
 		'Wiki':
@@ -1035,6 +1147,7 @@ func calculate_number_from_string_array(arr, caster, target):
 
 var dialogue_array = []
 var event_is_active = false
+var active_event_code = '' #scene code currently on screen, '' for direct-type scenes
 
 
 func interactive_message(code, type = '', args = {}):
@@ -1046,7 +1159,17 @@ func interactive_message_follow(code, type, args): #not safe
 
 func event_finished():
 	event_is_active = false
+	active_event_code = ''
 	start_event_attempt()
+
+#true while the scene is either on screen or still waiting its turn in dialogue_array
+func event_awaiting_display(code):
+	if event_is_active and active_event_code == code:
+		return true
+	for i in dialogue_array:
+		if typeof(i.code) == TYPE_STRING and i.code == code:
+			return true
+	return false
 
 func start_event_attempt():
 	if gui_controller.clock != null:
@@ -1068,10 +1191,24 @@ func start_event(code, type, args):
 	var data
 	if type == 'direct':
 		data = code
+		active_event_code = ''
 	else:
+		#last line of defence for a code nothing answers to. The callers that queue events now
+		#drop such codes themselves, but reaching the lookup below with one used to abort this
+		#function and leave event_is_active set, which stops every later event from opening.
+		#start_event_attempt() is deliberately not re-entered here - it has not struck this
+		#entry off dialogue_array yet, so calling it would pick the same code straight back up
+		if !scenedata.scenedict.has(code):
+			print("event requested with no scene for code: " + str(code))
+			event_is_active = false
+			active_event_code = ''
+			return
 		data = scenedata.scenedict[code].duplicate(true)
+		active_event_code = code
 		if !ResourceScripts.game_progress.seen_events.has(code):
 			ResourceScripts.game_progress.seen_events.push_back(code)
+		if args.has('timed_event'):
+			ResourceScripts.game_progress.consume_timed_event(code)
 		if args.has('start_dialogue_option'):
 			data.start_dialogue_option = args.start_dialogue_option
 	#it seems to be a good idea, to set scene_characters and active_character here
@@ -1124,6 +1261,9 @@ func start_event(code, type, args):
 			active_character = args.pregchar
 			active_character.set_stat('metrics_birth', active_character.get_stat('metrics_birth') + 1)
 			var baby = ResourceScripts.game_party.babies[active_character.get_stat('pregnancy_baby')]
+			#select_tutelage checks scene_characters[0] and sends everyone in the list to the course
+			#picked, so nobody left over from an earlier scene may stand in front of the baby
+			scene_characters.clear()
 			scene_characters.append(baby)
 		'event_selection':
 			data.location = active_location
@@ -1215,7 +1355,10 @@ func repeat_social_skill():
 
 func update_slave_list():
 	slave_list_node.update()
-	gui_controller.mansion.SlaveModule.show_slave_info()
+	if gui_controller.mansion.has_method("update_legacy_slave_panel"):
+		gui_controller.mansion.update_legacy_slave_panel()
+	else:
+		gui_controller.mansion.SlaveModule.show_slave_info()
 
 func rebuild_slave_list():
 	slave_list_node.rebuild()
@@ -1259,9 +1402,43 @@ func text_form_recitation(string_array):
 
 	return text
 
+#set while a _ready builds something that talks back: the root takes no children mid-_ready
+var defer_spec_node_mount = false
+var deferred_spec_nodes = {}
+var spec_node_layers = {}
+
+
+#A window that has to clear the mansion's room card needs a canvas layer of its own: the card
+#sits on layer 3 (mansion_view.tscn's Overlay) and in Godot 3 the layer number beats tree order
+#outright, so raise() among the root's children can never lift a window past it. An entry in
+#node_data asks for one with 'layer'; the layer becomes the window's parent rather than a node
+#inside its scene, because a CanvasLayer has no visibility of its own in this engine - hung
+#inside the window it would leave show() and hide() controlling nothing.
+func get_spec_node_parent(type):
+	var root = get_tree().get_root()
+	var data = ResourceScripts.node_data[type]
+	if !data.has('layer'):
+		return root
+	var holder_name = data.name + '_layer'
+	var holder = root.get_node_or_null(holder_name)
+	#The holder is asked for again before it is in the tree whenever the mount is deferred.
+	if holder == null and is_instance_valid(spec_node_layers.get(holder_name)):
+		holder = spec_node_layers[holder_name]
+	if holder == null:
+		holder = CanvasLayer.new()
+		holder.name = holder_name
+		spec_node_layers[holder_name] = holder
+		if defer_spec_node_mount:
+			root.call_deferred("add_child", holder)
+		else:
+			root.add_child(holder)
+	holder.layer = data.layer
+	return holder
+
+
 func get_spec_node(type, args = null, raise = true, unhide = true):
 	var window
-	var node = get_tree().get_root()
+	var node = get_spec_node_parent(type)
 	for n in modding_core.gui_nodes:
 		if n.name == ResourceScripts.node_data[type].name and !ResourceScripts.node_data[type].has('no_return'):
 			window = n
@@ -1272,6 +1449,8 @@ func get_spec_node(type, args = null, raise = true, unhide = true):
 	if node.has_node(ResourceScripts.node_data[type].name) and !ResourceScripts.node_data[type].has('no_return'):
 		window = node.get_node(ResourceScripts.node_data[type].name)
 		#node.remove_child(window)
+	elif window == null and is_instance_valid(deferred_spec_nodes.get(ResourceScripts.node_data[type].name)):
+		window = deferred_spec_nodes[ResourceScripts.node_data[type].name]
 	elif window == null:
 		match ResourceScripts.node_data[type].mode:
 			'scene':
@@ -1280,7 +1459,11 @@ func get_spec_node(type, args = null, raise = true, unhide = true):
 			'node':
 				window = ResourceScripts.node_data[type].node.new()
 		window.name = ResourceScripts.node_data[type].name
-		node.add_child(window) #adding more than one sysmessages at one frame causes error here
+		if defer_spec_node_mount:
+			deferred_spec_nodes[window.name] = window
+			node.call_deferred("add_child", window)
+		else:
+			node.add_child(window) #adding more than one sysmessages at one frame causes error here
 	if raise: 
 #		print(window.name)
 		window.raise()
@@ -1324,13 +1507,16 @@ func finish_quest_location(args):
 
 func mark_quest_location_completed(args):
 	var questdata = ResourceScripts.game_world.get_quest_by_id(args.id)
+	if questdata == null:
+		return
 	for req in questdata.requirements:
 		if req.code == 'complete_location':
 			req.completed = true
 
 func autocomplete_quest(q_id):
 	var questdata = ResourceScripts.game_world.get_quest_by_id(q_id)
-	if questdata == null or questdata.state == 'failed':#was forfit
+	#a cleared location outlives its quest now, so a second fight in it must not pay again
+	if questdata == null or questdata.state != 'taken':
 		return
 	selectedquest = questdata
 	play_animation("repeatable_quest_completed")
@@ -1357,20 +1543,7 @@ func combat_defeat():
 		gui_controller.exploration_dungeon.update_map()
 
 func character_boss_defeat():
-	var character_race = []
-	var character_class = []
-	var difficulty
-	if active_location.affiliation == 'local':
-		character_race.append([weightedrandom(active_area.races), 1])
-	if active_location.has("final_enemy_class"):
-		for i in active_location.final_enemy_class:
-			character_class.append([i, 1])
-
-	character_race = weightedrandom(character_race)
-	character_class = weightedrandom(character_class)
-	difficulty = variables.power_adjustments_per_difficulty[active_location.difficulty]
-	difficulty = rand_range(difficulty[0], difficulty[1])
-	interactive_message('character_boss_defeat', 'character_event', {characterdata = {type = 'raw',race = character_race, class = character_class, difficulty = difficulty, slave_type = 'slave'}})
+	interactive_message('character_boss_defeat', 'character_event', {})
 
 func loadimage(path, type = ""):
 	#var file = File.new()
@@ -1402,6 +1575,63 @@ func load_image_from_path(path:String):
 	var prew = ImageTexture.new()
 	prew.create_from_image(temp)
 	return prew
+
+
+#generated portraits live outside res://, so every reader used to hit the disk and decode
+#the png again - lists ask for one per character per rebuild. Keyed by path rather than by
+#character, so a hand picked or story portrait simply looks up a different entry
+var portrait_cache = {}
+
+
+func store_portrait(path:String, image:Image): #hands the fresh shot over without a disk round trip
+	var tex = ImageTexture.new()
+	tex.create_from_image(image)
+	portrait_cache[path] = tex
+	return tex
+
+
+func get_portrait(path:String):
+	if portrait_cache.has(path):
+		return portrait_cache[path]
+	var tex = load_image_from_path(path)
+	if tex != null:
+		portrait_cache[path] = tex
+	return tex
+
+
+func clear_portrait_cache(): #the files behind these paths belong to the session that wrote them
+	portrait_cache.clear()
+
+
+var portrait_booth = null
+
+
+#Forwarded from the booth: a character's picture has been taken, so a screen
+#showing them can ask for the icon again.  Screens listen here rather than to
+#the booth, which does not exist until the first portrait is asked for.
+signal portrait_taken(id)
+
+
+func queue_portrait(person): #generate a portrait for someone whose ragdoll nobody opened
+	if person == null or globalsettings.disable_paperdoll: #dolls switched off: nothing to photograph
+		return
+	if portrait_booth == null:
+		portrait_booth = load("res://src/core/portrait_booth.gd").new()
+		portrait_booth.name = "PortraitBooth"
+		add_child(portrait_booth)
+		portrait_booth.connect('portrait_taken', self, '_on_portrait_taken')
+	portrait_booth.enqueue(person)
+
+
+func _on_portrait_taken(id):
+	emit_signal('portrait_taken', id)
+
+
+func reshoot_portrait(person): #their look changed while the doll was open
+	if person == null or globalsettings.disable_paperdoll:
+		return
+	queue_portrait(person) #builds the booth if this is the first one
+	portrait_booth.reshoot(person)
 
 func load_sound_from_path(path:String): #not sure if works, needs testing
 	if !(path.is_abs_path() or path.is_rel_path()): return null
@@ -1470,9 +1700,6 @@ func dir_contents(target):
 		var file_name = dir.get_next()
 		while file_name != "":
 			if !dir.current_is_dir():
-				if file_name.ends_with('.remap'):
-					file_name = dir.get_next()
-					continue
 				array.append(target + "/" + file_name)
 			elif !file_name in ['.','..', null] && dir.current_is_dir():
 				array += dir_contents(target + "/" + file_name)
@@ -1689,15 +1916,34 @@ func play_animation_noq(animation, args = {}):
 			anim_scene.get_node("Label2").text = masdata.name
 			anim_scene.get_node("Label3").text = args.person.get_full_name()
 			anim_scene.play("class_achieved")
+		"body_upgrade": #(person, upgrade or icon + name, title) - a body rite performed in the ritual room
+			var rite_icon = args.get('icon')
+			var rite_name = args.get('name')
+			if !args.has('icon'):
+				rite_icon = Traitdata.body_upgrades[args.upgrade].icon
+				rite_name = Traitdata.body_upgrades[args.upgrade].name
+			anim_scene = get_spec_node(ANIM_CLASS_ACHIEVED)
+			if rite_icon is String:
+				anim_scene.get_node("TextureRect").texture = load(rite_icon)
+			else:
+				anim_scene.get_node("TextureRect").texture = rite_icon
+			anim_scene.get_node("Label").text = tr(args.get('title', "BODYRITE_ANIM_TITLE"))
+			anim_scene.get_node("Label2").text = tr(rite_name)
+			anim_scene.get_node("Label3").text = args.person.get_full_name()
+			anim_scene.play("class_achieved")
 		"quest_completed":
 			anim_scene = get_spec_node(ANIM_TASK_COMPLETED)
 			anim_scene.get_node("Label3").text = args.name
 			anim_scene.play("task_completed")
 		"repeatable_quest_completed":
 			anim_scene = get_spec_node(ANIM_TASK_COMPLETED)
-			var name =  tr(selectedquest.name)
-			if selectedquest.has("source"):
-				name += " (" + tr(worlddata.factiondata[selectedquest.source].name) + ")"
+			#the caller passes the quest where it has one; an error here would stall the queue for good
+			var quest = args.get('quest', selectedquest)
+			var name = ''
+			if quest != null:
+				name = tr(quest.name)
+				if quest.has("source") and worlddata.factiondata.has(quest.source):
+					name += " (" + tr(worlddata.factiondata[quest.source].name) + ")"
 			anim_scene.get_node("Label3").text = name
 			anim_scene.play("task_completed")
 		"skill_unlocked":
@@ -1706,20 +1952,9 @@ func play_animation_noq(animation, args = {}):
 			anim_scene.get_node("Label2").text = tr("SKILL" + args["skill"].code.to_upper())
 			anim_scene.get_node("Label3").text = args.person.get_full_name()
 			anim_scene.play("Ability_unlocked")
-		"factor":
-			anim_scene = get_spec_node(ANIM_GROWTHF)
-			anim_scene.get_node("TextureRect5").texture = args.character.get_icon()
-			anim_scene.get_node('Label').text = args.character.get_short_name()
-			var value = int(args.character.get_stat(args.stat))
-			anim_scene.get_node('Label2').text = "%s: %s" % [tr(statdata.statdata[args.stat].name), ResourceScripts.descriptions.factor_descripts[value]]
-			for i in range(1, 6):
-				anim_scene.get_node('fill%d' % i).visible = (i < value)
-			anim_scene.get_node("TextureRect6").rect_position.x += (value - 1) * 57
-			anim_scene.get_node("TextureRect4").rect_position.x += (value - 1) * 57
-			anim_scene.get_node("TextureRect7").rect_position.x += (value - 1) * 57
-#			anim_scene.get_node("Label2").text = tr("SKILL" + args["skill"].code.to_upper())
-#			anim_scene.get_node("Label3").text = args.person.get_full_name()
-			anim_scene.play("Animation_growth_factor")
+		"factor_upgrade": #(character, raised = [{code, from, to}], area)
+			anim_scene = get_spec_node(ANIM_FACTOR_UPGRADE)
+			anim_scene.play_upgrade(args.character, args.raised, args.get('area'))
 		"master_points":
 			anim_scene = get_spec_node(ANIM_MASTER_POINT)
 			if args.has("sound"):
@@ -1761,11 +1996,15 @@ const PADDINGS = 40
 #		new_font.size = new_size
 #	return new_font
 
-func font_size_adjust(node):
-	var new_font = font_size_calculator(node)
+func font_size_adjust(node, padding = PADDINGS):
+	var new_font = font_size_calculator(node, padding)
 	node.set("custom_fonts/font", new_font)
 
-func font_size_calculator(label): #, text, font):
+#`padding` is how much of the label's width is not available to the text. The
+#default suits the wide buttons this was written for; a narrow label has to pass
+#its own, or the default would eat more room than the label has and shrink the
+#text away to nothing.
+func font_size_calculator(label, padding = PADDINGS): #, text, font):
 	var font = label.get_font("font")
 	var new_font = DynamicFont.new()
 	new_font.use_filter = true
@@ -1774,7 +2013,11 @@ func font_size_calculator(label): #, text, font):
 		new_font.add_fallback(font.get_fallback(i))
 	new_font.size = font.get_size()
 	var text_width = new_font.get_string_size(label.get_text()).x
-	var label_text_width = label.get_size().x - PADDINGS
+	var label_text_width = label.get_size().x - padding
+	#nothing to fit into - leave the size alone rather than divide by zero or
+	#hand back a font of size 0
+	if label_text_width <= 0 or text_width <= 0:
+		return new_font
 	var diff = text_width / label_text_width
 	if text_width >= label_text_width:
 		var old_size = new_font.get_size()
@@ -1831,9 +2074,12 @@ func if_translation_key(text:String):
 	return ntext != text
 
 
-func upgrade_unlocked(upgrade):
-	if upgrade.code == 'exotic_trader':
-		ResourceScripts.game_world.areas.plains.factions.exotic_slave_trader.slavelevel = ResourceScripts.game_res.upgrades.exotic_trader*2+1
+#Nothing unlocks upgrades any more - the tree is gone. This stays as the signal's landing
+#place because the connection is made in _ready(); the one thing it used to do, raising the
+#exotic trader's stock, never worked: it wrote a 'slavelevel' onto the faction, while the
+#generator reads the one on each hireable_characters entry (world_gen.rebuild_guild_slaves).
+func upgrade_unlocked(_upgrade):
+	pass
 
 func print_order():
 	print("{")
@@ -1896,6 +2142,36 @@ func array_replace(arr, from, to):
 	for i in range(arr.size()):
 		if arr[i] == from:
 			arr[i] = to
+
+
+#set_disable_input is one global bool, so nested holders released it early and, worse, a
+#holder that waits across a yield dies together with its node and never releases it at all -
+#leaving the game deaf to mouse and keyboard. Counted here, on a singleton nothing can free.
+var input_lock_count = 0
+
+
+func lock_input():
+	input_lock_count += 1
+	get_tree().get_root().set_disable_input(true)
+
+
+func unlock_input():
+	input_lock_count = max(input_lock_count - 1, 0)
+	if input_lock_count == 0:
+		get_tree().get_root().set_disable_input(false)
+
+
+#the timer belongs to the tree, so the release happens even if the caller is gone by then
+func lock_input_briefly(duration = 0.15):
+	lock_input()
+	yield(get_tree().create_timer(duration), "timeout")
+	unlock_input()
+
+
+func reset_input_lock():
+	input_lock_count = 0
+	if get_tree() != null:
+		get_tree().get_root().set_disable_input(false)
 
 
 func _reset_mouse_events(): #stub, not, STUB - for set_disable_input is bugged
@@ -2042,90 +2318,3 @@ func is_btn_exists(btn_name):
 	return (hard_tutorial_btns.has(btn_name)
 			and hard_tutorial_btns[btn_name].source.get_ref()
 			and is_instance_valid(hard_tutorial_btns[btn_name].source.get_ref()))
-
-
-#web os methods. mb put them into separate autoload
-signal read_completed
-
-var js_callback_progress = JavaScript.create_callback(self, 'load_handler_progress');
-var js_callback_save = JavaScript.create_callback(self, 'load_handler_save');
-var js_interface;
-
-func _define_js()->void:
-	#Define JS script
-	JavaScript.eval("""
-	var _HTML5FileExchange = {};
-	_HTML5FileExchange.upload = function(gd_callback) {
-		canceled = true;
-		var input = document.createElement('INPUT'); 
-		input.setAttribute("type", "file");
-		input.click();
-		input.addEventListener('change', async (event) => {
-			if (event.target.files.length > 0){
-				canceled = false;}
-			const file = event.target.files[0];
-			const reader = new FileReader();
-			reader.readAsText(file); 
-			reader.onloadend = (e) => {
-				if (e.target.readyState == FileReader.DONE){
-					this.result = e.target.result;
-					gd_callback(e.target.result);
-				}
-			}
-		});
-	}
-	""", true)
-
-
-func load_external_progress():
-	if OS.get_name() != "HTML5" or !OS.has_feature('JavaScript'):
-		return
-	
-	_define_js()
-	js_interface = JavaScript.get_interface("_HTML5FileExchange")
-	js_interface.upload(js_callback_progress);
-	
-	yield(self, "read_completed")
-	SystemMessage(tr("MENUIMPORTPROGRESSCOMPLETED"))
-
-
-func load_external_save():
-	if OS.get_name() != "HTML5" or !OS.has_feature('JavaScript'):
-		return
-	
-	_define_js()
-	js_interface = JavaScript.get_interface("_HTML5FileExchange")
-	js_interface.upload(js_callback_save);
-
-
-func load_handler_progress(_args):
-	var fileType = js_interface.fileType;
-	var fileData = JSON.parse(_args[0])
-	if fileData.error != OK:
-		print ("wrong file format")
-		return
-	var parse_result = fileData.result
-	for key in parse_result:
-		var value = parse_result[key]
-		if progress_data.has(key) and progress_data[key] is int:
-			value = int(value)
-		progress_data[key] = value
-	emit_signal('read_completed')
-
-
-func load_handler_save(_args):
-	var fileType = js_interface.fileType;
-	var fileData = _args[0]
-	globals.LoadGame(fileData, true)
-
-
-func Download_File(_path, _filename):
-	if OS.get_name() != "HTML5" or !OS.has_feature('JavaScript'):
-		return
-	var f = File.new()
-	f.open(_path, File.READ)
-	var buf = f.get_buffer(f.get_len())
-	JavaScript.download_buffer(buf, _filename)
-	f.close()
-
-

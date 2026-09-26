@@ -44,7 +44,6 @@ func _ready():
 #	$LocationGui/ItemUsePanel/SpellsButton.connect("pressed", self, "switch_panel", ["spells"])
 	$LocationGui/ItemUsePanel/ItemsButton.pressed = true
 	$LocationGui/Resources/SelectWorkers.connect("pressed", self, "select_workers")
-	$LocationGui/Resources/Forget.connect("pressed", self, "forget_location")
 	return_all_btn.connect("pressed", self, "return_all_to_mansion")
 	$TestButton.connect("pressed", self, "test")
 	$TestButton.visible = gui_controller.mansion.in_test_mode
@@ -80,6 +79,8 @@ func _ready():
 	input_handler.register_btn_source('location_reju_btn', cast_panel, 'tut_get_reju_btn')
 	$LocationGui/AvailableSlaves.tut_register_first_recruit()
 	$LocationGui/AvailableSlaves.tut_register_first_char()
+	$LocationGui/AvailableSlaves.tut_register_first_handover()
+	$LocationGui/AvailableSlaves.tut_register_first_handover_quest()
 	$LocationGui/NavigationModule.tut_register_mansion_btn()
 	
 	add_child(animations)
@@ -167,7 +168,6 @@ func open_location(data):
 #	nav = $LocationGui/NavigationModule
 	selected_location = data.id
 	var gatherable_resources
-	$LocationGui/Resources/Forget.visible = false
 	gui_controller.clock.hide()
 	if data.has('gather_resources'):
 		gatherable_resources = data.gather_resources
@@ -201,15 +201,10 @@ func open_location(data):
 		open_location_actions()
 	build_location_description()
 #	if data.type in ["quest_location", "encounter"]:
-	if input_handler.active_area.questlocations.has(selected_location):#or active_area.encounters.has(selected_location):
-		$LocationGui/Resources/Forget.visible = false
-#		$LocationGui/Resources/SelectWorkers.visible = false
-#		$LocationGui/Resources/Label.visible = false
-	else:
+	if !input_handler.active_area.questlocations.has(selected_location):#or active_area.encounters.has(selected_location):
 		$LocationGui/Resources/Label.visible = true
 	if data.has("locked"):
 		if data.locked:
-			$LocationGui/Resources/Forget.visible = false
 			$LocationGui/Resources/SelectWorkers.visible = false
 			$LocationGui/Resources/Label.visible = true
 	gui_controller.nav_panel.build_accessible_locations()
@@ -226,11 +221,34 @@ func build_location_description():
 			pass
 		'quest_location':
 			text = tr(active_location.name) #+ "\n" + active_location.descript
+	if active_location.get('cleared', false):
+		if text != '':
+			text += " - "
+		text += "{color=aqua|" + tr("LOC_ABANDONED" if active_location.get('abandoned', false) \
+			else "LOC_CLEARED") + "}"
 	$LocationGui/DungeonInfo/RichTextLabel.bbcode_text = (
 		'[center]'
 		+ globals.TextEncoder(text)
 		+ "[/center]"
 	)
+	update_cleared_badge()
+
+
+#A bbcode segment cannot carry a tooltip of its own, so the explanation hangs on the badge beside
+#the header - and on the header itself, which is a node.
+func update_cleared_badge():
+	var cleared = active_location.get('cleared', false)
+	var nodes = [$LocationGui/DungeonInfo.get_node_or_null('cleared'),
+		$LocationGui/DungeonInfo/RichTextLabel]
+	for node in nodes:
+		if node == null:
+			continue
+		if node.name == 'cleared':
+			node.visible = cleared
+		if cleared:
+			globals.connecttexttooltip(node, globals.get_location_cleared_tooltip(active_location))
+		else:
+			globals.disconnect_text_tooltip(node)
 
 
 func slave_position_selected(pos, character):
@@ -454,24 +472,7 @@ func StartCombat():
 	globals.StartCombat()
 
 
-var action_type
 var active_skill
-
-
-func forget_location():
-	input_handler.get_spec_node(
-		input_handler.NODE_YESNOPANEL,
-		[
-			self,
-			'clear_dungeon_confirm',
-			tr("FORGETLOCATIONQUESTION")
-		]
-	)
-
-
-func clear_dungeon_confirm():
-	globals.remove_location(active_location.id)
-	action_type = 'location_finish'
 
 
 func build_location_group():
@@ -576,6 +577,7 @@ func build_location_group():
 		if active_location.group.values().has(i.id):
 			newbutton.get_node("icon").modulate = Color(0.3, 0.3, 0.3)
 		globals.connectslavetooltip(newbutton, i)
+		setup_levelup_indicator(newbutton, i)
 		for anim_num in range(planed_animations.size()-1, -1, -1):
 			var animation = planed_animations[anim_num]
 			if animation.person_id == i.id:
@@ -588,6 +590,32 @@ func build_location_group():
 		return
 	build_item_panel()
 #	build_spell_panel()
+
+
+#A traveler with enough experience banked for the next class carries the same green cross the
+#mansion card shows, and out here the cross is also the way back to that character's leveling window.
+func setup_levelup_indicator(button, person):
+	var indicator = button.get_node("LevelUpIndicator")
+	indicator.visible = person.get_stat('base_exp') >= person.get_next_class_exp()
+	if !indicator.visible:
+		return
+	globals.connecttexttooltip(indicator, tr("BTNLEVELING"))
+	indicator.connect("pressed", self, "open_levelup_menu", [person])
+	set_levelup_indicator_clickable(button, !is_in_use_state())
+
+
+#The leveling window belongs to the mansion screen, so the journey home has to finish before it can
+#be opened - return_to_mansion ends on close_all_closeable_windows, which would shut it again. It
+#only yields when there is a journey to make, hence the guard.
+func open_levelup_menu(person):
+	if gui_controller.current_screen != gui_controller.mansion:
+		yield(nav.return_to_mansion(), "completed")
+	if gui_controller.mansion == null:
+		return
+	var popup = gui_controller.mansion.get_node_or_null("CharacterProgressionPopup")
+	if popup == null:
+		return
+	popup.open(person)
 
 
 func add_rolled_chars(tarr):
@@ -746,6 +774,11 @@ func open_location_actions():
 	if active_location == null:
 		return
 	input_handler.ClearContainer($LocationGui/DungeonInfo/ScrollContainer/VBoxContainer)
+	#The story is done with a cleared place, and its options outliving it would let the player
+	#play the same scene again - several encounters have options with no requirements at all and
+	#were only ever guarded by the location disappearing on the spot.
+	if active_location.get('cleared', false):
+		return
 	var newbutton
 	var option_list = []
 	if active_location.has("locked"):
@@ -794,21 +827,24 @@ func check_events(action):
 
 func open_shop(pressed, pressed_button, shop):
 	var shop_data = {}
+	var shop_key = '' #buyback is kept per shop
 	match shop:
 		'area':
 			if input_handler.active_area and input_handler.active_area.has('shop'):
 				shop_data = input_handler.active_area.shop
+				shop_key = input_handler.active_area.code
 		'location':
 			if pressed and active_location and active_location.has('shop'):
 				shop_data = active_location.shop
+				shop_key = active_location.id
 		_:
 			shop_data = shop
-	$AreaShop.open_shop(pressed, pressed_button, shop_data)
+	$AreaShop.open_shop(pressed, pressed_button, shop_data, shop_key)
 
 
 func local_shop(pressed, button):
 	if active_location and active_location.has('shop'):
-		$AreaShop.open_shop(pressed, button, active_location.shop)
+		$AreaShop.open_shop(pressed, button, active_location.shop, active_location.id)
 
 func update_gold():
 	$AreaShop.update_gold()
@@ -964,6 +1000,15 @@ func highlight_spelltar_chars_true(value, char_id = null):
 			continue
 		if !value or char_id == null or (node.dragdata != null and node.dragdata.id == char_id):
 			node.get_node("mark").visible = value
+		#while an item or a spell is being aimed the whole card is the target, so the level-up
+		#cross has to let that click through instead of answering it
+		set_levelup_indicator_clickable(node, !value)
+
+
+func set_levelup_indicator_clickable(button, clickable):
+	button.get_node("LevelUpIndicator").mouse_filter = (
+		Control.MOUSE_FILTER_STOP if clickable else Control.MOUSE_FILTER_IGNORE
+	)
 
 func animate(target_node, skill, dedicated_sfx = false):
 	sfx_is_dedicated = sfx_is_dedicated or dedicated_sfx

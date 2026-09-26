@@ -15,6 +15,7 @@ var repeats = 1
 var cap_low = 1
 var cap_up = 999
 var num_select_expanded = false
+var craft_indefinitely = false
 
 var cancelentry
 var partdict
@@ -36,6 +37,8 @@ func _ready():
 	$NumberSelect2/VBoxContainer/HBoxContainer1/pt3/b3.connect('pressed', self, 'number_change', [1])
 	$NumberSelect2/VBoxContainer/HBoxContainer1/pt3/b4.connect('pressed', self, 'number_change', [10])
 	$NumberSelect2/VBoxContainer/AdvOption/HBoxContainer/TextureButton.connect('pressed', self, 'toggle_num_select_mode')
+	$NumberSelect2/VBoxContainer/AdvOption/HBoxContainer/InfinityToggle.connect('pressed', self, 'toggle_indefinite_craft')
+	globals.connecttexttooltip($NumberSelect2/VBoxContainer/AdvOption/HBoxContainer/InfinityToggle, tr("CRAFTINDEFINITETOOLTIP"))
 	$NumberSelect2/VBoxContainer/HBoxContainer2/pt1/b1.connect('pressed', self, 'cap_up_change', [-10])
 	$NumberSelect2/VBoxContainer/HBoxContainer2/pt1/b2.connect('pressed', self, 'cap_up_change', [-1])
 	$NumberSelect2/VBoxContainer/HBoxContainer2/pt3/b3.connect('pressed', self, 'cap_up_change', [1])
@@ -44,6 +47,12 @@ func _ready():
 	$NumberSelect2/VBoxContainer/HBoxContainer3/pt1/b2.connect('pressed', self, 'cap_low_change', [-1])
 	$NumberSelect2/VBoxContainer/HBoxContainer3/pt3/b3.connect('pressed', self, 'cap_low_change', [1])
 	$NumberSelect2/VBoxContainer/HBoxContainer3/pt3/b4.connect('pressed', self, 'cap_low_change', [10])
+	$NumberSelect2/VBoxContainer/HBoxContainer1/pt2/Amount.connect('text_entered', self, 'number_text_entered', ['repeat'])
+	$NumberSelect2/VBoxContainer/HBoxContainer1/pt2/Amount.connect('focus_exited', self, 'number_text_focus_exited', ['repeat'])
+	$NumberSelect2/VBoxContainer/HBoxContainer2/pt2/Amount.connect('text_entered', self, 'number_text_entered', ['cap_up'])
+	$NumberSelect2/VBoxContainer/HBoxContainer2/pt2/Amount.connect('focus_exited', self, 'number_text_focus_exited', ['cap_up'])
+	$NumberSelect2/VBoxContainer/HBoxContainer3/pt2/Amount.connect('text_entered', self, 'number_text_entered', ['cap_low'])
+	$NumberSelect2/VBoxContainer/HBoxContainer3/pt2/Amount.connect('focus_exited', self, 'number_text_focus_exited', ['cap_low'])
 	$NumberSelect2/VBoxContainer/Button.connect('pressed', self, 'confirm_craft')
 	$NumberSelect2/VBoxContainer/Button2.connect('pressed', self, 'confirm_craft_edit')
 	for i in $categories.get_children():
@@ -61,14 +70,24 @@ func _ready():
 	input_handler.register_btn_source('craft_matfilter_button', self, 'tut_get_mat_filter_btn')
 	input_handler.register_btn_source('steel_button', self, 'tut_get_steel_btn')
 	input_handler.register_btn_source('bread_delete', self, 'tut_get_bread_delete_btn')
+	input_handler.register_btn_source('meatsoup_button', self, 'tut_get_meatsoup_btn')
+	input_handler.register_btn_source('meatsoup_delete', self, 'tut_get_meatsoup_delete_btn')
 
 
 func tut_get_bread_btn():
 	return tut_get_recipe_btn("bread")
+func tut_get_meatsoup_btn():
+	return tut_get_recipe_btn("meatsoup")
 func tut_get_steel_btn():
 	return tut_get_recipe_btn("steel")
+#Placing an order tears the recipe list down and builds it again (select_category ->
+#rebuild_recipe_list), and ClearContainer only hides the old rows - they are not actually gone
+#until the end of the frame. Without skipping them this handed the tutorial a row that was
+#about to disappear, and the step it belonged to could never be finished.
 func tut_get_recipe_btn(recipe):
 	for btn in $CraftSelect/ScrollContainer/VBoxContainer.get_children():
+		if btn.is_queued_for_deletion() or !btn.visible:
+			continue
 		if btn.get_meta('item', {code = ""}).code == recipe:
 			return btn
 func tut_get_confirm_btn():
@@ -79,18 +98,31 @@ func tut_get_confirm2_btn():
 	return $NumberSelect2/VBoxContainer/Button
 func tut_get_back_btn():
 	return $CraftSelect/BackButton
+#A category the estate cannot do yet is hidden, and a hidden button in a container has
+#collapsed onto its neighbour - handing one back drew the tutorial's frame around whatever now
+#sits in that spot instead. Answering null makes the step say plainly that its button is not
+#there, which is what actually happened when the craft rooms moved onto the mansion plan.
 func tut_get_smith_cat_btn():
-	return $categories/smith
+	return $categories/smith if $categories/smith.visible else null
 func tut_get_cooking_cat_btn():
-	return $categories/cooking
+	return $categories/cooking if $categories/cooking.visible else null
 func tut_get_mat_filter_btn():
 	return $filter/materials
 func tut_get_bread_delete_btn():
+	return tut_get_queue_delete_btn("bread")
+func tut_get_meatsoup_delete_btn():
+	return tut_get_queue_delete_btn("meatsoup")
+#The bin on whichever queued order makes this recipe. The queue is rebuilt on every change,
+#so the row is found by what it is for rather than by where it sits in the list.
+func tut_get_queue_delete_btn(recipe):
 	for btn in $CraftSchedule/ScrollContainer/VBoxContainer.get_children():
+		#the queue is rebuilt the same way the recipe list is - see tut_get_recipe_btn
+		if btn.is_queued_for_deletion() or !btn.visible:
+			continue
 		var selected_craft = btn.get_meta("selected_craft", "")
 		if !selected_craft.empty():
 			var pdata = ResourceScripts.game_res.tasks_progresses[selected_craft]
-			if pdata.id == "bread":
+			if pdata.id == recipe:
 				return btn.get_node("DeleteButton")
 
 func set_filter(type):
@@ -102,9 +134,11 @@ func set_filter(type):
 
 var craftcategories = {
 	cooking = {reqs = []},
-	tailor = {reqs = [{type = "has_upgrade", name = 'tailor', value = 1}]},
-	alchemy = {reqs = [{type = "has_upgrade", name = 'alchemy', value = 1}]},
-	smith = {reqs = [{type = "has_upgrade", name = 'forge', value = 1}]},
+	tailor = {reqs = [{type = "has_craft_room", name = 'tailor_workshop', value = 1}]},
+	alchemy = {reqs = [{type = "has_craft_room", name = 'alchemy_room', value = 1}]},
+	smith = {reqs = [{type = "has_craft_room", name = 'forge', value = 1}]},
+	#enchanting needs somewhere to do it: the ritual room, of which the estate has one
+	enchant = {reqs = [{type = "has_mansion_room", name = 'ritual_room'}]},
 }
 
 var filtercategories = {
@@ -275,46 +309,38 @@ func sort_craft_list(first, second):
 
 func rebuild_scheldue():
 	input_handler.ClearContainer($CraftSchedule/ScrollContainer/VBoxContainer)
-	input_handler.ClearContainer($CraftSchedule2/ScrollContainer/VBoxContainer)
-	for i in ResourceScripts.game_res.crafting_lists[craft_category + '_material']:
+	#the craft type's one queue, items and materials together, in the order it is worked
+	var queue = ResourceScripts.game_res.crafting_lists[craft_category]
+	for i in queue:
 		var pdata = ResourceScripts.game_res.tasks_progresses[i]
 		var newnode = input_handler.DuplicateContainerTemplate($CraftSchedule/ScrollContainer/VBoxContainer)
 		var recipe_data = Items.recipes[pdata.id]
-		var item_data = Items.materiallist[recipe_data.resultitem]
-		newnode.get_node("icon").texture = item_data.icon
-		if pdata.has('repeat'):
-			newnode.get_node("Label").text = tr(item_data.name) + ": " +  str(pdata.repeat) 
+		var item_data
+		var in_store
+		if recipe_data.resultitemtype == 'material':
+			item_data = Items.materiallist[recipe_data.resultitem]
+			in_store = ResourceScripts.game_res.materials[recipe_data.resultitem]
 		else:
-			newnode.get_node("Label").text = "%s: %d / %d" % [tr(item_data.name), pdata.cap_up, ResourceScripts.game_res.materials[recipe_data.resultitem]]
-		newnode.connect("pressed", self, 'select_entry', [i])
-		newnode.set_meta("selected_craft", i)
-		newnode.get_node("DeleteButton").connect("pressed",self,'delete_from_queue', [i])
-		newnode.get_node("ProgressBar").visible = true
-		newnode.get_node("progress").visible = false
-		newnode.get_node("ProgressBar").value = pdata.progress
-		newnode.get_node("ProgressBar").max_value = pdata.progress_limit
-		newnode.arraydata = i
-		newnode.parentnodearray = ResourceScripts.game_res.crafting_lists[craft_category + '_material']
-		newnode.target_node = self
-		newnode.target_function = 'rebuild_scheldue'
-	for i in ResourceScripts.game_res.crafting_lists[craft_category + '_item']:
-		var pdata = ResourceScripts.game_res.tasks_progresses[i]
-		var newnode = input_handler.DuplicateContainerTemplate($CraftSchedule2/ScrollContainer/VBoxContainer)
-		var recipe_data = Items.recipes[pdata.id]
-		var item_data = Items.itemlist[recipe_data.resultitem]
+			item_data = Items.itemlist[recipe_data.resultitem]
+			in_store = ResourceScripts.game_res.get_item_amount(recipe_data.resultitem)
 		newnode.get_node("icon").texture = item_data.icon
 		if recipe_data.crafttype == 'modular':
 			newnode.get_node("icon").material = load("res://assets/ItemShader.tres").duplicate()
 		if pdata.has('repeat'):
-			newnode.get_node("Label").text = tr(item_data.name) + ": " +  str(pdata.repeat) 
+			newnode.get_node("Label").text = tr(item_data.name) + ": " + str(pdata.repeat)
+		elif pdata.has('continuous'):
+			newnode.get_node("Label").text = tr(item_data.name) + ": ∞"
 		else:
-			newnode.get_node("Label").text = "%s: %d / %d" % [tr(item_data.name), pdata.cap_up, ResourceScripts.game_res.get_item_amount(recipe_data.resultitem)]
+			newnode.get_node("Label").text = "%s: %d / %d" % [tr(item_data.name), pdata.cap_up, in_store]
 		newnode.connect("pressed", self, 'select_entry', [i])
 		newnode.set_meta("selected_craft", i)
 		newnode.get_node("DeleteButton").connect("pressed",self,'delete_from_queue', [i])
-		newnode.get_node("progress").text = str(floor(pdata.progress)) + "/" + str(pdata.progress_limit)
+		#Written on the row for both kinds. The bar the materials list used to show hangs below its
+		#row, where the next order in the list is drawn over it, and a food recipe's fraction of a
+		#work unit would round away to nothing in whole units - so it is kept to a tenth.
+		newnode.get_node("progress").text = str(stepify(pdata.progress, 0.1)) + "/" + str(pdata.progress_limit)
 		newnode.arraydata = i
-		newnode.parentnodearray = ResourceScripts.game_res.crafting_lists[craft_category + '_item']
+		newnode.parentnodearray = queue
 		newnode.target_node = self
 		newnode.target_function = 'rebuild_scheldue'
 
@@ -332,8 +358,11 @@ func confirm_craft():
 #	$CraftSchedule.show()
 	var amount = {}
 	if num_select_expanded:
-		amount.max = cap_up
-		amount.min = cap_low
+		if craft_indefinitely:
+			amount.continuous = true
+		else:
+			amount.max = cap_up
+			amount.min = cap_low
 	else:
 		amount.fixed = repeats
 	var parts = {}
@@ -353,9 +382,18 @@ func confirm_craft_edit():
 	var pdata = ResourceScripts.game_res.tasks_progresses[cancelentry]
 	if num_select_expanded:
 		pdata.erase('repeat')
-		pdata.cap_up = cap_up
-		pdata.cap_low = cap_low
+		if craft_indefinitely:
+			pdata.erase('cap_up')
+			pdata.erase('cap_low')
+			pdata.continuous = true
+		else:
+			pdata.erase('continuous')
+			pdata.cap_up = cap_up
+			pdata.cap_low = cap_low
 	else:
+		pdata.erase('continuous')
+		pdata.erase('cap_up')
+		pdata.erase('cap_low')
 		pdata.repeat = repeats
 	select_category(craft_category)
 
@@ -731,6 +769,7 @@ func close_number_select():
 func open_number_select():
 	repeats = 1
 	num_select_expanded = false
+	craft_indefinitely = false
 	build_num_select()
 	$NumberSelect2/VBoxContainer/Button2.visible = false
 	$NumberSelect2/VBoxContainer/Button.visible = true
@@ -744,9 +783,21 @@ func open_number_edit():
 	selected_item = Items.recipes[pdata.id]
 	if pdata.has('repeat'):
 		num_select_expanded = false
+		craft_indefinitely = false
 		repeats = pdata.repeat
+	elif pdata.has('continuous'):
+		num_select_expanded = true
+		craft_indefinitely = true
+		repeats = 1
+		var item_data = Items.recipes[pdata.id]
+		if item_data.resultitemtype == 'material':
+			cap_up = ResourceScripts.game_res.materials[item_data.resultitem] + repeats
+		else:
+			cap_up = ResourceScripts.game_res.get_item_amount(item_data.resultitem) + repeats
+		cap_low = 1
 	else:
 		num_select_expanded = true
+		craft_indefinitely = false
 		repeats = 1
 		cap_up = pdata.cap_up
 		cap_low = pdata.cap_low
@@ -777,20 +828,25 @@ func build_num_select():
 		else:
 			$NumberSelect2/VBoxContainer/icon.material = null
 	$NumberSelect2/VBoxContainer/HBoxContainer1/pt2/Amount.text = str(repeats)
-	$NumberSelect2/VBoxContainer/HBoxContainer2/pt2/Amount.text = "%d (%d)" % [cap_up, amount]
-	$NumberSelect2/VBoxContainer/HBoxContainer3/pt2/Amount.text = "%d (%d)" % [cap_low, amount]
+	$NumberSelect2/VBoxContainer/HBoxContainer2/pt2/Amount.text = str(cap_up)
+	$NumberSelect2/VBoxContainer/HBoxContainer3/pt2/Amount.text = str(cap_low)
+	globals.connecttexttooltip($NumberSelect2/VBoxContainer/HBoxContainer2/pt2/Amount, tr("CRAFTINPOSSESSION") + ": " + str(amount))
+	globals.connecttexttooltip($NumberSelect2/VBoxContainer/HBoxContainer3/pt2/Amount, tr("CRAFTINPOSSESSION") + ": " + str(amount))
 	if num_select_expanded:
 		$NumberSelect2/VBoxContainer/AdvOption/HBoxContainer/TextureButton.pressed = true
 		$NumberSelect2/VBoxContainer/label1.visible = false
 		$NumberSelect2/VBoxContainer/HBoxContainer1.visible = false
-		$NumberSelect2/VBoxContainer/label2.visible = true
-		$NumberSelect2/VBoxContainer/HBoxContainer2.visible = true
-		$NumberSelect2/VBoxContainer/label3.visible = true
-		$NumberSelect2/VBoxContainer/HBoxContainer3.visible = true
+		$NumberSelect2/VBoxContainer/AdvOption/HBoxContainer/InfinityToggle.visible = true
+		$NumberSelect2/VBoxContainer/AdvOption/HBoxContainer/InfinityToggle.pressed = craft_indefinitely
+		$NumberSelect2/VBoxContainer/label2.visible = !craft_indefinitely
+		$NumberSelect2/VBoxContainer/HBoxContainer2.visible = !craft_indefinitely
+		$NumberSelect2/VBoxContainer/label3.visible = !craft_indefinitely
+		$NumberSelect2/VBoxContainer/HBoxContainer3.visible = !craft_indefinitely
 	else:
 		$NumberSelect2/VBoxContainer/AdvOption/HBoxContainer/TextureButton.pressed = false
 		$NumberSelect2/VBoxContainer/label1.visible = true
 		$NumberSelect2/VBoxContainer/HBoxContainer1.visible = true
+		$NumberSelect2/VBoxContainer/AdvOption/HBoxContainer/InfinityToggle.visible = false
 		$NumberSelect2/VBoxContainer/label2.visible = false
 		$NumberSelect2/VBoxContainer/HBoxContainer2.visible = false
 		$NumberSelect2/VBoxContainer/label3.visible = false
@@ -807,6 +863,12 @@ func toggle_num_select_mode():
 		amount = ResourceScripts.game_res.get_item_amount(item_data.resultitem)
 	cap_up = amount + repeats
 	cap_low = 1
+	craft_indefinitely = false
+	build_num_select()
+
+
+func toggle_indefinite_craft():
+	craft_indefinitely = !craft_indefinitely
 	build_num_select()
 
 
@@ -821,8 +883,6 @@ func cap_up_change(value):
 	cap_up += value
 	if cap_up < 1:
 		cap_up = 1
-	if cap_up < cap_low:
-		cap_up = cap_low
 	build_num_select()
 
 
@@ -830,6 +890,24 @@ func cap_low_change(value):
 	cap_low += value
 	if cap_low < 1:
 		cap_low = 1
-	if cap_up < cap_low:
-		cap_low = cap_up
+	build_num_select()
+
+
+func number_text_entered(_text, field):
+	set_number_from_text(field)
+
+
+func number_text_focus_exited(field):
+	set_number_from_text(field)
+
+
+func set_number_from_text(field):
+	var input = $NumberSelect2/VBoxContainer.get_node("HBoxContainer%s/pt2/Amount" % ({repeat = 1, cap_up = 2, cap_low = 3}[field]))
+	var value = int(input.text)
+	if field == 'repeat':
+		repeats = max(1, value)
+	elif field == 'cap_up':
+		cap_up = max(1, value)
+	else:
+		cap_low = max(1, value)
 	build_num_select()

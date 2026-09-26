@@ -1,13 +1,51 @@
 extends Panel
 
+#Emitted whenever the list folds or unfolds, by whatever route - the handle, a card opening
+#over it, a lesson, the view buttons. The mansion screen listens because folding is what
+#uncovers the floorplan, so the buttons that say which view is up have to follow it.
+signal fold_changed(state)
+
 var active_person
 onready var SlaveModule = get_parent().SlaveModule
-onready var SlaveContainer = $ScrollContainer/VBoxContainer
+onready var CardContainer = $ScrollContainer/CardContainer
+onready var RowContainer = $ScrollContainer/RowContainer
+onready var EntryContentTemplate = $ScrollContainer/VBoxContainer/Button
+var SlaveContainer
 onready var LocationsList = $TravelsContainerPanel/TravelsContainer/HBoxContainer
 onready var LocationsPanel = $TravelsContainerPanel
 onready var header = $HBoxContainer
 onready var modes = $modes
 onready var CharacterContextMenu = $CharacterContextMenu
+onready var SortButton = $SortButton
+onready var SortMenu = $SortMenu
+onready var ListFoldButton = $ListFoldButton
+onready var ListFoldTween = $ListFoldTween
+onready var ExpandedCharacter = $ExpandedCharacter
+onready var ExpandedTween = $ExpandedCharacter/Tween
+onready var ExpandedCardSlot = $ExpandedCharacter/CardSlot
+onready var ExpandedExtra = $ExpandedCharacter/Extra
+onready var ExpandedInfoButton = $ExpandedCharacter/Extra/CharacterInfoButton
+onready var ExpandedDetails = $ExpandedCharacter/Extra/Details
+onready var ExpandedSocialPanel = $ExpandedCharacter/Extra/SocialPanel
+onready var ExpandedSocialSkills = $ExpandedCharacter/Extra/SocialPanel/Margin/Content/SocialSkills
+onready var ExpandedRuleButtons = $ExpandedCharacter/Extra/RulesPanel/Margin/Content/Rules
+onready var ExpandedFoodPreferences = $ExpandedCharacter/FoodPreferencesPanel
+onready var ExpandedSexPanel = $SexPanel
+onready var ExpandedNameEditButton = $ExpandedCharacter/Extra/NameEditButton
+onready var ExpandedNameEditor = $ExpandedCharacter/NameEditor
+onready var ExpandedFirstName = $ExpandedCharacter/NameEditor/Margin/Content/Identity/NameValue
+onready var ExpandedSurname = $ExpandedCharacter/NameEditor/Margin/Content/Identity/SurnameValue
+onready var ExpandedNicknameEdit = $ExpandedCharacter/NameEditor/Margin/Content/NicknameEdit
+onready var ExpandedBodyPreview = $ExpandedBodyPreview
+onready var ExpandedBodyImage = $ExpandedBodyPreview/StoredImage
+onready var ExpandedPaperdoll = $ExpandedBodyPreview/Paperdoll
+onready var ExpandedCloseButton = $ExpandedBodyPreview/CloseButton
+onready var ExpandedBodyTween = $ExpandedBodyPreview/Tween
+onready var ExpandedPrevButton = $ExpandedPrevCharacter
+onready var ExpandedNextButton = $ExpandedNextCharacter
+var ExpandedNudityToggle
+
+var pending_date_person
 
 var populatedlocations = []
 var default_locations = ["show_all", "mansion"]
@@ -16,6 +54,32 @@ var prev_selected_location = "show_all"
 var visible_persons = []
 
 const BUTTON_HEIGHT = 64
+const CARD_ROOT = "CardLayout/Margin/Rows"
+const CARD_BODY = CARD_ROOT + "/Body"
+const CARD_PORTRAIT_ROOT = CARD_BODY + "/Portrait"
+const CARD_PORTRAIT = CARD_PORTRAIT_ROOT + "/Image"
+const CARD_LOCATION_BACKDROP = CARD_PORTRAIT_ROOT + "/Location"
+const CARD_HP_BAR = CARD_PORTRAIT_ROOT + "/HP"
+const CARD_MP_BAR = CARD_PORTRAIT_ROOT + "/MP"
+const CARD_LUST_BAR = CARD_PORTRAIT_ROOT + "/Lust"
+const CARD_SEX = CARD_PORTRAIT_ROOT + "/Sex"
+const CARD_RACE = CARD_PORTRAIT_ROOT + "/Race"
+const CARD_LEVELUP_INDICATOR = CARD_PORTRAIT_ROOT + "/LevelUpIndicator"
+const CARD_WARNINGS = CARD_PORTRAIT_ROOT + "/Warnings"
+const CARD_WARN_FOOD = CARD_WARNINGS + "/Food"
+const CARD_WARN_BED = CARD_WARNINGS + "/Bed"
+const CARD_STATUS = CARD_ROOT + "/Header/SlaveType"
+const CARD_INFO_STRIPS = CARD_BODY + "/InfoStrips"
+const CARD_WORK_STRIP = CARD_INFO_STRIPS + "/Work"
+const CARD_WORK_TYPE = CARD_WORK_STRIP + "/Content/Icon"
+const CARD_WORK_HIGHLIGHT = CARD_WORK_STRIP + "/Content/Highlight"
+const CARD_WORK_LABEL = CARD_WORK_STRIP + "/Content/Label"
+const CARD_LOCATION_STRIP = CARD_INFO_STRIPS + "/Location"
+const CARD_LOCATION_ICON = CARD_LOCATION_STRIP + "/Content/Icon"
+const CARD_ACTIONS = CARD_ROOT + "/Actions"
+const CARD_EXP_BAR = CARD_ROOT + "/ExpBar"
+#white while the next class is still being paid for, the level-up green once it is paid
+const CARD_EXP_COLOR = Color(1, 1, 1)
 
 const TEX_ROW_NORMAL = preload("res://assets/Textures_v2/MANSION/CharacterList/Buttons/button_job_chars.png")
 const TEX_ROW_HOVER = preload("res://assets/Textures_v2/MANSION/CharacterList/Buttons/button_job_chars_hover.png")
@@ -27,6 +91,76 @@ const TEX_TRAVEL_SMALL = preload("res://assets/Textures_v2/MANSION/icon_travel_s
 const TEX_NO = preload("res://assets/Textures_v2/MANSION/no.png")
 const TEX_YES = preload("res://assets/Textures_v2/MANSION/yes.png")
 const TEX_FOOD_STARVING = preload("res://assets/images/iconsitems/food_old.png")
+const TEX_WARN_FOOD_POOR = preload("res://assets/images/gui/gui icons/food_hate.png")
+const TEX_WARN_BED = preload("res://assets/images/gui/gui icons/icon_bedlimit.png")
+#The badge blinks off a shader rather than off a tween per card - see demand_warning_pulse.shader
+#for why the material is built here instead of being saved into the scene.
+const WARNING_PULSE_SHADER = preload("res://gui_modules/Mansion/Modules/demand_warning_pulse.shader")
+const TEX_WORK_REST = preload("res://assets/images/gui/icon_bed.png")
+const TEX_WORK_TRAINING = preload("res://assets/Textures_v2/MANSION/Dating/Icons/icon_discipline.png")
+const TEX_WORK_CRAFT = preload("res://assets/images/gui/icon_craft64x64.png")
+const TEX_WORK_SERVICE = preload("res://assets/images/gui/service.png")
+const TEX_WORK_QUEST = preload("res://assets/Textures_v2/DUNGEON/Icons/exclaim.png")
+const CARD_ACTION_DISABLED_MATERIAL = preload("res://assets/sfx/bw_shader.tres")
+const SKILL_EMPTY_TEXTURE = preload("res://assets/Textures_v2/MANSION/Skills/Buttons/buttonskill_empty.png")
+const SKILL_NO_IMAGE_TEXTURE = preload("res://assets/images/gui/panels/noimage.png")
+#Nudity is no longer a checkbox in the rules list: the doll carries the undress
+#buttons, and a unique character - drawn as a sprite, with no doll to put them on
+#- gets this one button over the picture instead.
+const NUDITY_TOGGLE = preload("res://gui_modules/Universal/Scripts/NudityToggle.gd")
+const EXPANDED_ANIMATION_TIME = 0.24
+const LIST_FOLD_ANIMATION_TIME = 0.18
+const LIST_FOLDED_HEIGHT = 60.0
+const EXPANDED_WORK_RULES = [
+	"lock",
+	"hide",
+	"ration",
+	"shifts",
+	"contraceptive",
+	"relationship",
+]
+const HIDDEN_CHARACTER_ALPHA = 0.68
+
+var expanded_card
+var expanded_card_visual
+var expanded_card_blocker
+var expanded_card_original_modulate = Color(1, 1, 1, 1)
+var expanded_pending_card
+var expanded_target_rect = Rect2()
+var expanded_origin_rect = Rect2()
+var expanded_animation_state = ""
+var expanded_skill_position = 0
+var expanded_build_person
+var expanded_build_stage = -1
+var expanded_details_ready = false
+var expanded_geometry_ready = false
+var expanded_body_build_token = 0
+var expanded_body_pending_person
+var expanded_body_build_state
+var expanded_paperdoll_cache_person_id = ""
+var expanded_paperdoll_cache_clothed = true
+#The list folds down to its title bar, which is what uncovers the mansion floorplan lying
+#behind it. Open is how the mansion opens: the household is the screen, and the plan is what
+#the player asks for with the view buttons down the left or with this handle. The plan is a
+#backdrop rather than a panel, so the list does not have to leave room for it - it only has
+#to get out of the way.
+const FOLD_FOLDED = 0
+const FOLD_FULL = 1
+const FOLD_GLYPHS = ["v", "^"]
+const FOLD_TOOLTIPS = ["MSLMUNFOLDLIST", "MSLMFOLDLIST"]
+
+var list_fold_state = FOLD_FULL
+#the fold the list was in when a card was expanded over it, restored when the card closes
+var expanded_restore_fold = FOLD_FULL
+var list_unfolded_size = Vector2()
+
+const EXPANDED_BODY_PREVIEW_PAPERDOLL_WIDTH = 626.0
+const EXPANDED_BODY_PREVIEW_FRAME_PADDING = 4.0
+const EXPANDED_BODY_PREVIEW_SCREEN_MARGIN = 15.0
+const EXPANDED_BODY_PREVIEW_MIN_WIDTH = 46.0
+# Where the card's close button ends, and so where anything else in that corner
+# has to start: the doll's undress bar and the nudity toggle both clear it.
+const EXPANDED_CLOSE_BUTTON_HEIGHT = 38
 
 var mode = 'default'
 #var mode = 'food'
@@ -64,6 +198,8 @@ const SORT_SEX_ORDER = ['male', 'female', 'futa']
 const SORT_CLASS_ORDER = ['master', 'spouse', 'heir', 'servant', 'servant_notax', 'slave_trained', 'slave']
 const SORT_COLOR_IDLE = Color(0.878431, 0.878431, 0.878431)
 const SORT_COLOR_HOVER = Color(1, 1, 1)
+const SORT_MENU_KEYS = ['', 'name', 'occupation', 'train_available', 'date_available', 'levelup']
+const SORT_MENU_LABELS = ['MSLMSORTDEFAULT', 'MSLMSORTNAME', 'MSLMSORTWORK', 'MSLMSORTTRAINABLE', 'MSLMSORTDATEABLE', 'MSLMSORTLEVELUP']
 
 var sort_key = ''
 var sort_desc = false
@@ -88,74 +224,1256 @@ func _set_job_label_color_from_key(job_label, color_key):
 
 
 func _ready():
+	list_unfolded_size = rect_size
+	expanded_target_rect = Rect2(ExpandedCharacter.rect_position, ExpandedCharacter.rect_size)
+	#The embedded ragdoll scene defaults to an always-updating Viewport. It is only a
+	#preview here, so keep that Viewport disabled until an expanded character needs it.
+	_clear_expanded_body_preview()
+	ExpandedTween.connect("tween_all_completed", self, "_on_expanded_animation_finished")
+	ListFoldTween.connect("tween_all_completed", self, "_on_list_fold_animation_finished")
+	ExpandedDetails.connect("inventory_requested", self, "OpenInventory")
+	ExpandedDetails.connect("food_filter_requested", self, "_open_expanded_food_filter")
+	ExpandedDetails.connect("sex_panel_requested", self, "_open_expanded_sex_panel")
+	ExpandedInfoButton.connect("pressed", self, "_open_expanded_character_info")
+	ExpandedNameEditButton.connect("pressed", self, "_open_expanded_name_editor")
+	ExpandedNameEditor.get_node("Margin/Content/Buttons/Cancel").connect(
+		"pressed", ExpandedNameEditor, "hide"
+	)
+	ExpandedNameEditor.get_node("Margin/Content/Buttons/Confirm").connect(
+		"pressed", self, "_confirm_expanded_nickname"
+	)
+	ExpandedNicknameEdit.connect("text_entered", self, "_confirm_expanded_nickname")
+	ExpandedCloseButton.connect("pressed", self, "close_expanded_character")
+	ExpandedPrevButton.connect("pressed", self, "_step_expanded_character", [-1])
+	ExpandedNextButton.connect("pressed", self, "_step_expanded_character", [1])
+	globals.connecttexttooltip(ExpandedPrevButton, tr("MSMPREVCHARACTER"))
+	globals.connecttexttooltip(ExpandedNextButton, tr("MSMNEXTCHARACTER"))
+	ExpandedPrevButton.hide()
+	ExpandedNextButton.hide()
+	#The doll's undress buttons are the Nudity rule on this screen, so what the
+	#player picks there is written to the character and the portraits follow.
+	ExpandedPaperdoll.undress_is_a_rule = true
+	ExpandedPaperdoll.connect("undress_level_changed", self, "_on_expanded_doll_undressed")
+	#the close button already sits in the top corner of the frame
+	ExpandedPaperdoll.place_controls_below(EXPANDED_CLOSE_BUTTON_HEIGHT)
+	ExpandedNudityToggle = NUDITY_TOGGLE.new()
+	ExpandedNudityToggle.place_below(EXPANDED_CLOSE_BUTTON_HEIGHT)
+	ExpandedNudityToggle.connect("nudity_changed", self, "_on_expanded_nudity_changed")
+	ExpandedBodyPreview.add_child(ExpandedNudityToggle)
+	ExpandedFoodPreferences.add_to_group("ignore_rightclicks")
+	globals.connecttexttooltip(ExpandedNameEditButton, tr("NICKNAME_BUTTON_TEXT"))
+	hotkeys.connect("bindings_changed", self, "_build_expanded_info_tooltip")
+	_build_expanded_info_tooltip()
+	_sync_input_listening()
+	set_process(false)
+	_initialize_entry_templates()
+	_select_slave_container()
 	input_handler.slave_list_node = self
+	input_handler.connect('PortraitUpdate', self, 'refresh_portraits')
 	globals.connect("slave_added", self, "queue_rebuild")
-	globals.connect("task_removed", self, "queue_rebuild")
+	globals.connect("task_removed", self, "queue_task_refresh")
+	#The upkeep badges are answered from the larder and the floorplan, neither of which this
+	#list owns. A bed given out on the plan beside it, or a food type forbidden in the diet
+	#panel over it, changes nothing about the character - so without these the badge would sit
+	#there stale until the next day rolled the whole list over.
+	globals.connect("rooms_changed", self, "queue_upkeep_refresh")
+	globals.connect("upkeep_changed", self, "queue_upkeep_refresh")
 	globals.connect("hour_tick", self, "update_dislocations")
-	globals.connecttexttooltip($BedroomIcon, tr("BEDROOMTOOLTIP"))
-	globals.connecttexttooltip($DateIcon, tr("DATETOOLTIP"))
-	globals.connecttexttooltip($SexIcon, tr("SEXTOOLTIP"))
 	for nd in modes.get_children():
 		nd.connect('pressed', self, 'set_mode', [nd.name])
-#	for rl in ['lock', 'ration', 'shifts', 'constrain', 'luxury', 'contraceptive', 'nudity', 'personality_lock', 'relationship', 'masturbation']:
+#	for rl in ['lock', 'ration', 'shifts', 'constrain', 'contraceptive', 'nudity', 'relationship', 'masturbation']:
 #		globals.connecttexttooltip(header.get_node('rule_' + rl), tr('WORKRULE%sDESCRIPT' % rl.to_upper()))
 #	for rl in ['waitress', 'hostess', 'dancer', 'stripper', 'males', 'females', 'futa', 'petting', 'oral', 'anal', 'pussy', 'group', 'sextoy']:
 #		globals.connecttexttooltip(header.get_node('brothel_' + rl), tr('BROTHEL%sDESCRIPT' % rl.to_upper()))
-	for rl in ['meat', 'fish', 'grain', 'vegetables', 'bread', 'meatsoup', 'curry', 'friedfish', 'fishcakes']:
-		globals.connecttexttooltip(header.get_node('food_' + rl),
-			tr('MATERIAL%sDESCRIPT' % rl.to_upper()) + globals.get_food_info_text(Items.materiallist[rl]))
-#	globals.connecttexttooltip(header.get_node('food_state'),
-#		"[center]" + tr("FOODSTATEHEADER") + "[/center]\n" + tr("FOODSTATEHEADERDESCRIPT"))
 	input_handler.connect("mass_select_in_act", self, "off_mass_select_effect")
-	input_handler.register_btn_source("slave_2_line", self, "tut_get_slave_line", self, 'tut_get_slave_line_rect')
-	input_handler.register_btn_source("daisy_line", self, "tut_get_daisy_line", self, 'tut_get_daisy_line_rect')
-	input_handler.register_btn_source("ff_meat", self, "tut_get_ff_meat")
-#	input_handler.register_btn_source("ff_vegetables", self, "tut_get_ff_vegetables")#delete with time(29.01.26)
+	input_handler.register_btn_source("slave_2_line", self, "tut_get_slave_line")
+	input_handler.register_btn_source("daisy_line", self, "tut_get_daisy_line")
+	#the legacy skill/summary panels are hidden in the reworked mansion, so the hard tutorial
+	#drives their replacements on the expanded character card instead
+	if !get_parent().show_legacy_character_panels:
+		input_handler.register_btn_source("master_line", self, "tut_get_master_line")
+		input_handler.register_btn_source("char_info", self, "tut_get_char_info_btn")
+		input_handler.register_btn_source("mentor_skill_btn", self, "tut_get_mentor_skill_btn")
+		input_handler.register_btn_source("progression_btn", self, "tut_get_progression_btn")
+		input_handler.register_btn_source("training_btn", self, "tut_get_training_btn")
 	input_handler.register_btn_source("daisy_waitress", self, "tut_get_daisy_waitress")
 	input_handler.register_btn_source("default_mode", self, "tut_get_default_mode")
 	input_handler.register_btn_source("service_mode", self, "tut_get_service_mode")
+	#the fold handle is taught rather than driven: it is the second way to the floorplan, the
+	#first being the view buttons down the left
+	input_handler.register_btn_source("slave_list_fold_btn", self, "tut_get_list_fold_btn")
+	ListFoldButton.connect('pressed', self, '_toggle_slave_list')
+	apply_default_fold()
+	_setup_sort_menu()
 	build_sort_headers()
 	get_parent().connect("visibility_changed", self, "on_mansion_shown")
+
+
+#node input callbacks run before the singleton's, so the hard tutorial's own right click
+#gate never sees these events - closing the card mid-step would strand the tutorial
+func _tutorial_blocks_rmb():
+	if !input_handler.hard_tutorial_active or input_handler.hard_tutorial == null:
+		return false
+	return !input_handler.hard_tutorial.is_RMB_pass()
+
+
+#Listening is armed only while a card is expanded, which is the one thing here that answers to
+#a click landing outside itself. The list itself does not - it is the screen the mansion opens
+#on, not a menu hanging over it - so with no card open this module hears nothing at all and eats
+#nobody else's clicks.
+func _sync_input_listening():
+	set_process_input(expanded_card != null)
+
+
+#A card stands open over the list the way a menu stands open over a screen, so looking somewhere
+#else puts it away. The list underneath is not touched: it is not a popup and has nowhere to go.
+#This runs before the GUI is dispatched, so the click that closed the card is swallowed rather
+#than also landing on whatever it was over - one gesture, one result.
+func _should_close_expanded(event):
+	if expanded_card == null:
+		return false
+	if !(event is InputEventMouseButton) or !event.pressed:
+		return false
+	if event.button_index != BUTTON_LEFT:
+		return false
+	#a character dragged out of the card is let go somewhere else on purpose
+	if get_viewport().gui_is_dragging():
+		return false
+	#the lesson decides what may be pressed while it is running, and the other screens raise
+	#their own panels over this one
+	if input_handler.hard_tutorial_active:
+		return false
+	if get_parent().get("mansion_state") != null and get_parent().mansion_state != "default":
+		return false
+	return !_click_is_inside(event.position)
+
+
+#Ours is the list's own rectangle plus whatever it opened that does not live inside it: the sort
+#menu stands as a top level node, and the two character popups are siblings raised over the
+#screen. Tooltips need no case of their own - one only exists while the pointer is inside the
+#node that owns it, so a click over a tooltip is a click inside that node.
+func _click_is_inside(position):
+	if get_global_rect().has_point(position):
+		return true
+	if is_instance_valid(SortMenu) and SortMenu.visible \
+			and SortMenu.get_global_rect().has_point(position):
+		return true
+	#The expanded card's body preview is authored wider than this module and hangs past its right
+	#edge - the doll's own buttons, which sit 156px inside the doll's right side, land out there.
+	#Measured against this module's rectangle alone they read as a click on the mansion, and the
+	#card was closed by the press that was meant to undress the character. The preview widens
+	#again while the Customize menu is open, and this rect grows with it.
+	if is_instance_valid(ExpandedBodyPreview) and ExpandedBodyPreview.visible \
+			and ExpandedBodyPreview.get_global_rect().has_point(position):
+		return true
+	#The step arrows flank the open card in the empty space beside it, so the left one hangs off
+	#this module the way the body preview hangs off its other side. Measured against the module's
+	#rectangle alone a press on it reads as a click on the mansion, and the card would close on
+	#the very gesture that was meant to walk it to the next character.
+	for button in [ExpandedPrevButton, ExpandedNextButton]:
+		if is_instance_valid(button) and button.visible \
+				and button.get_global_rect().has_point(position):
+			return true
+	for name in ['CharacterProgressionPopup', 'CharacterTrainingPopup']:
+		var popup = get_parent().get_node_or_null(name)
+		if popup != null and popup.visible and popup is Control:
+			if popup.get_global_rect().has_point(position):
+				return true
+	return false
+
+
+func _input(event):
+	if _should_close_expanded(event):
+		if is_instance_valid(SortMenu) and SortMenu.visible:
+			SortMenu.hide()
+		close_expanded_character()
+		get_viewport().set_input_as_handled()
+		return
+	if expanded_card == null or !(event is InputEventMouseButton):
+		return
+	if event.button_index == BUTTON_RIGHT and _tutorial_blocks_rmb():
+		get_viewport().set_input_as_handled()
+		return
+	if event.button_index == BUTTON_RIGHT and event.pressed:
+		var target = _get_expanded_right_click_target()
+		if target != null:
+			if target.has_meta("expanded_social_position"):
+				_select_expanded_social_position(target.get_meta("expanded_social_position"))
+				get_viewport().set_input_as_handled()
+			return
+		close_expanded_character()
+		get_viewport().set_input_as_handled()
+
+
+func _get_expanded_right_click_target():
+	for node in get_tree().get_nodes_in_group("ignore_rightclicks"):
+		if !(node is Control) or !is_instance_valid(node) or !node.is_visible_in_tree():
+			continue
+		if node != ExpandedCharacter and !ExpandedCharacter.is_a_parent_of(node):
+			continue
+		if node.get_global_rect().has_point(get_global_mouse_position()):
+			return node
+	return null
+
+
+func _build_expanded_info_tooltip():
+	globals.connecttexttooltip(
+		ExpandedInfoButton,
+		hotkeys.get_tooltip_text("MSMNAME", "mansion_char_info")
+	)
 
 
 #the mansion screen coming back (from a character panel, the city, a scene) is a fresh start
 #for the list, so it always reappears in the order the player arranged themselves
 func on_mansion_shown():
 	if get_parent().visible:
+		expanded_paperdoll_cache_person_id = ""
+		_close_expanded_character_immediate()
+		if rebuild_pending:
+			rebuild()
+		elif upkeep_refresh_pending:
+			refresh_upkeep_warnings()
+		upkeep_refresh_pending = false
 		reset_sorting()
+		apply_default_fold()
+
+
+func _on_card_expand_requested(card):
+	if get_parent().mansion_state != "default" or mode != "default":
+		return
+	if !is_instance_valid(card) or card.disabled:
+		return
+	if expanded_card == card:
+		return
+	if expanded_card != null:
+		expanded_pending_card = card
+		close_expanded_character()
+		return
+	open_expanded_character(card)
+
+
+func open_expanded_character(card):
+	if !is_instance_valid(card) or card.get_parent() != CardContainer:
+		return
+	var person = card.get_meta("slave", null)
+	if person == null:
+		return
+	#The expanded card is 855px tall, so a folded list cannot hold it: the list opens all the
+	#way for it and goes back to where the player had it when the card closes. Unanimated and
+	#before the origin rect is measured - a fold tween running on rect_size would be fighting
+	#the card's own tween for the same property.
+	expanded_restore_fold = list_fold_state
+	if list_fold_state != FOLD_FULL:
+		set_slave_list_fold(FOLD_FULL, false)
+	expanded_origin_rect = _expanded_rect_for_global_rect(card.get_global_rect())
+	#Keep the source card in its container. Moving it out made GridContainer rebuild the
+	#visible order twice per animation. A visual copy can move while the real slot stays put.
+	_claim_expanded_card_source(card)
+	_create_expanded_card_visual()
+
+	#Build one section per frame while the geometry is moving. Previously the entire
+	#detail pane landed on the animation's last frame and caused a visible hitch there.
+	ExpandedExtra.modulate.a = 0.0
+	#Keep the transparent detail tree active so its containers finish layout during the
+	#staged build instead of all recalculating on the reveal frame.
+	ExpandedExtra.show()
+	ExpandedFoodPreferences.hide()
+	ExpandedSexPanel.hide()
+	ExpandedNameEditor.hide()
+	ExpandedSocialPanel.hide()
+	ExpandedBodyPreview.show()
+	ExpandedBodyPreview.modulate.a = 0.0
+	_cancel_expanded_body_preview_build()
+	_clear_expanded_body_preview()
+	expanded_body_pending_person = person
+	ExpandedCharacter.rect_position = expanded_origin_rect.position
+	ExpandedCharacter.rect_size = expanded_origin_rect.size
+	ExpandedCharacter.show()
+	ExpandedCharacter.raise()
+	_update_expanded_step_buttons()
+	_sync_input_listening()
+	expanded_animation_state = "opening"
+	expanded_build_person = person
+	ExpandedDetails.prepare_expanded_person(person)
+	expanded_build_stage = 0
+	expanded_details_ready = false
+	expanded_geometry_ready = false
+	set_process(true)
+	_play_expanded_geometry(expanded_target_rect)
+
+
+func close_expanded_character():
+	if expanded_card == null or expanded_animation_state == "closing":
+		return
+	var close_rect = expanded_origin_rect
+	if is_instance_valid(expanded_card):
+		close_rect = _expanded_rect_for_global_rect(expanded_card.get_global_rect())
+	expanded_build_stage = -1
+	expanded_build_person = null
+	_cancel_expanded_body_preview_build()
+	ExpandedFoodPreferences.hide()
+	ExpandedSexPanel.hide()
+	ExpandedNameEditor.hide()
+	set_process(false)
+	ExpandedExtra.hide()
+	ExpandedBodyPreview.hide()
+	#A step to the neighbouring character closes this card to open that one, and the arrows stay
+	#up across the swap - they are the control the player is holding down, not part of the card.
+	if expanded_pending_card == null:
+		ExpandedPrevButton.hide()
+		ExpandedNextButton.hide()
+	expanded_animation_state = "closing"
+	_play_expanded_geometry(close_rect)
+
+
+func _close_expanded_character_immediate():
+	expanded_pending_card = null
+	_cancel_expanded_body_preview_build()
+	ExpandedFoodPreferences.hide()
+	ExpandedSexPanel.hide()
+	ExpandedNameEditor.hide()
+	if expanded_card == null:
+		return
+	ExpandedPrevButton.hide()
+	ExpandedNextButton.hide()
+	ExpandedTween.stop_all()
+	ExpandedTween.remove_all()
+	_restore_expanded_card()
+	ExpandedCharacter.hide()
+	ExpandedExtra.hide()
+	ExpandedExtra.modulate.a = 0.0
+	ExpandedBodyPreview.hide()
+	ExpandedBodyPreview.modulate.a = 0.0
+	_clear_expanded_body_preview()
+	expanded_animation_state = ""
+	expanded_build_stage = -1
+	expanded_build_person = null
+	set_process(false)
+	_sync_input_listening()
+
+
+func _play_expanded_geometry(target_rect):
+	ExpandedTween.stop_all()
+	ExpandedTween.remove_all()
+	ExpandedTween.interpolate_property(
+		ExpandedCharacter, "rect_position", ExpandedCharacter.rect_position, target_rect.position,
+		EXPANDED_ANIMATION_TIME, Tween.TRANS_QUAD, Tween.EASE_OUT
+	)
+	ExpandedTween.interpolate_property(
+		ExpandedCharacter, "rect_size", ExpandedCharacter.rect_size, target_rect.size,
+		EXPANDED_ANIMATION_TIME, Tween.TRANS_QUAD, Tween.EASE_OUT
+	)
+	ExpandedTween.start()
+
+
+func _on_expanded_animation_finished():
+	if expanded_animation_state == "opening":
+		expanded_geometry_ready = true
+		expanded_animation_state = "waiting_details"
+		_try_reveal_expanded_character()
+		return
+	if expanded_animation_state == "revealing":
+		expanded_animation_state = "open"
+		_start_expanded_body_preview_build()
+		return
+	if expanded_animation_state != "closing":
+		return
+	_restore_expanded_card()
+	ExpandedCharacter.hide()
+	ExpandedExtra.hide()
+	ExpandedExtra.modulate.a = 0.0
+	expanded_animation_state = ""
+	_sync_input_listening()
+	var next_card = expanded_pending_card
+	expanded_pending_card = null
+	if is_instance_valid(next_card) and next_card.get_parent() == CardContainer:
+		open_expanded_character(next_card)
+
+
+func _process(_delta):
+	if expanded_build_stage < 0:
+		set_process(false)
+		return
+	if !is_instance_valid(expanded_card) or expanded_build_person == null:
+		_close_expanded_character_immediate()
+		return
+	if expanded_card.get_meta("slave", null) != expanded_build_person:
+		_close_expanded_character_immediate()
+		return
+	match expanded_build_stage:
+		0:
+			ExpandedDetails.build_professions()
+		1:
+			ExpandedDetails.build_overview()
+		2:
+			ExpandedDetails.build_expanded_character_info()
+		3:
+			ExpandedDetails.build_relationships()
+		4:
+			ExpandedDetails.build_equipment()
+		5:
+			ExpandedDetails.build_traits()
+		6:
+			ExpandedDetails.build_buffs()
+		7:
+			ExpandedDetails.build_combat_stats()
+		8:
+			#The ragdoll is intentionally assembled after the geometry tween. Its full material
+			#pass is too expensive to share a frame with the opening animation.
+			expanded_body_pending_person = expanded_build_person
+		9:
+			build_expanded_social_skills(expanded_build_person)
+		10:
+			build_expanded_rules(expanded_build_person)
+			expanded_build_stage = -1
+			expanded_details_ready = true
+			expanded_build_person = null
+			set_process(false)
+			_try_reveal_expanded_character()
+			return
+	expanded_build_stage += 1
+
+
+func _try_reveal_expanded_character():
+	if !expanded_details_ready or !expanded_geometry_ready:
+		return
+	if expanded_animation_state != "waiting_details":
+		return
+	ExpandedExtra.modulate.a = 0.0
+	ExpandedExtra.show()
+	ExpandedBodyPreview.hide()
+	expanded_animation_state = "revealing"
+	ExpandedTween.stop_all()
+	ExpandedTween.remove_all()
+	ExpandedTween.interpolate_property(
+		ExpandedExtra, "modulate:a", 0.0, 1.0,
+		0.1, Tween.TRANS_QUAD, Tween.EASE_OUT
+	)
+	ExpandedTween.start()
+
+
+#What the arrows walk through is the list as it stands on screen: the location tabs decide which
+#characters are in it and the sorting decides their order, so a step lands on the card the player
+#would have clicked next rather than on whoever happens to be beside them in the party roster.
+func _get_expanded_step_cards():
+	var cards = []
+	for card in CardContainer.get_children():
+		if !card.has_meta('slave') or !card.visible or card.disabled:
+			continue
+		cards.append(card)
+	return cards
+
+
+#The arrows are only worth showing while there is somewhere to go, and never during a lesson -
+#the tutorial hands the player one particular character and has no way to follow them off it.
+func _update_expanded_step_buttons():
+	var can_step = expanded_card != null and !input_handler.hard_tutorial_active \
+		and _get_expanded_step_cards().size() > 1
+	ExpandedPrevButton.visible = can_step
+	ExpandedNextButton.visible = can_step
+	if can_step:
+		_raise_expanded_step_buttons()
+
+
+#A Control has no z_index in Godot 3 - inside one canvas the child list is the whole of the draw
+#order - and both the card and the doll panel raise themselves to the end of it after they open.
+#So the arrows have to be put back on top afterwards, or they end up under whatever moved last.
+func _raise_expanded_step_buttons():
+	ExpandedPrevButton.raise()
+	ExpandedNextButton.raise()
+
+
+func _step_expanded_character(direction):
+	#Both of the states left out here are a geometry tween in flight - the panel travelling to or
+	#from a row. A swap during one would take the tween's target out from under it and strand the
+	#panel at whatever size that frame had.
+	if expanded_card == null or expanded_animation_state in ["", "opening", "closing"]:
+		return
+	var cards = _get_expanded_step_cards()
+	if cards.size() < 2:
+		return
+	var index = cards.find(expanded_card)
+	if index < 0:
+		return
+	#The list is a ring here. Stopping dead at either end would leave one arrow doing nothing
+	#with nothing on screen to say why, and the ends of a sorted list are not a place the player
+	#asked to be.
+	var target = cards[wrapi(index + direction, 0, cards.size())]
+	#The panel closes back onto whichever row it belongs to, so the new row has to be somewhere
+	#on screen - stepping past the bottom of the scroll would otherwise aim that close at a
+	#card off the list.
+	$ScrollContainer.ensure_control_visible(target)
+	#the same two steps the card's own press does, in the same order: the list marks who is
+	#selected, then the panel swaps over to them
+	get_parent().set_active_person(target.get_meta('slave'))
+	_swap_expanded_character(target)
+
+
+#Stepping to the neighbour changes what the panel holds, not whether it is open. Routing it
+#through close-then-open put the screen through a whole cycle for a swap that moves nothing: the
+#panel shrank onto one row and grew out of the next, and a list the player had folded was folded
+#back and unfolded again on every press. This keeps the geometry and the fold exactly where they
+#are and rebuilds only the contents, the same staged build a fresh open uses.
+func _swap_expanded_character(card):
+	if !card.has_meta("slave"):
+		return
+	var person = card.get_meta("slave")
+	_release_expanded_card_source()
+	expanded_origin_rect = _expanded_rect_for_global_rect(card.get_global_rect())
+	_claim_expanded_card_source(card)
+	_create_expanded_card_visual()
+	ExpandedFoodPreferences.hide()
+	ExpandedSexPanel.hide()
+	ExpandedNameEditor.hide()
+	ExpandedSocialPanel.hide()
+	#A step taken while the previous one was still fading in leaves that fade running on the pane
+	#this one is about to blank, so it is stopped rather than left to drive the alpha back up.
+	ExpandedTween.stop_all()
+	ExpandedTween.remove_all()
+	ExpandedExtra.modulate.a = 0.0
+	ExpandedExtra.show()
+	_cancel_expanded_body_preview_build()
+	_clear_expanded_body_preview()
+	ExpandedBodyPreview.show()
+	ExpandedBodyPreview.modulate.a = 0.0
+	expanded_body_pending_person = person
+	expanded_build_person = person
+	ExpandedDetails.prepare_expanded_person(person)
+	expanded_build_stage = 0
+	expanded_details_ready = false
+	#the panel is already the size it opens to, so the half of the open that moves it is done
+	expanded_geometry_ready = true
+	expanded_animation_state = "waiting_details"
+	_update_expanded_step_buttons()
+	set_process(true)
+
+
+func _clear_expanded_body_preview():
+	ExpandedBodyImage.texture = null
+	ExpandedBodyImage.hide()
+	if is_instance_valid(ExpandedNudityToggle):
+		ExpandedNudityToggle.hide()
+	ExpandedPaperdoll.modulate.a = 1.0
+	ExpandedPaperdoll.hide()
+	# the new doll has no viewport of its own to switch off - it draws straight
+	# into the screen and costs nothing while it stands still
+	#var viewport = ExpandedPaperdoll.get_node_or_null("VPC/VP")
+	#if viewport != null:
+	#	viewport.render_target_update_mode = Viewport.UPDATE_DISABLED
+
+
+func _set_expanded_body_preview_width(desired_width):
+	var viewport_right = get_viewport().get_visible_rect().end.x
+	var available_width = viewport_right - ExpandedBodyPreview.rect_global_position.x \
+		- EXPANDED_BODY_PREVIEW_SCREEN_MARGIN
+	ExpandedBodyPreview.rect_size.x = clamp(
+		ceil(desired_width),
+		EXPANDED_BODY_PREVIEW_MIN_WIDTH,
+		max(available_width, EXPANDED_BODY_PREVIEW_MIN_WIDTH)
+	)
+
+
+func _fit_expanded_body_preview_to_texture(texture):
+	var texture_size = texture.get_size()
+	if texture_size.y <= 0:
+		_set_expanded_body_preview_width(EXPANDED_BODY_PREVIEW_PAPERDOLL_WIDTH)
+		return
+	var content_height = max(
+		ExpandedBodyPreview.rect_size.y - EXPANDED_BODY_PREVIEW_FRAME_PADDING * 2.0,
+		1.0
+	)
+	var portrait_width = content_height * texture_size.x / texture_size.y
+	_set_expanded_body_preview_width(
+		portrait_width + EXPANDED_BODY_PREVIEW_FRAME_PADDING * 2.0
+	)
+
+
+func _show_expanded_body_image(texture):
+	if texture == null:
+		return
+	_fit_expanded_body_preview_to_texture(texture)
+	ExpandedBodyImage.texture = texture
+	ExpandedBodyImage.show()
+	ExpandedPaperdoll.hide()
+	# the new doll has no viewport of its own to switch off - it draws straight
+	# into the screen and costs nothing while it stands still
+	#var viewport = ExpandedPaperdoll.get_node_or_null("VPC/VP")
+	#if viewport != null:
+	#	viewport.render_target_update_mode = Viewport.UPDATE_DISABLED
+
+
+func _cancel_expanded_body_preview_build():
+	expanded_body_build_token += 1
+	expanded_body_pending_person = null
+	expanded_body_build_state = null
+	if is_instance_valid(ExpandedBodyTween):
+		ExpandedBodyTween.stop_all()
+		ExpandedBodyTween.remove_all()
+
+
+func _start_expanded_body_preview_build():
+	var person = expanded_body_pending_person
+	if person == null or expanded_animation_state != "open":
+		return
+	expanded_body_build_token += 1
+	var token = expanded_body_build_token
+	expanded_body_build_state = _build_expanded_body_preview_deferred(person, token)
+
+
+func _expanded_body_build_is_current(person, token):
+	return token == expanded_body_build_token \
+		and expanded_animation_state == "open" \
+		and is_instance_valid(expanded_card) \
+		and expanded_card.get_meta("slave", null) == person
+
+
+func _build_expanded_body_preview_deferred(person, token):
+	#Let the final tween frame draw before doing the expensive ragdoll material pass.
+	yield(get_tree(), "idle_frame")
+	if !_expanded_body_build_is_current(person, token):
+		return
+	ExpandedBodyPreview.modulate.a = 0.0
+	ExpandedBodyPreview.show()
+	ExpandedBodyPreview.raise()
+	_raise_expanded_step_buttons()
+	_build_expanded_body_preview(person)
+	#The Viewport is UPDATE_ONCE; wait until that frame exists before fading it in.
+	yield(get_tree(), "idle_frame")
+	if !_expanded_body_build_is_current(person, token):
+		return
+	expanded_body_pending_person = null
+	ExpandedBodyTween.stop_all()
+	ExpandedBodyTween.remove_all()
+	ExpandedBodyTween.interpolate_property(
+		ExpandedBodyPreview, "modulate:a", 0.0, 1.0,
+		0.12, Tween.TRANS_QUAD, Tween.EASE_OUT
+	)
+	ExpandedBodyTween.start()
+	expanded_body_build_state = null
+
+
+func _build_expanded_body_preview(person, force_paperdoll = false):
+	_clear_expanded_body_preview()
+	if person == null:
+		return
+	var stored_image = person.get_stored_body_image()
+	if stored_image != null:
+		_show_expanded_body_image(stored_image)
+	elif !input_handler.globalsettings.disable_paperdoll:
+		_set_expanded_body_preview_width(EXPANDED_BODY_PREVIEW_PAPERDOLL_WIDTH)
+		ExpandedPaperdoll.show()
+		ExpandedPaperdoll.test_mode = false
+		var clothed = !person.has_work_rule("nudity")
+		var cache_matches = expanded_paperdoll_cache_person_id == str(person.id) \
+			and expanded_paperdoll_cache_clothed == clothed \
+			and ExpandedPaperdoll.character == person
+		if force_paperdoll or !cache_matches:
+			ExpandedPaperdoll.rebuild(person)
+			ExpandedPaperdoll.rebuild_cloth(clothed)
+			expanded_paperdoll_cache_person_id = str(person.id)
+			expanded_paperdoll_cache_clothed = clothed
+		else:
+			# the new doll has no viewport of its own to switch off - it draws straight
+			# into the screen and costs nothing while it stands still
+			#var viewport = ExpandedPaperdoll.get_node_or_null("VPC/VP")
+			#if viewport != null:
+			#	viewport.render_target_update_mode = Viewport.UPDATE_ONCE
+			pass
+	else:
+		var silhouette = person.get_body_image()
+		if silhouette != null:
+			_show_expanded_body_image(silhouette)
+	# Keep the same sprite-selection order as CharacterInfo: a unique nude sprite
+	# replaces the stored body image when the nudity rule is active, while the
+	# marriage sprite (when applicable) has final priority.
+	var unique_code = person.get_stat("unique")
+	if person.uses_paperdoll(): #switched to the doll, so none of their own sprites apply
+		unique_code = null
+	if unique_code != null and worlddata.pregen_character_sprites.has(unique_code):
+		var sprite_data = worlddata.pregen_character_sprites[unique_code]
+		var unique_texture
+		if person.has_work_rule("nudity") and sprite_data.has("nude"):
+			unique_texture = images.get_sprite(sprite_data.nude.path)
+		if ResourceScripts.game_progress.spouse != null and globals.valuecheck({type = "has_spouse", check = true}) and !ResourceScripts.game_progress.marriage_completed:
+			var spouse_person = characters_pool.get_char_by_id(ResourceScripts.game_progress.spouse)
+			if spouse_person != null and spouse_person.get_stat("unique") == unique_code and sprite_data.has("wed"):
+				unique_texture = images.get_sprite(sprite_data.wed.path)
+		if unique_texture != null:
+			_show_expanded_body_image(unique_texture)
+	#the doll carries its own undress buttons; a sprite has none, so the rule gets
+	#a button of its own over the picture
+	if is_instance_valid(ExpandedNudityToggle):
+		ExpandedNudityToggle.bind(person)
+		if ExpandedNudityToggle.visible:
+			ExpandedNudityToggle.raise()
+
+
+func _create_expanded_card_visual():
+	if is_instance_valid(expanded_card_visual):
+		if expanded_card_visual.get_parent() == ExpandedCardSlot:
+			ExpandedCardSlot.remove_child(expanded_card_visual)
+		expanded_card_visual.queue_free()
+	expanded_card_visual = null
+	if !is_instance_valid(expanded_card) or !expanded_card.has_node("CardLayout"):
+		return
+	var source_layout = expanded_card.get_node("CardLayout")
+	#Runtime tooltip/action connections are external to CardLayout and are not reliably
+	#remapped by duplicate(). Copy the visual tree without signals, then bind it to the
+	#same person explicitly so the enlarged card remains fully interactive.
+	expanded_card_visual = source_layout.duplicate(14)
+	expanded_card_visual.name = "ExpandedCardVisual"
+	#The source layout delegates input to its outer card button. The expanded copy has no
+	#such parent, so let its root receive double-clicks from the portrait/background.
+	expanded_card_visual.mouse_filter = MOUSE_FILTER_STOP
+	ExpandedCardSlot.add_child(expanded_card_visual)
+	_copy_card_tooltips(source_layout, expanded_card_visual)
+	_connect_expanded_card_actions(expanded_card_visual, expanded_card.get_meta("slave"))
+	_connect_expanded_card_doubleclicks(expanded_card_visual, expanded_card.get_meta("slave"))
+
+
+func _connect_expanded_card_actions(layout, person):
+	var actions = layout.get_node("Margin/Rows/Actions")
+	actions.get_node("Progression").connect("pressed", self, "OpenProgression", [person])
+	actions.get_node("Training").connect("pressed", self, "OpenTraining", [person])
+	actions.get_node("Inventory").connect("pressed", self, "OpenInventory", [person])
+	actions.get_node("CharInfo").connect("pressed", self, "_open_character_info", [person])
+	actions.get_node("Date").connect("pressed", self, "OpenDate", [person])
+
+
+func _connect_expanded_card_doubleclicks(node, person):
+	if node is Control and !(node is BaseButton) and node.mouse_filter != MOUSE_FILTER_IGNORE:
+		node.connect("gui_input", self, "_expanded_card_gui_input", [person])
+	for child in node.get_children():
+		_connect_expanded_card_doubleclicks(child, person)
+
+
+#The portrait is the handle the card was opened by, so pressing it again is what puts the card
+#away - the same gesture both ways. Everywhere else on the card a double click still opens the
+#character sheet; over the portrait that gesture cannot arrive, because the first press of it has
+#already folded the card, so the second is ignored rather than opening the sheet behind the fold.
+func _expanded_card_gui_input(event, person):
+	if !(event is InputEventMouseButton) or event.button_index != BUTTON_LEFT or !event.pressed:
+		return
+	if expanded_animation_state == "closing":
+		return
+	#the lesson decides what may be pressed while it is running, the same as for a click landing
+	#outside the card - folding here would take away the very card the step is pointing at
+	if !input_handler.hard_tutorial_active and _expanded_portrait_has_point(get_global_mouse_position()):
+		get_tree().set_input_as_handled()
+		close_expanded_character()
+		return
+	if event.doubleclick:
+		get_tree().set_input_as_handled()
+		_open_character_info(person)
+
+
+#The portrait band of the enlarged copy - the picture with its frame, and the bars and icons
+#lying over it, which are the parts of that band that take a click of their own. Only the copy
+#is asked: the real card underneath is transparent and keeps its own press to open.
+func _expanded_portrait_has_point(position):
+	if !is_instance_valid(expanded_card_visual):
+		return false
+	var portrait = expanded_card_visual.get_node_or_null("Margin/Rows/Body/Portrait")
+	if portrait == null or !portrait.is_visible_in_tree():
+		return false
+	return portrait.get_global_rect().has_point(position)
+
+
+func _copy_card_tooltips(source, target):
+	for connection in source.get_signal_connection_list("mouse_entered"):
+		if connection.target == null or !is_instance_valid(connection.target):
+			continue
+		var binds = connection.binds.duplicate()
+		#Tooltip helpers bind the hovered Control itself for popup positioning. Remap that
+		#argument as well, otherwise the tooltip appears beside the transparent source card.
+		for index in binds.size():
+			if typeof(binds[index]) == TYPE_OBJECT and binds[index] == source:
+				binds[index] = target
+		target.connect("mouse_entered", connection.target, connection.method, binds, connection.flags)
+	for source_child in source.get_children():
+		if target.has_node(source_child.name):
+			_copy_card_tooltips(source_child, target.get_node(source_child.name))
+
+
+#The row in the list the open panel stands for: hidden, undraggable and covered so it cannot be
+#pressed again from underneath. Stepping to the neighbour hands that role from one card to the
+#next without the panel closing, so claiming and letting go are their own two steps.
+func _claim_expanded_card_source(card):
+	expanded_card = card
+	expanded_card_original_modulate = card.self_modulate
+	card.self_modulate.a = 0.0
+	card.drag_enabled = false
+	expanded_card_blocker = Control.new()
+	expanded_card_blocker.name = "ExpandedCardInputBlocker"
+	expanded_card_blocker.anchor_right = 1.0
+	expanded_card_blocker.anchor_bottom = 1.0
+	expanded_card_blocker.mouse_filter = MOUSE_FILTER_STOP
+	card.add_child(expanded_card_blocker)
+	expanded_card_blocker.raise()
+
+
+func _release_expanded_card_source():
+	if expanded_card == null:
+		return
+	if is_instance_valid(expanded_card):
+		expanded_card.self_modulate = expanded_card_original_modulate
+		expanded_card.drag_enabled = sort_key == ""
+	if is_instance_valid(expanded_card_blocker):
+		if is_instance_valid(expanded_card) and expanded_card_blocker.get_parent() == expanded_card:
+			expanded_card.remove_child(expanded_card_blocker)
+		expanded_card_blocker.queue_free()
+	expanded_card_blocker = null
+	#Keep the last visual under the now-hidden overlay. Destroying its whole card tree in
+	#the closing callback caused one last-frame spike; it is replaced before the next open.
+	expanded_card = null
+
+
+func _restore_expanded_card():
+	if expanded_card == null:
+		return
+	_release_expanded_card_source()
+	#both teardown paths come through here, so the list is put back exactly once
+	if expanded_restore_fold != FOLD_FULL:
+		set_slave_list_fold(expanded_restore_fold, false)
+		expanded_restore_fold = FOLD_FULL
+
+
+func _expanded_rect_for_global_rect(global_rect):
+	var inverse = get_global_transform_with_canvas().affine_inverse()
+	var local_position = inverse.xform(global_rect.position)
+	var local_end = inverse.xform(global_rect.position + global_rect.size)
+	var slot_offset = ExpandedCardSlot.rect_position
+	return Rect2(local_position - slot_offset, local_end - local_position + slot_offset * 2.0)
+
+
+func build_expanded_social_skills(person):
+	input_handler.ClearContainer(ExpandedSocialSkills)
+	person.rebuild_skills()
+	var source = person.skills.social_skill_panel
+	#skills.social_skills only holds explicitly learned ones - everything a class, trait or
+	#item grants (the master's Mentor among them) lives in the resolved list
+	var has_social_skills = !person.get_social_skills().empty()
+	ExpandedSocialPanel.visible = has_social_skills
+	if !has_social_skills:
+		return
+	for position in range(1, 7):
+		var button = input_handler.DuplicateContainerTemplate(ExpandedSocialSkills)
+		button.add_to_group("ignore_rightclicks")
+		button.set_meta("expanded_social_position", position)
+		button.get_node("icon").texture = SKILL_EMPTY_TEXTURE
+		button.get_node("icon").material = null
+		button.get_node("charges").hide()
+		button.get_node("cooldown").hide()
+		button.get_node("manacost").hide()
+		button.get_node("energycost").hide()
+		button.disabled = false
+		if !source.has(position):
+			button.connect("pressed", self, "_select_expanded_social_position", [position])
+			continue
+		var skill = Skilldata.get_template(source[position], person)
+		button.set_meta("skill", skill.code)
+		button.get_node("icon").texture = skill.icon if skill.icon != null else SKILL_NO_IMAGE_TEXTURE
+		if skill.cost.has("mp"):
+			button.get_node("manacost").text = str(int(skill.cost.mp))
+			button.get_node("manacost").show()
+		if skill.cost.has("energy"):
+			button.get_node("energycost").text = str(int(skill.cost.energy))
+			button.get_node("energycost").show()
+		var used_charges = person.skills.social_skills_charges.get(skill.code, 0)
+		var charges_left = skill.charges - used_charges
+		button.get_node("charges").text = str(charges_left) + "/" + str(skill.charges)
+		button.get_node("charges").show()
+		if charges_left <= 0:
+			button.disabled = true
+			var cooldown = person.skills.social_cooldowns.get(skill.code, person.skills.daily_cooldowns.get(skill.code, null))
+			if cooldown != null:
+				button.get_node("cooldown").text = str(cooldown)
+				button.get_node("cooldown").show()
+		if !person.check_cost(skill.cost) or !person.checkreqs(skill.reqs) or person.has_status("no_social_skills") or person.get_work() == "disabled":
+			button.disabled = true
+		if button.disabled:
+			button.get_node("icon").material = CARD_ACTION_DISABLED_MATERIAL
+		globals.connectskilltooltip(button, skill.code, person)
+		button.connect("pressed", self, "_select_expanded_social_skill", [skill.code])
+
+
+func build_expanded_rules(person):
+	input_handler.ClearContainer(ExpandedRuleButtons)
+	if person == null:
+		return
+	for code in EXPANDED_WORK_RULES:
+		if !_expanded_rule_is_visible(person, code):
+			continue
+		var button = input_handler.DuplicateContainerTemplate(ExpandedRuleButtons)
+		button.name = code
+		button.get_node("Label").text = tr("WORKRULE" + code.to_upper())
+		button.pressed = person.check_work_rule(code)
+		button.disabled = _expanded_rule_is_disabled(person, code)
+		_refresh_expanded_rule_button(button)
+		var tooltip = "[center]" + tr("WORKRULE" + code.to_upper()) + "[/center]\n"
+		tooltip += person.translate(tr("WORKRULE" + code.to_upper() + "DESCRIPT"))
+		globals.connecttexttooltip(button, tooltip)
+		button.connect("pressed", self, "_toggle_expanded_rule", [person, code])
+
+
+func _refresh_expanded_rule_button(button):
+	button.get_node("Mark").visible = !button.pressed and !button.disabled
+	button.get_node("Checked").visible = button.pressed and !button.disabled
+	button.get_node("Disabled").visible = !button.pressed and button.disabled
+	button.get_node("CheckedDisabled").visible = button.pressed and button.disabled
+
+
+func _expanded_rule_is_visible(person, code):
+	if person.is_master() and code == "relationship":
+		return false
+	if person.check_trait("undead") and code in ["contraceptive", "ration"]:
+		return false
+	return true
+
+
+func _expanded_rule_is_disabled(person, code):
+	match code:
+		"relationship":
+			return person.is_master()
+		"contraceptive", "ration":
+			return person.check_trait("undead")
+	return false
+
+
+func _toggle_expanded_rule(person, code):
+	if person == null:
+		return
+	person.set_work_rule(code, !person.check_work_rule(code))
+	ExpandedDetails.build_overview()
+	build_expanded_rules(person)
+	if is_instance_valid(expanded_card):
+		update_entry_availability(expanded_card, person)
+	if code == "hide":
+		if is_instance_valid(expanded_card_visual) and is_instance_valid(expanded_card):
+			var source_layout = expanded_card.get_node("CardLayout")
+			expanded_card_visual.self_modulate = source_layout.self_modulate
+			expanded_card_visual.modulate = source_layout.modulate
+		apply_sorting()
+		show_location_characters()
+		if selected_location != "show_all":
+			_close_expanded_character_immediate()
+		return
+
+
+#The rule left the rules list: it is switched on the body preview now, either by
+#the doll's undress buttons or by the unique character's own button.
+func _on_expanded_nudity_changed(person):
+	if person == null:
+		return
+	_build_expanded_body_preview(person, true)
+	ExpandedBodyPreview.visible = ExpandedBodyImage.visible or ExpandedPaperdoll.visible
+	refresh_portraits()
+
+
+#The doll rebuilt itself on the way here and keeps the step the player picked, so
+#only what is drawn from the character outside the doll needs a fresh look.
+func _on_expanded_doll_undressed(_level):
+	refresh_portraits()
+
+
+func _select_expanded_social_skill(skill_code):
+	if expanded_card == null:
+		return
+	var person = expanded_card.get_meta("slave", null)
+	if person == null:
+		return
+	get_parent().skill_source = person
+	get_parent().SkillModule.person = person
+	get_parent().SkillModule.select_skill_target(skill_code)
+
+
+func _select_expanded_social_position(position):
+	if expanded_card == null:
+		return
+	var person = expanded_card.get_meta("slave", null)
+	if person == null:
+		return
+	expanded_skill_position = position
+	input_handler.ShowSkillSelectPanel(person, variables.PANEL_SOC, self, "_expanded_social_skill_selected")
+
+
+func _expanded_social_skill_selected(skill):
+	if expanded_card == null:
+		return
+	var person = expanded_card.get_meta("slave", null)
+	if person == null:
+		return
+	if skill == null:
+		person.skills.social_skill_panel.erase(expanded_skill_position)
+	else:
+		person.skills.social_skill_panel[expanded_skill_position] = skill
+	build_expanded_social_skills(person)
+
+
+func _open_expanded_character_info():
+	if !is_instance_valid(expanded_card):
+		return
+	var person = expanded_card.get_meta("slave", null)
+	if person != null:
+		_open_character_info(person)
+
+
+#The arrow beside Consent works both ways: a second press puts the panel away again.
+func _open_expanded_sex_panel(person):
+	if person == null or expanded_card == null:
+		return
+	if ExpandedSexPanel.visible:
+		ExpandedSexPanel.hide()
+		return
+	ExpandedNameEditor.hide()
+	ExpandedFoodPreferences.hide()
+	ExpandedSexPanel.set_person(person)
+	ExpandedSexPanel.show()
+	ExpandedSexPanel.raise()
+
+
+func _open_expanded_food_filter(person):
+	if person == null or expanded_card == null:
+		return
+	ExpandedNameEditor.hide()
+	ExpandedSexPanel.hide()
+	ExpandedFoodPreferences.open_diet_window(person)
+	ExpandedFoodPreferences.raise()
+
+
+func _open_expanded_name_editor():
+	if !is_instance_valid(expanded_card):
+		return
+	var person = expanded_card.get_meta("slave", null)
+	if person == null:
+		return
+	ExpandedFoodPreferences.hide()
+	ExpandedSexPanel.hide()
+	ExpandedFirstName.text = tr(str(person.get_stat("name")))
+	var surname = str(person.get_stat("surname"))
+	ExpandedSurname.text = surname if surname != "" else "—"
+	ExpandedNicknameEdit.text = str(person.get_stat("nickname"))
+	ExpandedNameEditor.show()
+	ExpandedNameEditor.raise()
+	ExpandedNicknameEdit.grab_focus()
+	ExpandedNicknameEdit.select_all()
+
+
+func _confirm_expanded_nickname(_submitted_text = ""):
+	if !is_instance_valid(expanded_card):
+		ExpandedNameEditor.hide()
+		return
+	var person = expanded_card.get_meta("slave", null)
+	if person == null:
+		ExpandedNameEditor.hide()
+		return
+	person.set_stat("nickname", ExpandedNicknameEdit.text.strip_edges())
+	update_button(expanded_card)
+	_create_expanded_card_visual()
+	apply_sorting()
+	ExpandedNameEditor.hide()
+
+
+func _setup_sort_menu():
+	SortMenu.clear()
+	for i in SORT_MENU_KEYS.size():
+		SortMenu.add_item(tr(SORT_MENU_LABELS[i]), i)
+		SortMenu.set_item_as_radio_checkable(i, true)
+	SortButton.connect('pressed', self, '_open_sort_menu')
+	SortMenu.connect('id_pressed', self, '_select_sort_option')
+	_sync_sort_menu()
+
+
+func _open_sort_menu():
+	var button_rect = SortButton.get_global_rect()
+	var popup_position = button_rect.position + Vector2(0, button_rect.size.y)
+	SortMenu.hide()
+	SortMenu.set_as_toplevel(true)
+	SortMenu.rect_global_position = popup_position
+	SortMenu.popup()
+	SortMenu.set_as_minsize()
+	SortMenu.rect_size.x = max(SortMenu.rect_size.x, button_rect.size.x)
+
+
+func _select_sort_option(id):
+	if id < 0 or id >= SORT_MENU_KEYS.size():
+		return
+	_close_expanded_character_immediate()
+	sort_key = SORT_MENU_KEYS[id]
+	sort_desc = false
+	apply_sorting()
+	_sync_sort_menu()
+
+
+func _sync_sort_menu():
+	var selected_index = SORT_MENU_KEYS.find(sort_key)
+	if selected_index < 0:
+		selected_index = 0
+	for i in SORT_MENU_KEYS.size():
+		SortMenu.set_item_checked(i, i == selected_index)
+	SortButton.get_node('Label').text = tr(SORT_MENU_LABELS[selected_index])
+
+
+func _toggle_slave_list():
+	set_fold_from_view(list_fold_state != FOLD_FOLDED)
+
+
+#Folding as a change of view, which is what the handle does and what the mansion's own view
+#buttons do. A card standing open cannot be left hanging over an uncovered floorplan, and the
+#sort menu is asking about a list that is on its way out - both go with it. Remembered, because
+#the view the player leaves is the one they should find on the way back.
+func set_fold_from_view(folded):
+	var state = FOLD_FOLDED if folded else FOLD_FULL
+	if list_fold_state == state:
+		return
+	_close_expanded_character_immediate()
+	SortMenu.hide()
+	set_slave_list_fold(state)
+
+
+#Where the fold control sits when it is the only thing on the bar, and when it shares it.
+const FOLD_BUTTON_LEFT = 12.0
+const FOLD_BUTTON_WIDTH = 47.0
+const FOLD_BUTTON_RIGHT_MARGIN = 12.0
+
+
+#Folded, the bar is nothing but a handle for opening the list again: sorting a list nobody can
+#see and filtering it by place are both answers to a question that is not being asked. The
+#handle takes the whole width so there is one obvious thing to press rather than a short
+#button with a stretch of empty bar beside it.
+func apply_fold_to_bar():
+	var open = list_fold_state != FOLD_FOLDED
+	SortButton.visible = open
+	$TravelsContainerPanel.visible = open
+	ListFoldButton.margin_left = FOLD_BUTTON_LEFT
+	if open:
+		ListFoldButton.margin_right = FOLD_BUTTON_LEFT + FOLD_BUTTON_WIDTH
+	else:
+		ListFoldButton.margin_right = rect_size.x - FOLD_BUTTON_RIGHT_MARGIN
+
+
+func fold_height(state):
+	return LIST_FOLDED_HEIGHT if state == FOLD_FOLDED else list_unfolded_size.y
+
+
+func set_slave_list_fold(state, animated = true):
+	list_fold_state = state
+	ListFoldTween.stop_all()
+	ListFoldTween.remove_all()
+	rect_clip_content = true
+	var target_size = list_unfolded_size
+	target_size.y = fold_height(state)
+	ListFoldButton.get_node("Label").text = FOLD_GLYPHS[state]
+	globals.connecttexttooltip(ListFoldButton, tr(FOLD_TOOLTIPS[state]))
+	#Folded there is nothing below the title bar to reach. Ignoring the mouse on the container
+	#is not enough - IGNORE steps over that one control, not the cards inside it, so the sliver
+	#of the top row left showing at the clip edge could still be grabbed and dragged out.
+	#Hiding it takes the whole subtree out of reach along with it.
+	$ScrollContainer.mouse_filter = MOUSE_FILTER_IGNORE if state == FOLD_FOLDED \
+		else MOUSE_FILTER_STOP
+	$ScrollContainer.visible = state != FOLD_FOLDED
+	apply_fold_to_bar()
+	#the floorplan's counters and portraits hang off this bar's bottom edge as one panel with
+	#it, so folding the list is what puts them up and opening it is what takes them away
+	var rooms = get_parent().get_node_or_null("MansionRoomsModule")
+	if rooms != null:
+		rooms.set_hud_visible(state == FOLD_FOLDED)
+		#A room card is a panel on the plan, and the sheet that catches clicks beside it covers
+		#the whole screen from a CanvasLayer that outranks everything here. Left open behind the
+		#list it would swallow every press meant for a row, with nothing on screen to explain why.
+		#So the plan going away takes its card with it.
+		if state != FOLD_FOLDED:
+			rooms.close_card()
+	#said before the tween rather than after it: what is uncovered is decided here, and the
+	#buttons that name the view must not lag a fifth of a second behind the view itself
+	emit_signal("fold_changed", state)
+	if !animated:
+		rect_size = target_size
+		rect_clip_content = state != FOLD_FULL
+		return
+	ListFoldTween.interpolate_property(self, "rect_size", rect_size, target_size,
+		LIST_FOLD_ANIMATION_TIME, Tween.TRANS_QUAD, Tween.EASE_IN_OUT)
+	ListFoldTween.start()
+
+
+func _on_list_fold_animation_finished():
+	rect_clip_content = list_fold_state != FOLD_FULL
+
+
+#Called on the way into the mansion, which always opens on the household: a floorplan the player
+#left up is not carried across a trip to a character screen, the town or a scene. They ask for it
+#again with the view buttons, which is one press.
+func apply_default_fold():
+	set_slave_list_fold(FOLD_FULL, false)
+
+
+#Every state wants the whole list - the ones that ask the player to pick somebody out of it, and
+#the default one because the list is what the mansion rests on. The exception is a lesson in
+#progress: it puts the fold where its own step needs it and nothing else may move it.
+func apply_state_fold(is_default):
+	if is_default and input_handler.hard_tutorial_active:
+		return
+	set_slave_list_fold(FOLD_FULL)
+
+
+#entry lookups for the hard tutorial. The card view has no full-width rows to clamp, so the
+#highlight is the entry's own rect now
+func tut_get_entry_by(check_func, value):
+	for line in SlaveContainer.get_children():
+		if !line.has_meta("slave"):
+			continue
+		if call(check_func, line.get_meta('slave'), value):
+			return line
+	return null
+
+func _tut_is_class(person, value):
+	return person.get_stat('slave_class') == value
+
+func _tut_is_unique(person, value):
+	return person.get_stat('unique') == value
+
+func _tut_is_master(person, _value):
+	return person.is_master()
 
 func tut_get_slave_line():
-	for line in SlaveContainer.get_children():
-		if line.get_meta('slave').get_stat('slave_class') == 'servant':
-			return line
-func tut_get_slave_line_rect():
-	var check_rect
-	for line in SlaveContainer.get_children():
-		if line.get_meta('slave').get_stat('slave_class') == 'servant':
-			check_rect = line.get_global_rect()
-			break
-	check_rect.size.x = 300
-	return check_rect
+	return tut_get_entry_by("_tut_is_class", 'servant')
 func tut_get_daisy_line():
-	for line in SlaveContainer.get_children():
-		if line.get_meta('slave').get_stat('unique') == 'daisy':
-			return line
-func tut_get_daisy_line_rect():
-	var check_rect
-	for line in SlaveContainer.get_children():
-		if line.get_meta('slave').get_stat('unique') == 'daisy':
-			check_rect = line.get_global_rect()
-			break
-	check_rect.size.x = 300
-	return check_rect
+	return tut_get_entry_by("_tut_is_unique", 'daisy')
+func tut_get_master_line():
+	return tut_get_entry_by("_tut_is_master", null)
 
-func tut_get_ff_meat():
-	return SlaveContainer.get_children()[0].get_node("ff_meat")
-#func tut_get_ff_vegetables():
-#	return SlaveContainer.get_children()[0].get_node("ff_vegetables")
+#replacements for the hidden legacy panels: character info and the social skill bar both
+#live on the expanded card now, so the card has to be open before these resolve
+func tut_get_char_info_btn():
+	return ExpandedInfoButton
+func tut_get_mentor_skill_btn():
+	for button in ExpandedSocialSkills.get_children():
+		if button.get_meta("skill", "") == "mentor":
+			return button
+	return null
+#the card action row is a copy of the card layout, so it only resolves while a card is expanded
+func tut_get_progression_btn():
+	if !is_instance_valid(expanded_card_visual):
+		return null
+	return expanded_card_visual.get_node_or_null("Margin/Rows/Actions/Progression")
+func tut_get_training_btn():
+	if !is_instance_valid(expanded_card_visual):
+		return null
+	return expanded_card_visual.get_node_or_null("Margin/Rows/Actions/Training")
+
+#row-view widgets - only present while the list is in one of the non-default modes
 func tut_get_daisy_waitress():
-	var line = tut_get_daisy_line()
-	return line.get_node("rule_waitress")
+	for line in RowContainer.get_children():
+		if !line.has_meta("slave") or !line.has_node("rule_waitress"):
+			continue
+		if line.get_meta('slave').get_stat('unique') == 'daisy':
+			return line.get_node("rule_waitress")
+	return null
+
+#the whole bar is the handle while the list is folded (apply_fold_to_bar), so this frames
+#the strip the player actually has to hit rather than a button-sized corner of it
+func tut_get_list_fold_btn():
+	return ListFoldButton
 
 func tut_get_default_mode():
 	return modes.get_node("default")
@@ -166,6 +1484,7 @@ func off_mass_select_effect():
 	mass_select_press_effect = null
 
 func OpenJobModule(person = null):
+	_close_expanded_character_immediate()
 	input_handler.ActivateTutorial('TUTORIALLIST4')
 	if person != null:
 		get_parent().get_node("MansionJobModule2").selected_location = person.get_location()
@@ -175,7 +1494,31 @@ func OpenJobModule(person = null):
 	get_parent().get_node("MansionJobModule2").focus_on_person_task(person)
 
 
+#Unfolding the list on one character: what the player would do by opening the list and pressing
+#their card, in one step, for a menu opened somewhere else on the screen.
+func unfold_to_person(person):
+	if person == null:
+		return false
+	set_slave_list_fold(FOLD_FULL)
+	var card = card_of_person(person)
+	if card == null:
+		return false
+	_on_card_expand_requested(card)
+	return true
+
+
+func card_of_person(person):
+	for holder in [CardContainer, RowContainer]:
+		if holder == null:
+			continue
+		for card in holder.get_children():
+			if card.get_meta("slave", null) == person:
+				return card
+	return null
+
+
 func OpenInventory(person = null):
+	_close_expanded_character_immediate()
 	get_parent().remove_hovered_person()
 	gui_controller.inventory = input_handler.get_spec_node(input_handler.NODE_INVENTORY_NEW)
 	ResourceScripts.core_animations.UnfadeAnimation(gui_controller.inventory, 0.3)
@@ -187,7 +1530,56 @@ func OpenInventory(person = null):
 	gui_controller.emit_signal("screen_changed")
 
 
+func OpenProgression(person):
+	_close_expanded_character_immediate()
+	get_parent().get_node("CharacterProgressionPopup").open(person)
+
+
+#Training is its own popup over the mansion now, so the card no longer has to detour through
+#the character info window to reach it.
+func OpenTraining(person):
+	_close_expanded_character_immediate()
+	get_parent().remove_hovered_person()
+	get_parent().get_node("CharacterTrainingPopup").open(person, _get_training_tab(person))
+
+
+#The card date button starts the date straight from the mansion list, so the character
+#panel never has to be opened just to reach its date action.
+func OpenDate(person):
+	_close_expanded_character_immediate()
+	get_parent().remove_hovered_person()
+	pending_date_person = person
+	input_handler.get_spec_node(input_handler.NODE_YESNOPANEL, [self, 'date_confirmed', person.translate(tr("DATECONFIRM"))])
+
+
+func date_confirmed():
+	var person = pending_date_person
+	pending_date_person = null
+	if person == null:
+		return
+	person.add_stat('metrics_dates', 1)
+	if !ResourceScripts.game_globals.unlimited_date_sex:
+		ResourceScripts.game_globals.weekly_dates_left -= 1
+	person.tags.push_back("no_date_day")
+	ResourceScripts.core_animations.BlackScreenTransition()
+	yield(get_tree().create_timer(0.5), "timeout")
+	update()
+	gui_controller.date_panel = input_handler.get_spec_node(input_handler.NODE_DATE)
+	gui_controller.previous_screen = gui_controller.current_screen
+	gui_controller.current_screen = gui_controller.date_panel
+	gui_controller.date_panel.raise()
+	gui_controller.date_panel.initiate(person)
+	gui_controller.date_panel.show()
+
+
+func _open_character_info(person):
+	_close_expanded_character_immediate()
+	get_parent().set_active_person(person)
+	get_parent().mansion_state_set("char_info")
+
+
 func OpenSpells(person = null):
+	_close_expanded_character_immediate()
 	get_parent().remove_hovered_person()
 	gui_controller.spells = input_handler.get_spec_node(input_handler.NODE_SPELLS)
 	ResourceScripts.core_animations.UnfadeAnimation(gui_controller.spells, 0.3)
@@ -200,128 +1592,782 @@ func OpenSpells(person = null):
 func update_buttons():
 	for i in SlaveContainer.get_children():
 		if i.has_meta("slave"):
-			i.pressed = (get_parent().active_person == i.get_meta('slave'))
+			var should_be_pressed = get_parent().active_person == i.get_meta('slave')
+			if i.pressed != should_be_pressed:
+				i.pressed = should_be_pressed
+				_refresh_card_visual(i)
+
+
+func _select_slave_container():
+	var use_cards = mode == 'default'
+	CardContainer.visible = use_cards
+	RowContainer.visible = !use_cards
+	SlaveContainer = CardContainer if use_cards else RowContainer
+
+
+func _initialize_entry_templates():
+	#The card view must not carry the entire hidden legacy row. With a large roster those
+	#dozens of extra Controls per card make every idle frame and layout pass expensive.
+	for container in [CardContainer, RowContainer]:
+		var container_template = container.get_node("Button")
+		if container_template.get_child_count() > 0:
+			continue
+		for template_child in EntryContentTemplate.get_children():
+			if container == CardContainer and template_child.name != "CardLayout":
+				continue
+			container_template.add_child(template_child.duplicate())
+		container_template.get_parent().set_meta("built_rows_signature", "")
+
+
+func _ensure_selected_container_entries():
+	var signature = build_rows_signature()
+	if SlaveContainer.get_meta("built_rows_signature", "") == signature:
+		return
+	input_handler.ClearContainer(SlaveContainer)
+	if SlaveContainer == RowContainer:
+		mass_rule_list.clear()
+		mass_service_list.clear()
+	for person_id in ResourceScripts.game_party.character_order:
+		var person = ResourceScripts.game_party.characters[person_id]
+		if SlaveContainer == CardContainer:
+			_build_card_entry(person, person_id)
+		else:
+			_build_row_entry(person, person_id)
+	SlaveContainer.set_meta("built_rows_signature", signature)
+
+
+func _setup_card(newbutton, person):
+	newbutton.get_node(CARD_ACTIONS + "/Progression").connect("pressed", self, "OpenProgression", [person])
+	newbutton.get_node(CARD_ACTIONS + "/Training").connect("pressed", self, "OpenTraining", [person])
+	newbutton.get_node(CARD_ACTIONS + "/Inventory").connect("pressed", self, "OpenInventory", [person])
+	newbutton.get_node(CARD_ACTIONS + "/CharInfo").connect("pressed", self, "_open_character_info", [person])
+	newbutton.get_node(CARD_ACTIONS + "/Date").connect("pressed", self, "OpenDate", [person])
+	_set_card_text_tooltip(newbutton.get_node(CARD_ACTIONS + "/Progression"), tr("BTNLEVELING"))
+	_set_card_text_tooltip(newbutton.get_node(CARD_ACTIONS + "/Training"), tr("SIBLINGMODULETRAININGS"))
+	_set_card_text_tooltip(newbutton.get_node(CARD_ACTIONS + "/Inventory"), tr("LMMINVENTORY"))
+	_set_card_text_tooltip(newbutton.get_node(CARD_ACTIONS + "/CharInfo"), tr("MSMNAME"))
+	_set_card_text_tooltip(newbutton.get_node(CARD_ACTIONS + "/Date"), tr("BTNDATE"))
+
+
+func _set_card_text_tooltip(node, tooltip_text, move_right = false):
+	var signature = str(move_right) + "|" + str(tooltip_text)
+	if node.has_meta("card_tooltip_signature") and node.get_meta("card_tooltip_signature") == signature:
+		return
+	if tooltip_text == "":
+		globals.disconnect_text_tooltip(node)
+	else:
+		globals.connecttexttooltip(node, tooltip_text, move_right)
+	node.set_meta("card_tooltip_signature", signature)
+
+
+func _get_date_availability(person):
+	if person.is_on_quest():
+		return [false, "ONQUESTLABEL"]
+	if person.is_master():
+		return [false, "NODATEMASTER"]
+	if person.has_status("no_date"):
+		return [false, "NODATEUNIQUE"]
+	if person.get_stat('slave_class') in ['servant', 'servant_notax', 'heir'] and !person.has_status("relation"):
+		return [false, "NODATERELATION"]
+	if person.tags.has("no_date_day") and !ResourceScripts.game_globals.unlimited_date_sex:
+		return [false, "NODATETODAY"]
+	if ResourceScripts.game_globals.weekly_dates_left <= 0:
+		return [false, "NODATEWEEK"]
+	return [true, ""]
+
+
+#The same answers the card's own buttons are built from, for anything else that offers those
+#actions - the work strip's menu among them. One set of rules, asked in two places, rather than
+#two sets that drift apart.
+func date_availability(person):
+	return _get_date_availability(person)
+
+
+func training_availability(person):
+	return _get_training_availability(person)
+
+
+func _get_training_availability(person):
+	if person.is_on_quest():
+		return [false, person.translate(tr("ONQUESTLABEL"))]
+	#Servants and heirs use trait training, while masters use their general upgrade tree;
+	#neither route requires an assigned slave trainer.
+	if !person.training.is_slave():
+		return [true, ""]
+	#Finished slave training opens the post-training trait/reward screen.
+	if !person.training.enable:
+		return [true, ""]
+	if person.training.is_rebel_blocked():
+		return [false, tr("ACTIONREBELBLOCKED")]
+	#Today's training is spent, but the panel is still worth opening - the trainer can be
+	#swapped, dispositions read and rewards bought - so this is a note, not a lock. Test mode
+	#lifts the limit inside the panel, so the card must not claim one either.
+	if !person.training.has_category_not_in_cd() and !gui_controller.mansion.in_test_mode:
+		return [true, tr("TRAINCOOLDOWN") % max(int(ceil(person.training.cooldown.positive)), 1)]
+	#A missing trainer is worth saying, but it never blocks the screen itself - the panel
+	#still shows the training setup, so only a time-based block disables the button.
+	if person.training.trainer == null:
+		return [true, person.translate(tr("TRAINNOTRAINER"))]
+	return [true, ""]
+
+
+func _get_training_tab(person):
+	if person.is_master():
+		return "master_upg"
+	if person.get_stat('slave_class') in ['slave', 'slave_trained', 'servant', 'servant_notax', 'heir']:
+		return "trainings"
+	return "minor_upg"
+
+
+func _get_training_title(person):
+	match _get_training_tab(person):
+		"master_upg":
+			return tr("SIBLINGMODULETRAININGSMASTER")
+		"minor_upg":
+			return tr("SIBLINGMODULEMINORTRAINING")
+		_:
+			return tr("SIBLINGMODULETRAININGS")
+
+
+#buying a class is the bigger upgrade, so it sorts ahead of a spare mastery point instead of
+#sharing one bucket with it
+func _get_progress_rank(person):
+	if _can_buy_class(person):
+		return 0
+	for mastery in Skilldata.masteries:
+		if person.can_upgrade_mastery(mastery) or person.can_upgrade_mastery(mastery, true):
+			return 1
+	return 2
+
+
+#enough exp alone is not an upgrade: the character also needs a class they are actually
+#allowed to buy, the same way CharacterProgressionModule enables its Unlock button
+func _can_buy_class(person):
+	if person.get_next_class_exp() > person.get_stat('base_exp'):
+		return false
+	for prof in classesdata.professions.values():
+		if person.has_profession(prof.code):
+			continue
+		if ResourceScripts.game_globals.unlock_all_classes:
+			return true
+		if !person.checkreqs(prof.showupreqs, true) or !person.checkreqs(prof.reqs, true):
+			continue
+		var blocked = false
+		for conflict in prof.conflict_classes:
+			if person.has_profession(conflict):
+				blocked = true
+				break
+		if !blocked:
+			return true
+	return false
+
+
+func _get_character_type_tooltip(person):
+	return globals.character_type_tooltip(person)
+
+
+func _work_icon_texture(value):
+	if value is String:
+		return load(value)
+	return value
+
+
+func _get_card_work_output(person, job_text):
+	var result = {texture = null, tooltip = ""}
+	var work_code = person.get_work()
+	if work_code in ['', 'learning', 'travel'] or person.is_on_quest():
+		return result
+	if work_code == 'crafting':
+		var task_id = person.predict_active_task()
+		if task_id == null or !ResourceScripts.game_res.tasks_progresses.has(task_id):
+			return result
+		var craft_task = ResourceScripts.game_res.tasks_progresses[task_id]
+		if craft_task.job == 'building':
+			if upgradedata.upgradelist.has(task_id):
+				var upgrade = upgradedata.upgradelist[task_id]
+				result.texture = images.upgrade_icons[upgrade.icon]
+				result.tooltip = "[center]" + job_text + "[/center]\n" + tr(upgrade.name)
+			return result
+		if !Items.recipes.has(craft_task.id):
+			return result
+		var recipe = Items.recipes[craft_task.id]
+		var item_data = Items.materiallist.get(recipe.resultitem) if recipe.resultitemtype == 'material' else Items.itemlist.get(recipe.resultitem)
+		if item_data != null:
+			result.texture = _work_icon_texture(item_data.icon)
+			result.tooltip = "[center]" + job_text + "[/center]\n" + tr(item_data.name)
+		return result
+	if ResourceScripts.game_res.is_farming_work(work_code):
+		var farm_outputs = person.get_farming_rules()
+		var output_names = []
+		for output_code in farm_outputs:
+			if !Items.materiallist.has(output_code):
+				continue
+			var material = Items.materiallist[output_code]
+			if result.texture == null:
+				result.texture = _work_icon_texture(material.icon)
+			output_names.append(tr(material.name))
+		if !output_names.empty():
+			result.tooltip = "[center]" + job_text + "[/center]\n" + PoolStringArray(output_names).join(", ")
+		return result
+	var task = person.find_worktask()
+	if task == null:
+		return result
+	if task.has('job') and Items.materiallist.has(task.job):
+		var material = Items.materiallist[task.job]
+		result.texture = _work_icon_texture(material.icon)
+		result.tooltip = "[center]" + job_text + "[/center]\n" + tr(material.name)
+	elif task.has('icon') and task.icon != null:
+		result.texture = _work_icon_texture(task.icon)
+		result.tooltip = "[center]" + job_text + "[/center]"
+	return result
+
+
+func _get_card_work_icon(person, output):
+	if output.texture != null:
+		return output.texture
+	if person.is_on_quest() or person.get_work() == "disabled":
+		return TEX_WORK_QUEST
+	#service is a task per settlement now, so the work code carries the place with it
+	if ResourceScripts.game_res.is_service_task(person.get_work()):
+		return TEX_WORK_SERVICE
+	match person.get_work():
+		"", "rest":
+			return TEX_WORK_REST
+		"travel":
+			return TEX_TRAVEL_SMALL
+		"learning":
+			return TEX_WORK_TRAINING
+		"crafting":
+			return TEX_WORK_CRAFT
+	var task = person.find_worktask()
+	if task != null:
+		if task.has("production_icon") and task.production_icon != null:
+			return _work_icon_texture(task.production_icon)
+		if task.has("icon") and task.icon != null:
+			return _work_icon_texture(task.icon)
+	return TEX_WORK_REST
+
+
+func _set_card_work_highlight(newbutton, color_key):
+	var highlight = newbutton.get_node(CARD_WORK_HIGHLIGHT)
+	var color = Color(variables.hexcolordict[JOB_COLOR_DEFAULT])
+	if variables.hexcolordict.has(color_key):
+		color = Color(variables.hexcolordict[color_key])
+	color.a = 0.9
+	highlight.self_modulate = color
+
+
+func _update_card_work_type(newbutton, person, job_text, color_key = ""):
+	var work_icon = newbutton.get_node(CARD_WORK_TYPE)
+	var work_label = newbutton.get_node(CARD_WORK_LABEL)
+	var work_strip = newbutton.get_node(CARD_WORK_STRIP)
+	var output = _get_card_work_output(person, job_text)
+	work_icon.texture = _get_card_work_icon(person, output)
+	work_icon.visible = work_icon.texture != null
+	work_label.text = job_text
+	work_label.hide()
+	if color_key == "":
+		color_key = _get_card_job_display(person).color
+	_set_card_work_highlight(newbutton, color_key)
+	_set_card_text_tooltip(work_strip, job_text)
+
+
+func _reset_card_location_strip(newbutton):
+	newbutton.get_node(CARD_LOCATION_ICON).texture = null
+	_set_card_text_tooltip(newbutton.get_node(CARD_LOCATION_STRIP), "")
+	_set_card_location_backdrop(newbutton, null)
+
+
+func _get_card_location_backdrop(location_code):
+	#the strip carries small icons, the backdrop behind the portrait wants the location art
+	#itself. Capitals have no background of their own, but their icon id doubles as one
+	if location_code in ["Mansion", "mansion"]:
+		return images.get_card_background("mansion")
+	var location_data = ResourceScripts.world_gen.get_location_from_code(location_code)
+	if location_data == null:
+		return null
+	if location_data.type == "capital":
+		return images.get_card_background(worlddata.lands[location_data.area].capital_icon)
+	if !location_data.has('background'):
+		return null
+	return images.get_card_background(location_data.background)
+
+
+func _set_card_location_backdrop(newbutton, location_code):
+	var backdrop = newbutton.get_node_or_null(CARD_LOCATION_BACKDROP)
+	if backdrop == null: #row layouts have no portrait card to put it behind
+		return
+	backdrop.texture = null if location_code == null else _get_card_location_backdrop(location_code)
+
+
+func _refresh_entry_portrait(entry, person):
+	if person == null:
+		return
+	if entry.has_node(CARD_PORTRAIT):
+		entry.get_node(CARD_PORTRAIT).texture = person.get_icon()
+	if entry.has_node("icon"):
+		entry.get_node("icon").texture = person.get_icon_small()
+
+
+#a regenerated portrait lands a couple of frames after whatever triggered it, long after
+#the list drew itself, and nothing here listened for it - the card kept the old picture
+#until the next full rebuild. Re-reading is a cached lookup now, so every entry just takes
+#its own again rather than the signal carrying who changed
+func refresh_portraits():
+	if SlaveContainer != null:
+		for entry in SlaveContainer.get_children():
+			if !is_instance_valid(entry) or entry.is_queued_for_deletion() or !entry.has_meta('slave'):
+				continue
+			_refresh_entry_portrait(entry, entry.get_meta('slave'))
+	if !is_instance_valid(expanded_card) or !is_instance_valid(expanded_card_visual):
+		return
+	var portrait_path = CARD_PORTRAIT.trim_prefix("CardLayout/")
+	var expanded_person = expanded_card.get_meta("slave", null)
+	if expanded_person != null and expanded_card_visual.has_node(portrait_path):
+		expanded_card_visual.get_node(portrait_path).texture = expanded_person.get_icon()
+
+
+func _get_navigation_location_texture(location_code):
+	#Keep the card thumbnail identical to the one produced by NavigationModule.
+	if location_code in ["Mansion", "mansion"]:
+		return images.get_background("mansion")
+	if location_code == "Infinite":
+		return images.get_icon("tower")
+	var location_data = ResourceScripts.world_gen.get_location_from_code(location_code)
+	if location_data == null:
+		return null
+	if location_data.type == "capital":
+		return images.get_icon(worlddata.lands[location_data.area].capital_icon)
+	return images.get_background(location_data.background)
+
+
+func _set_card_location_strip(newbutton, texture, label, tooltip = ""):
+	newbutton.get_node(CARD_LOCATION_ICON).texture = texture
+	_set_card_text_tooltip(newbutton.get_node(CARD_LOCATION_STRIP), tooltip if tooltip != "" else label)
+
+
+#The strip along the foot of the card: how much of the next class unlock is banked. It is filled
+#here rather than beside the HP and MP bars so it is refreshed by whatever refreshes the level-up
+#mark over the portrait - the two read the same two numbers and must never disagree.
+func _update_card_exp_bar(newbutton, person):
+	var bar = newbutton.get_node(CARD_EXP_BAR)
+	var current = floor(person.get_stat('base_exp'))
+	var required = max(floor(person.get_next_class_exp()), 1)
+	bar.max_value = required
+	bar.value = min(current, required)
+	bar.tint_progress = Color(variables.hexcolordict.levelup_text_color) if current >= required else CARD_EXP_COLOR
+	_set_card_text_tooltip(bar, "%s %d/%d" % [tr("STATBASE_EXP"), int(current), int(required)])
+
+
+func _set_card_action_available(button, available):
+	button.disabled = !available
+	button.material = null if available else CARD_ACTION_DISABLED_MATERIAL
+
+
+func _update_card_action_states(newbutton, person):
+	newbutton.get_node(CARD_LEVELUP_INDICATOR).visible = person.get_stat('base_exp') >= person.get_next_class_exp()
+	_update_card_exp_bar(newbutton, person)
+	var progression_button = newbutton.get_node(CARD_ACTIONS + "/Progression")
+	var progression_available = person.is_avaliable()
+	_set_card_action_available(progression_button, progression_available)
+	var progression_tooltip = tr("BTNLEVELING")
+	if !progression_available:
+		progression_tooltip += "\n" + person.get_unaval_string()
+	_set_card_text_tooltip(progression_button, progression_tooltip)
+	var training_availability = _get_training_availability(person)
+	var training_button = newbutton.get_node(CARD_ACTIONS + "/Training")
+	_set_card_action_available(training_button, training_availability[0])
+	var training_tooltip = _get_training_title(person)
+	if !training_availability[0]:
+		training_tooltip += "\n" + training_availability[1]
+	else:
+		training_tooltip += "\n" + tr("TRAINTOOLTIP")
+		#an available button can still carry a note, like a slave waiting for a trainer
+		if training_availability[1] != "":
+			training_tooltip += "\n" + training_availability[1]
+	_set_card_text_tooltip(training_button, training_tooltip)
+	var date_availability = _get_date_availability(person)
+	var date_button = newbutton.get_node(CARD_ACTIONS + "/Date")
+	date_button.visible = !person.is_master()
+	_set_card_action_available(date_button, date_availability[0])
+	var date_tooltip = tr("BTNDATE") + " (%d/%d)" % [ResourceScripts.game_globals.weekly_dates_left, ResourceScripts.game_globals.weekly_dates_max]
+	if !date_availability[0]:
+		date_tooltip += "\n" + person.translate(tr(date_availability[1]))
+	_set_card_text_tooltip(date_button, date_tooltip)
+	var inventory_button = newbutton.get_node(CARD_ACTIONS + "/Inventory")
+	_set_card_action_available(inventory_button, !person.is_on_quest())
+	var inventory_tooltip = tr("LMMINVENTORY")
+	if inventory_button.disabled:
+		inventory_tooltip += "\n" + person.translate(tr("ONQUESTLABEL"))
+	_set_card_text_tooltip(inventory_button, inventory_tooltip)
+
+
+func _get_job_color_key(mod_value):
+	if typeof(mod_value) != TYPE_STRING or mod_value == "":
+		return JOB_COLOR_DEFAULT
+	if JOB_SERVICE_MODS.has(mod_value):
+		return JOB_COLOR_SERVICE
+	if JOB_GATHER_MODS.has(mod_value):
+		return JOB_COLOR_GATHER
+	if JOB_CRAFT_MODS.has(mod_value):
+		return JOB_COLOR_CRAFT
+	return JOB_COLOR_DEFAULT
+
+
+#The card view used to refresh every hidden legacy column as well. Keep the display
+#calculation independent so the normal mansion screen only touches controls it can draw.
+func _get_card_job_display(person):
+	var result = {text = tr("TASKREST"), color = JOB_COLOR_DEFAULT}
+	var work_code = person.get_work()
+	var is_traveling = person.travel.location == "travel" || person.check_location('travel') || work_code == 'travel'
+	if is_traveling:
+		result.text = tr("TASKTRAVEL")
+		result.color = JOB_COLOR_TRAVEL
+	elif work_code == '' or !person.is_avaliable():
+		if person.is_on_quest():
+			var time_left = int(person.get_quest_time_remains())
+			if time_left > 0:
+				var time_left_string = ''
+				if time_left == 1:
+					time_left = 4 - ResourceScripts.game_globals.hour
+					time_left_string = str(time_left) + " turns"
+				else:
+					time_left_string = str(time_left) + " d."
+				result.text = "On Quest: " + time_left_string
+			else:
+				result.text = person.get_unaval_string()
+		else:
+			result.color = JOB_COLOR_REST
+	elif work_code == 'learning':
+		result.text = tr("SIBLINGMODULETRAININGS")
+	elif work_code == 'crafting':
+		var predict_task_id = person.predict_active_task()
+		if predict_task_id == null or !ResourceScripts.game_res.tasks_progresses.has(predict_task_id):
+			result.text = tr('TASKREST')
+		else:
+			var predict_task = ResourceScripts.game_res.tasks_progresses[predict_task_id]
+			var predict_task_cat = predict_task.job
+			if predict_task_cat != 'building':
+				predict_task_cat = predict_task_cat.trim_suffix('_item')
+				predict_task_cat = predict_task_cat.trim_suffix('_material')
+			if tasks.tasklist.has(predict_task_cat):
+				var predict_job = tasks.tasklist[predict_task_cat]
+				result.text = tr(predict_job.name)
+				if predict_job.has('mod'):
+					result.color = _get_job_color_key(predict_job.mod)
+	else:
+		var task = person.find_worktask()
+		if task != null:
+			result.text = tr(task.name)
+			if task.has('mod'):
+				result.color = _get_job_color_key(task.mod)
+	if !person.is_worker():
+		result.color = 'red'
+	return result
+
+
+func _update_card_location(newbutton, person):
+	if !person.is_avaliable():
+		_set_card_location_strip(newbutton, null, person.get_unaval_string())
+		_set_card_location_backdrop(newbutton, null)
+		return
+	if person.check_location('travel'):
+		var tooltip = tr("MSLMRELOC") + ": " + tr("MSLMRE") + " " + str(ceil(person.travel.travel_time / person.travel_per_tick())) + tr("MSLMTURN") + ". "
+		var texture = _get_navigation_location_texture(person.travel.travel_target.location)
+		if texture == null:
+			texture = TEX_TRAVEL_SMALL
+		_set_card_location_strip(newbutton, texture, tr("TASKTRAVEL"), tooltip)
+		#on the road the strip already points at where they are headed, so does the backdrop
+		_set_card_location_backdrop(newbutton, person.travel.travel_target.location)
+		return
+	if person.check_location('aliron') || person.get_location() == "mansion":
+		_set_card_location_strip(newbutton, _get_navigation_location_texture("mansion"), tr("MANSION_LABEL"))
+		_set_card_location_backdrop(newbutton, "mansion")
+		return
+	var location_code = person.get_location()
+	var location = ResourceScripts.world_gen.get_location_from_code(location_code)
+	if location != null:
+		_set_card_location_strip(newbutton, _get_navigation_location_texture(location_code), tr(location.name))
+		_set_card_location_backdrop(newbutton, location_code)
+	else:
+		_set_card_location_strip(newbutton, null, "")
+		_set_card_location_backdrop(newbutton, null)
+
+
+func _update_card_static_content(newbutton, person):
+	var sex = person.get_stat('sex')
+	var race = person.get_stat('race')
+	var slave_class = person.get_stat('slave_class')
+	var signature = "%s|%s|%s|%s|%s" % [
+		person.get_short_name(),
+		sex,
+		race,
+		slave_class,
+		str(person.get_stat('unique')),
+	]
+	if newbutton.has_meta("card_static_signature") and newbutton.get_meta("card_static_signature") == signature:
+		return
+	newbutton.set_meta("card_static_signature", signature)
+	newbutton.get_node(CARD_ROOT + "/Header/Name").text = person.get_short_name()
+	newbutton.get_node(CARD_STATUS).texture = person.get_class_icon()
+	newbutton.get_node(CARD_SEX).texture = images.get_icon(sex)
+	var race_icon = races.racelist[race].icon
+	if race_icon is String:
+		race_icon = load(race_icon)
+	newbutton.get_node(CARD_RACE).texture = race_icon
+	var name_color = Color(variables.hexcolordict.unique) if person.is_master() or person.is_unique() else Color(0.878431, 0.878431, 0.878431)
+	newbutton.get_node(CARD_ROOT + "/Header/Name").set("custom_colors/font_color", name_color)
+	_set_card_text_tooltip(newbutton.get_node(CARD_SEX), tr("MSLMSex") + ": " + tr("SLAVESEX" + sex.to_upper()))
+	_set_card_text_tooltip(newbutton.get_node(CARD_STATUS), _get_character_type_tooltip(person))
+	_set_card_text_tooltip(newbutton.get_node(CARD_RACE), "[center]{color=green|" + races.racelist[race].name + "}[/center]\n\n" + person.show_race_description())
+
+
+func _update_card_button(newbutton, person):
+	newbutton.get_node(CARD_PORTRAIT).texture = person.get_icon()
+	input_handler.queue_portrait(person) #most of a mansion never had a shot taken at all
+	_update_card_static_content(newbutton, person)
+	_update_card_progress(newbutton.get_node(CARD_HP_BAR), tr("STATHP"), person.hp, person.get_stat('hpmax'))
+	_update_card_progress(newbutton.get_node(CARD_MP_BAR), tr("STATMP"), person.mp, person.get_stat('mpmax'))
+	var lust_bar = newbutton.get_node(CARD_LUST_BAR)
+	lust_bar.visible = person.check_trait('succubus')
+	if lust_bar.visible:
+		_update_card_progress(lust_bar, tr("STATLUST"), person.get_stat('lust'), person.get_stat('lustmax'))
+	var job_display = _get_card_job_display(person)
+	newbutton.set_meta("card_job_text", job_display.text)
+	_update_card_work_type(newbutton, person, job_display.text, job_display.color)
+	_set_job_label_color_from_key(newbutton.get_node(CARD_WORK_LABEL), job_display.color)
+	_update_card_location(newbutton, person)
+	#The character sheet opens whatever the person is doing - being away or on a quest is
+	#something the sheet itself reports, not a reason to shut it. What they work at is written
+	#on the card's own work strip, which is where the old button's tooltip only repeated it.
+	var card_info = newbutton.get_node(CARD_ACTIONS + "/CharInfo")
+	_set_card_action_available(card_info, true)
+	_set_card_text_tooltip(card_info, tr("MSMNAME"))
+	_update_card_warnings(newbutton, person)
+	_refresh_card_visual(newbutton)
+
+
+func get_turn_animation_source(person_id):
+	if is_instance_valid(expanded_card) and is_instance_valid(expanded_card_visual):
+		var expanded_person = expanded_card.get_meta("slave", null)
+		var portrait_path = CARD_PORTRAIT.trim_prefix("CardLayout/")
+		if expanded_person != null and str(expanded_person.id) == str(person_id) and expanded_card_visual.has_node(portrait_path):
+			return expanded_card_visual.get_node(portrait_path)
+	for card in CardContainer.get_children():
+		var person = card.get_meta("slave", null)
+		if person == null or str(person.id) != str(person_id) or !card.has_node(CARD_PORTRAIT):
+			continue
+		var portrait = card.get_node(CARD_PORTRAIT)
+		if !$ScrollContainer.get_global_rect().intersects(portrait.get_global_rect()):
+			return null
+		return portrait
+	return null
+
+
+func _set_card_hover(newbutton, hovered):
+	newbutton.set_meta("card_hovered", hovered)
+	_refresh_card_visual(newbutton)
+
+
+func _on_card_toggled(pressed, newbutton):
+	_refresh_card_visual(newbutton)
+
+
+func _refresh_card_visual(newbutton):
+	var card_person = newbutton.get_meta("slave", null)
+	var card_alpha = HIDDEN_CHARACTER_ALPHA \
+		if card_person != null and card_person.check_work_rule("hide") else 1.0
+	if !newbutton.has_node("CardLayout"):
+		newbutton.modulate.a = card_alpha
+		return
+	var color = Color(1, 1, 1)
+	if newbutton.disabled:
+		color = Color(0.55, 0.55, 0.55)
+	elif newbutton.pressed:
+		color = Color(1.18, 1.06, 0.72)
+	elif newbutton.get_meta("card_hovered", false):
+		color = Color(1.12, 1.08, 1.02)
+	var card_layout = newbutton.get_node("CardLayout")
+	card_layout.self_modulate = color
+	card_layout.modulate.a = card_alpha
+
+#a roster change while the mansion screen is hidden waits for on_mansion_shown
+var rebuild_pending = false
 
 func rebuild():
-	#update_button reads this for the luxury rule, and rebuild can run before the first
-	#update()/refresh_after_turn() - on a fresh game the queued rebuild is the very first call
-	luxury_rooms_taken = globals.calculate_lux_rooms()
+	if !get_parent().visible:
+		rebuild_pending = true
+		return
+	rebuild_pending = false
+	upkeep_refresh_pending = false
+	_prepare_rebuild()
+	_ensure_selected_container_entries()
+	_finish_rebuild()
+
+
+func rebuild_for_loading(progress_node, progress_start, progress_end):
+	# This path is only used while a save is opening. Build a frame-budgeted batch so
+	# large rosters advance the loading bar instead of freezing it on one percentage.
+	yield(get_tree(), "idle_frame")
+	_prepare_rebuild()
+	yield(_ensure_selected_container_entries_for_loading(
+		progress_node,
+		progress_start,
+		progress_end
+	), "completed")
+	_finish_rebuild()
+	if is_instance_valid(progress_node):
+		progress_node.set_progress(progress_end)
+
+
+func _prepare_rebuild():
+	task_refresh_queued = false
+	_close_expanded_character_immediate()
+	_select_slave_container()
 	update_dislocations()
 #	build_locations_list()
 	#LocationsPanel.visible = (get_parent().mansion_state != "sex")
-#	$population.visible = LocationsPanel.is_visible()
-#	$food_consumption.visible = LocationsPanel.is_visible()
-#	$BedroomLimit.visible = !LocationsPanel.is_visible()
-#	$BedroomIcon.visible = !LocationsPanel.is_visible()
-#	$SexLimit.visible = !LocationsPanel.is_visible()
-#	$SexIcon.visible = !LocationsPanel.is_visible()
-#	$DateLimit.visible = !LocationsPanel.is_visible()
-#	$DateIcon.visible = !LocationsPanel.is_visible()
-	$population.text = str(ResourceScripts.game_party.characters.size()) +"/" + str(ResourceScripts.game_res.get_pop_cap())
-
-	$food_consumption.text = str(ResourceScripts.game_party.get_food_consumption()) + "/" + tr("MSLMDAY")
-	input_handler.ClearContainer(SlaveContainer)
+	input_handler.ClearContainer(CardContainer)
+	input_handler.ClearContainer(RowContainer)
+	CardContainer.set_meta("built_rows_signature", "")
+	RowContainer.set_meta("built_rows_signature", "")
 	mass_rule_list.clear()
 	mass_service_list.clear()
-	for i in ResourceScripts.game_party.character_order:
-		var person = ResourceScripts.game_party.characters[i]
-		var newbutton = input_handler.DuplicateContainerTemplate(SlaveContainer)
-		
-		newbutton.get_node("rhand").connect("pressed", self, 'OpenInventory', [person])
-		newbutton.get_node("rhand").set_disabled(false)
-		newbutton.get_node("lhand").connect("pressed", self, 'OpenInventory', [person])
-		newbutton.get_node("lhand").set_disabled(false)
-		newbutton.get_node("chest").connect("pressed", self, 'OpenInventory', [person])
-		newbutton.get_node("chest").set_disabled(false)
-		newbutton.get_node("legs").connect("pressed", self, 'OpenInventory', [person])
-		newbutton.get_node("legs").set_disabled(false)
-		newbutton.get_node("SpellIcon").connect("pressed", self, 'OpenSpells', [person])
-		
-		for rl in ['lock', 'ration', 'shifts', 'constrain', 'luxury', 'contraceptive', 'nudity', 'personality_lock', 'relationship', 'masturbation']:
-			var true_btn = newbutton.get_node('rule_' + rl)
-			true_btn.connect('pressed', self, 'toggle_rules', [newbutton, rl])
-			if rl != 'luxury':
-				globals.connecttexttooltip(newbutton.get_node('rule_' + rl), "[center]"+tr("WORKRULE"+rl.to_upper()) + "[/center]\n" + person.translate(tr('WORKRULE%sDESCRIPT' % rl.to_upper())))
-			mass_rule_list.append({
-				btn_node = true_btn,
-				act_func = 'toggle_rules_mass',
-				act_args = [weakref(newbutton), rl]
-			})
-		for rl in  ['waitress', 'hostess', 'dancer', 'stripper', 'males', 'females', 'futa', 'petting', 'oral', 'anal', 'pussy', 'group', 'sextoy']:
-			var true_btn = newbutton.get_node('rule_' + rl)
-			true_btn.connect('pressed', self, 'toggle_service', [newbutton, rl])
-			globals.connecttexttooltip(newbutton.get_node('rule_' + rl), "[center]" + tr("BROTHEL"+rl.to_upper()) + "[/center]\n" + person.translate(tr('BROTHEL%sDESCRIPT' % rl.to_upper())))
-			mass_service_list.append({
-				btn_node = true_btn,
-				act_func = 'toggle_service_mass',
-				act_args = [weakref(newbutton), rl]
-			})
-		for f_id in ['meat', 'fish', 'grain', 'vegetables', 'bread', 'meatsoup', 'curry', 'friedfish', 'fishcakes']:
-			newbutton.get_node('ff_' + f_id).connect('pressed', self, 'press_food', [newbutton, f_id])
-		
-#		var list = person.get_social_skills()
-#		newbutton.get_node("SpellIcon").visible = !list.empty()
-		newbutton.get_node("SpellIcon").visible = false
-		
-		update_row_availability(newbutton, person)
+	_select_slave_container()
 
-		newbutton.pressed = (get_parent().active_person == person)
-		newbutton.set_meta('slave', person)
 
-		# globals.connectslavetooltip(newbutton, person)
-		
-		newbutton.target_node = self
-		newbutton.target_function = 'rebuild'
-		newbutton.arraydata = i
-		newbutton.parentnodearray = ResourceScripts.game_party.character_order
-
-		newbutton.connect('pressed', get_parent(), 'set_active_person', [person])
-		newbutton.connect('gui_input', self, 'double_clicked', [newbutton])
-		newbutton.connect('mouse_entered', get_parent(), 'set_hovered_person', [newbutton, person])
-		newbutton.connect('mouse_exited_custom', get_parent(), 'remove_hovered_person')
-		
-		newbutton.get_node("job").connect("pressed", self, 'OpenJobModule', [person])
-#		newbutton.get_node("job").set_disabled(false)
-#		newbutton.get_node("job").disabled = person.travel.location == "travel" || person.is_on_quest()
-		
-		match get_parent().mansion_state:
-			"skill":
-				build_for_skills(person, newbutton)
-				newbutton.get_node("job").set_disabled(true)
-				newbutton.get_node("job").set_mouse_filter(MOUSE_FILTER_IGNORE)
-			"default":
-				pass
-			"sex":
-				build_for_sex(person, newbutton)
-		var pos = self.rect_size
-		$TravelsContainerPanel.rect_position.y = pos.y - 50
-		update_button(newbutton)
+func _finish_rebuild():
 	apply_sorting()
 	rows_signature = build_rows_signature()
 	show_location_characters()
-	update_description()
 	update_header()
 
 
-func update_row_availability(newbutton, person):
+func _ensure_selected_container_entries_for_loading(progress_node, progress_start, progress_end):
+	# Always yield once so rebuild_for_loading() can safely await this even for an empty roster.
+	yield(get_tree(), "idle_frame")
+	var signature = build_rows_signature()
+	if SlaveContainer.get_meta("built_rows_signature", "") == signature:
+		if is_instance_valid(progress_node):
+			progress_node.set_progress(progress_end)
+		return
+	var character_ids = ResourceScripts.game_party.character_order
+	var total = max(character_ids.size(), 1)
+	var completed = 0
+	var slice_start = OS.get_ticks_msec()
+	for person_id in character_ids:
+		var person = ResourceScripts.game_party.characters[person_id]
+		if SlaveContainer == CardContainer:
+			_build_card_entry(person, person_id)
+		else:
+			_build_row_entry(person, person_id)
+		completed += 1
+		if is_instance_valid(progress_node):
+			progress_node.set_progress(lerp(progress_start, progress_end, float(completed) / total))
+		if OS.get_ticks_msec() - slice_start >= variables.turn_frame_budget_msec:
+			yield(get_tree(), "idle_frame")
+			slice_start = OS.get_ticks_msec()
+	SlaveContainer.set_meta("built_rows_signature", signature)
+
+
+func _setup_entry_common(newbutton, person, person_id):
+	newbutton.pressed = get_parent().active_person == person
+	newbutton.set_meta('slave', person)
+	newbutton.target_node = self
+	newbutton.target_function = 'apply_manual_order'
+	newbutton.arraydata = person_id
+	newbutton.parentnodearray = ResourceScripts.game_party.character_order
+	newbutton.connect('pressed', get_parent(), 'set_active_person', [person])
+	newbutton.connect('gui_input', self, 'double_clicked', [newbutton])
+	newbutton.connect('mouse_entered', get_parent(), 'set_hovered_person', [newbutton, person])
+	newbutton.connect('mouse_exited_custom', get_parent(), 'remove_hovered_person')
+
+
+func _apply_mansion_state_to_entry(person, newbutton):
+	if newbutton.get_parent() == CardContainer:
+		return
+	match get_parent().mansion_state:
+		"skill":
+			build_for_skills(person, newbutton)
+			newbutton.get_node("job").set_disabled(true)
+			newbutton.get_node("job").set_mouse_filter(MOUSE_FILTER_IGNORE)
+		"sex":
+			build_for_sex(person, newbutton)
+
+
+func _build_card_entry(person, person_id):
+	var newbutton = input_handler.DuplicateContainerTemplate(CardContainer)
+	_setup_entry_common(newbutton, person, person_id)
+	newbutton.connect('pressed', self, '_on_card_expand_requested', [newbutton])
+	_setup_card(newbutton, person)
+	newbutton.connect('mouse_entered', self, '_set_card_hover', [newbutton, true])
+	newbutton.connect('mouse_exited_custom', self, '_set_card_hover', [newbutton, false])
+	newbutton.connect('toggled', self, '_on_card_toggled', [newbutton])
+	update_entry_availability(newbutton, person, false)
+	update_button(newbutton, 'default')
+	_apply_mansion_state_to_entry(person, newbutton)
+
+
+func _build_row_entry(person, person_id):
+	var newbutton = input_handler.DuplicateContainerTemplate(RowContainer)
+	_setup_entry_common(newbutton, person, person_id)
+	for slot in ['rhand', 'lhand', 'chest', 'legs']:
+		newbutton.get_node(slot).connect("pressed", self, 'OpenInventory', [person])
+	newbutton.get_node("job").connect("pressed", self, 'OpenJobModule', [person])
+	for rl in ['lock', 'ration', 'shifts', 'constrain', 'contraceptive', 'nudity', 'relationship', 'masturbation']:
+		var true_btn = newbutton.get_node('rule_' + rl)
+		true_btn.connect('pressed', self, 'toggle_rules', [newbutton, rl])
+		globals.connecttexttooltip(true_btn, "[center]" + tr("WORKRULE" + rl.to_upper()) + "[/center]\n" + person.translate(tr('WORKRULE%sDESCRIPT' % rl.to_upper())))
+		mass_rule_list.append({
+			btn_node = true_btn,
+			act_func = 'toggle_rules_mass',
+			act_args = [weakref(newbutton), rl]
+		})
+	for rl in ['waitress', 'hostess', 'dancer', 'stripper', 'males', 'females', 'futa', 'petting', 'oral', 'anal', 'pussy', 'group', 'sextoy']:
+		var true_btn = newbutton.get_node('rule_' + rl)
+		true_btn.connect('pressed', self, 'toggle_service', [newbutton, rl])
+		globals.connecttexttooltip(true_btn, "[center]" + tr("BROTHEL" + rl.to_upper()) + "[/center]\n" + person.translate(tr('BROTHEL%sDESCRIPT' % rl.to_upper())))
+		mass_service_list.append({
+			btn_node = true_btn,
+			act_func = 'toggle_service_mass',
+			act_args = [weakref(newbutton), rl]
+		})
+	update_entry_availability(newbutton, person, false)
+	update_button(newbutton, mode)
+	_apply_mansion_state_to_entry(person, newbutton)
+
+
+func update_entry_availability(newbutton, person, refresh_visual = true):
+	var card_inventory = newbutton.get_node(CARD_ACTIONS + "/Inventory")
+	if newbutton.get_parent() == CardContainer:
+		newbutton.disabled = person.is_on_quest()
+		card_inventory.disabled = person.is_on_quest()
+		_update_card_action_states(newbutton, person)
+		if refresh_visual:
+			_refresh_card_visual(newbutton)
+		return
 	if person.is_on_quest():
 		newbutton.disabled = true
-		newbutton.get_node("rhand").set_disabled(true)
-		newbutton.get_node("lhand").set_disabled(true)
-		newbutton.get_node("chest").set_disabled(true)
-		newbutton.get_node("legs").set_disabled(true)
+		for slot in ['rhand', 'lhand', 'chest', 'legs']:
+			newbutton.get_node(slot).disabled = true
+		card_inventory.disabled = true
 	else:
 		newbutton.disabled = false
-		newbutton.texture_normal = TEX_ROW_NORMAL
-		newbutton.texture_hover = TEX_ROW_HOVER
-		newbutton.get_node("rhand").set_disabled(false)
-		newbutton.get_node("lhand").set_disabled(false)
-		newbutton.get_node("chest").set_disabled(false)
-		newbutton.get_node("legs").set_disabled(false)
+		if newbutton.get_parent() == RowContainer:
+			newbutton.texture_normal = TEX_ROW_NORMAL
+			newbutton.texture_hover = TEX_ROW_HOVER
+		for slot in ['rhand', 'lhand', 'chest', 'legs']:
+			newbutton.get_node(slot).disabled = false
+		card_inventory.disabled = false
+	_update_card_action_states(newbutton, person)
+	if refresh_visual:
+		_refresh_card_visual(newbutton)
 
 
 var rows_signature = ""
 var rebuild_queued = false
+var upkeep_refresh_queued = false
+var task_refresh_queued = false
 
 
 #task_removed is emitted once per deleted task, and ending a turn from the job panel
@@ -334,6 +2380,7 @@ var rebuild_queued = false
 func queue_rebuild():
 	if rebuild_queued:
 		return
+	task_refresh_queued = false
 	rebuild_queued = true
 	call_deferred("flush_queued_rebuild")
 
@@ -343,28 +2390,76 @@ func flush_queued_rebuild():
 	rebuild()
 
 
-#covers everything that changes how a row is built: the roster, the mansion state, and
-#the list mode - which mansion_state does not always imply, since set_mode changes it alone
+#One sweep however many times the signals fire - a swap between two beds moves two people and
+#a farm delivering its harvest touches a food type per crop, and each of those would otherwise
+#pay for a walk over every card on the list.
+func queue_upkeep_refresh():
+	if upkeep_refresh_queued or rebuild_queued:
+		return
+	upkeep_refresh_queued = true
+	call_deferred("flush_queued_upkeep_refresh")
+
+
+#hidden, the sweep waits for on_mansion_shown too: after rooms_changed every stat read is a full rebuild
+var upkeep_refresh_pending = false
+
+func flush_queued_upkeep_refresh():
+	if !upkeep_refresh_queued:
+		return
+	upkeep_refresh_queued = false
+	if rebuild_queued:
+		return
+	if !get_parent().visible:
+		upkeep_refresh_pending = true
+		return
+	refresh_upkeep_warnings()
+
+
+#Removing a job changes work labels and availability, not the roster or the entry tree.
+#During a turn the normal post-turn refresh is already guaranteed, so avoid doing the same
+#work once in the deferred signal flush and again before input is unlocked.
+func queue_task_refresh():
+	if task_refresh_queued or rebuild_queued:
+		return
+	task_refresh_queued = true
+	call_deferred("flush_queued_task_refresh")
+
+
+func flush_queued_task_refresh():
+	if !task_refresh_queued:
+		return
+	task_refresh_queued = false
+	if rebuild_queued:
+		return
+	if gui_controller.clock != null and is_instance_valid(gui_controller.clock) and gui_controller.clock.turn_in_progress:
+		return
+	if build_rows_signature() != rows_signature:
+		rebuild()
+	else:
+		update()
+
+
+#Covers everything that changes the cached entries themselves. The view mode only changes
+#which already-built container and columns are visible, so it deliberately is not included.
 func build_rows_signature():
-	var res = str(get_parent().mansion_state) + "/" + str(mode)
+	var res = str(get_parent().mansion_state)
 	for id in ResourceScripts.game_party.character_order:
 		res += "|" + str(id)
 	return res
 
 
-#post-turn refresh: a full rebuild recreates ~40 nodes and dozens of tooltips per character,
-#which is the bulk of the finish turn cost. Rows only need recreating when the roster
-#(or the panel mode that changes how a row is built) actually changed
+#Post-turn refresh keeps both cached views. Recreate them only when the roster or mansion
+#state changed; ordinary mode switches and stat changes update the existing controls.
 func refresh_after_turn(spread = false):
 	if spread: #always a coroutine when asked for, so callers can yield on 'completed'
 		yield(get_tree(), 'idle_frame')
-	#the signature already encodes mansion_state and mode, so testing it alone is strictly
-	#stronger than the old "not in default mode -> always rebuild" clause, which forced a
-	#full unsliced rebuild every single turn ended from the job or craft panel
+	#A turn can change equipment and body state even while the preview is closed.
+	expanded_paperdoll_cache_person_id = ""
+	#The old non-default-mode clause forced a full unsliced rebuild every time a turn ended
+	#from the job or craft panel; the cached lists only need their values refreshed.
 	if build_rows_signature() != rows_signature:
 		rebuild()
 		return
-	luxury_rooms_taken = globals.calculate_lux_rooms()
 	update_dislocations()
 	if spread:
 		yield(get_tree(), 'idle_frame')
@@ -373,16 +2468,22 @@ func refresh_after_turn(spread = false):
 		#a rebuild landing between chunks frees these nodes out from under us
 		if !is_instance_valid(i) or i.is_queued_for_deletion() or !i.has_meta('slave'):
 			continue
-		update_row_availability(i, i.get_meta('slave'))
+		update_entry_availability(i, i.get_meta('slave'), false)
 		update_button(i)
 		if spread and OS.get_ticks_msec() - slice >= variables.turn_frame_budget_msec:
 			yield(get_tree(), 'idle_frame')
 			slice = OS.get_ticks_msec()
+	if is_instance_valid(expanded_card) and expanded_animation_state == "open":
+		var expanded_person = expanded_card.get_meta("slave")
+		ExpandedDetails.set_person(expanded_person)
+		_build_expanded_body_preview(expanded_person, true)
+		build_expanded_social_skills(expanded_person)
+		build_expanded_rules(expanded_person)
+		_create_expanded_card_visual()
 	if spread:
 		yield(get_tree(), 'idle_frame')
 	apply_sorting() #occupations and exp moved on, so the sorted view has to follow
 	show_location_characters()
-	update_description()
 	update_header()
 
 
@@ -390,6 +2491,11 @@ func double_clicked(event, button):
 	if !(event is InputEventMouseButton):
 		return
 	if event.button_index == BUTTON_RIGHT and event.pressed and !event.doubleclick:
+		if _tutorial_blocks_rmb():
+			return
+		if expanded_card != null:
+			close_expanded_character()
+			return
 		if button.disabled:
 			return
 #		event.accept_event()
@@ -458,6 +2564,8 @@ func update_dislocations():
 		return
 	locations_signature = new_signature
 	build_locations_list(has_training)
+	#the row was just rebuilt from scratch, so whatever the fold had hidden is back
+	apply_fold_to_bar()
 
 
 func build_locations_list(has_training = null):
@@ -469,22 +2577,21 @@ func build_locations_list(has_training = null):
 	var newseparator = $TravelsContainerPanel/VSeparator.duplicate()
 	LocationsList.add_child(newseparator)
 	newseparator.visible = true
-	newseparator.rect_position.y = 100
 	var sorted_locations = sort_locations()
 	for loca in sorted_locations:
 		if loca == null:
 			continue
 		newbutton = input_handler.DuplicateContainerTemplate(LocationsList)
+		newbutton.set_meta("location", loca)
 		if loca == 'aliron':
 			newbutton.text = tr("MSLMMANSION")
 		else:
 			newbutton.text = ResourceScripts.world_gen.get_location_from_code(loca).name
-		newbutton.set_meta("location", loca)
-		newbutton.connect("pressed", self, "show_location_characters", [newbutton])
+		newbutton.connect("pressed", self, "show_place", [loca, newbutton])
+		globals.connecttexttooltip(newbutton, tr("MSLMSHOWPLACE") % newbutton.text)
 		newseparator = $TravelsContainerPanel/VSeparator.duplicate()
 		LocationsList.add_child(newseparator)
 		newseparator.visible = true
-		newseparator.rect_position.y = 100
 	
 	var f = has_training
 	if f == null: #called directly - work it out ourselves
@@ -533,7 +2640,8 @@ func build_for_sex(person, newbutton):
 	var limit = calculate_sex_limits()
 	var sex_participants = get_parent().sex_participants
 	
-	newbutton.texture_disabled = TEX_ROW_DISABLED
+	if mode != 'default':
+		newbutton.texture_disabled = TEX_ROW_DISABLED
 	
 	if sex_participants.has(person):
 		newbutton.pressed = true
@@ -543,23 +2651,28 @@ func build_for_sex(person, newbutton):
 			newbutton.disabled = true
 
 
-func update_description():
-	var sex_participants = get_parent().sex_participants
-	$BedroomLimit.text = str(sex_participants.size()) +  '/' + str(calculate_sex_limits())
-	$DateLimit.text = str(ResourceScripts.game_globals.weekly_dates_left) + "/" + str(ResourceScripts.game_globals.weekly_dates_max)
-	$SexLimit.text = str(ResourceScripts.game_globals.weekly_sex_left) + "/" + str(ResourceScripts.game_globals.weekly_sex_max)
-
-
 func calculate_sex_limits():
 	if get_parent() != null && get_parent().get("in_test_mode") == true:
 		return ResourceScripts.game_party.character_order.size()
-	var slavelimit = 2
-	if ResourceScripts.game_res.upgrades.has('master_bedroom'):
-		slavelimit += ResourceScripts.game_res.upgrades.master_bedroom
-	return slavelimit
+	return ResourceScripts.game_res.get_sex_limit()
+
+
+#These name the places the household is currently spread across, and one chip means one place
+#in both halves of the screen: the panel below draws it - the mansion as its floorplan,
+#anywhere else as the work waiting there - and the list narrows to the people who are there.
+#Folded, only the first half is visible; open, only the second; the chip does not need to know
+#which. "Show all" is not a place, so it only ever widens the list.
+#These buttons filter the list and nothing else now. Choosing which place the mansion screen
+#is showing work for moved to the navigation strip, where the places are pictures rather than
+#names - one control doing both meant picking somebody out of a list also walked the floorplan
+#somewhere else, which is not what the player was asking for.
+func show_place(_code, button = null):
+	show_location_characters(button)
 
 
 func show_location_characters(button = null):
+	if button != null:
+		_close_expanded_character_immediate()
 	if button != null:
 		prev_selected_location = selected_location
 		selected_location = button.get_meta("location")
@@ -600,6 +2713,8 @@ func show_location_characters(button = null):
 					get_parent().set_active_person(visible_persons[0].get_meta("slave"))
 		if get_parent().mansion_state == "sex":
 			person.visible = person_reference.travel.location == ResourceScripts.game_world.mansion_location
+		if person_reference.check_work_rule("hide"):
+			person.visible = selected_location == "show_all"
 	
 	if visible_persons.size() < 1 and selected_location != "show_all":
 		selected_location = "show_all"
@@ -608,23 +2723,34 @@ func show_location_characters(button = null):
 
 
 func update_location_buttons():
+	var rooms = get_parent().get_node_or_null("MansionRoomsModule")
 	for i in LocationsList.get_children():
 		if i == LocationsList.get_child(LocationsList.get_children().size()-1) || !i.has_meta('location'):
 			continue
-		i.pressed = selected_location == i.get_meta("location")
+		var code = i.get_meta("location")
+		#a place chip is lit when the panel below is drawing that place; the two that are not
+		#places are lit by what the list is narrowed to
+		if rooms != null and !(code in ["show_all", "training"]):
+			i.pressed = code == rooms.place
+		else:
+			i.pressed = selected_location == code
 
 
 func build_for_skills(person, newbutton):
 	if person == get_parent().skill_source:
-		newbutton.texture_disabled = TEX_ROW_PRESSED
+		if mode != 'default':
+			newbutton.texture_disabled = TEX_ROW_PRESSED
 		newbutton.disabled = true
 	if !person in get_parent().chars_for_skill:
-		newbutton.texture_disabled = TEX_ROW_DISABLED
+		if mode != 'default':
+			newbutton.texture_disabled = TEX_ROW_DISABLED
 		newbutton.disabled = true
 	else:
-		newbutton.texture_normal = TEX_ROW_AVAIL
-		newbutton.texture_hover = TEX_ROW_HOVER2
+		if mode != 'default':
+			newbutton.texture_normal = TEX_ROW_AVAIL
+			newbutton.texture_hover = TEX_ROW_HOVER2
 	newbutton.get_node("job").disabled = true
+	_refresh_card_visual(newbutton)
 
 
 var training_types = {
@@ -642,15 +2768,28 @@ func remove_from_travel(person):
 	get_parent().persons_for_travel.erase(person)
 	rebuild()
 
-var luxury_rooms_taken = 0
 func update():
-	luxury_rooms_taken = globals.calculate_lux_rooms()
+	if rebuild_pending and !get_parent().visible:
+		return
 	update_dislocations()
+	_select_slave_container()
+	_ensure_selected_container_entries()
 #	get_parent().NavModule.build_accessible_locations()
-	for i in $ScrollContainer/VBoxContainer.get_children():
+	for i in SlaveContainer.get_children():
+		if !i.has_meta('slave'):
+			continue
+		update_entry_availability(i, i.get_meta('slave'), false)
 		update_button(i)
+	if is_instance_valid(expanded_card) and expanded_animation_state == "open":
+		var expanded_person = expanded_card.get_meta("slave")
+		ExpandedDetails.set_person(expanded_person)
+		_build_expanded_body_preview(expanded_person, true)
+		build_expanded_social_skills(expanded_person)
+		build_expanded_rules(expanded_person)
+		_create_expanded_card_visual()
 	apply_sorting()
-	update_description()
+	update_buttons()
+	show_location_characters()
 	update_header()
 	match_mode()
 	if mode == 'rules':
@@ -666,14 +2805,27 @@ func update_button(newbutton, t_mode = mode):
 	if newbutton.name == 'Button':
 		return
 	var person = newbutton.get_meta('slave')
+	if newbutton.get_parent() == CardContainer:
+		_update_card_button(newbutton, person)
+		return
 	if person.get_work() == 'learning':
-		t_mode = 'training'
 		newbutton.get_node('progress').value = variables.tutduration - person.get_quest_time_remains()
 		newbutton.get_node('progress').max_value = variables.tutduration
 	newbutton.get_node("icon").texture = person.get_icon_small()
 	newbutton.get_node("name").text = person.get_short_name()
+	newbutton.get_node(CARD_PORTRAIT).texture = person.get_icon()
+	input_handler.queue_portrait(person) #most of a mansion never had a shot taken at all
+	newbutton.get_node(CARD_ROOT + "/Header/Name").text = person.get_short_name()
+	newbutton.get_node(CARD_SEX).texture = images.get_icon(person.get_stat('sex'))
+	var race_icon = races.racelist[person.get_stat('race')].icon
+	if race_icon is String:
+		race_icon = load(race_icon)
+	newbutton.get_node(CARD_RACE).texture = race_icon
 	if person.is_master() or person.is_unique():
 		newbutton.get_node("name").set("custom_colors/font_color", variables.hexcolordict.unique)
+		newbutton.get_node(CARD_ROOT + "/Header/Name").set("custom_colors/font_color", variables.hexcolordict.unique)
+	else:
+		newbutton.get_node(CARD_ROOT + "/Header/Name").set("custom_colors/font_color", Color(0.878431, 0.878431, 0.878431))
 	newbutton.get_node("sex").texture = images.get_icon(person.get_stat('sex'))
 	var job_label = newbutton.get_node("job/Label")
 	_set_job_label_color_from_key(job_label, JOB_COLOR_DEFAULT)
@@ -686,6 +2838,12 @@ func update_button(newbutton, t_mode = mode):
 	newbutton.get_node("stats/mp").value = person.mp
 	newbutton.get_node("stats").hint_tooltip = "HP: " + str(round(person.hp)) + "/" + str(round(person.get_stat('hpmax'))) + "\nMP: " + str(round(person.mp)) + "/" + str(round(person.get_stat('mpmax')))
 	newbutton.get_node("explabel").text = str(floor(person.get_stat('base_exp')))
+	_update_card_progress(newbutton.get_node(CARD_HP_BAR), tr("STATHP"), person.hp, person.get_stat('hpmax'))
+	_update_card_progress(newbutton.get_node(CARD_MP_BAR), tr("STATMP"), person.mp, person.get_stat('mpmax'))
+	var lust_bar = newbutton.get_node(CARD_LUST_BAR)
+	lust_bar.visible = person.check_trait('succubus')
+	if lust_bar.visible:
+		_update_card_progress(lust_bar, tr("STATLUST"), person.get_stat('lust'), person.get_stat('lustmax'))
 	if is_traveling:
 		job_label.text = tr("TASKTRAVEL")
 		_set_job_label_color_from_key(job_label, JOB_COLOR_TRAVEL)
@@ -707,6 +2865,7 @@ func update_button(newbutton, t_mode = mode):
 			_set_job_label_color_from_key(job_label, JOB_COLOR_REST)
 	elif work_code == 'learning':
 		newbutton.get_node('progress').value = variables.tutduration - person.get_quest_time_remains()
+		job_label.text = tr("SIBLINGMODULETRAININGS")
 #	elif work_code == 'special':
 #		var task = person.find_worktask()
 #		job_label.text = tr("TASKMISSION")
@@ -737,22 +2896,29 @@ func update_button(newbutton, t_mode = mode):
 		newbutton.get_node("explabel").set("custom_colors/font_color", Color(1,1,1))
 	# if !person.check_location('Aliron'):
 	#location
+	_reset_card_location_strip(newbutton)
 	if !person.is_avaliable():
 		newbutton.get_node('LocIcon').texture = null
+		_set_card_location_strip(newbutton, null, person.get_unaval_string())
 		person_location = null
 	elif person.check_location('travel'):
 		newbutton.get_node('LocIcon').texture = TEX_TRAVEL_SMALL
 		newbutton.get_node('LocIcon').hint_tooltip = tr("MSLMRELOC") + ": " + tr("MSLMRE") + " " + str(ceil(person.travel.travel_time / person.travel_per_tick())) + tr("MSLMTURN") + ". "
+		var travel_texture = _get_navigation_location_texture(person.travel.travel_target.location)
+		if travel_texture == null:
+			travel_texture = TEX_TRAVEL_SMALL
+		_set_card_location_strip(newbutton, travel_texture, tr("TASKTRAVEL"), newbutton.get_node('LocIcon').hint_tooltip)
 		person_location = null
 		
-	elif person.check_location('aliron') || person.get_location() == "mansion": # Temporary
-		person_location = "aliron"
+	elif person.check_location('aliron') || person.get_location() == "mansion":
+		_set_card_location_strip(
+			newbutton,
+			_get_navigation_location_texture("mansion"),
+			tr("MANSION_LABEL")
+		)
+		person_location = null
 	else:
-		### Temporary
-		if person.get_location() == "mansion":
-			person_location = "aliron"
-		else:
-			person_location = person.get_location()
+		person_location = person.get_location()
 
 	if person_location != null:
 		var ploc = ResourceScripts.world_gen.get_location_from_code(person_location)
@@ -767,6 +2933,7 @@ func update_button(newbutton, t_mode = mode):
 				'quest_location', 'encounter':
 					newbutton.get_node('LocIcon').texture = images.get_icon('travel_event')
 			newbutton.get_node('LocIcon').hint_tooltip = tr(ploc.name)
+			_set_card_location_strip(newbutton, _get_navigation_location_texture(person_location), tr(ploc.name))
 			#newbutton.get_node('Location').text = tr(ploc.name)
 	#job
 	var job_button = newbutton.get_node("job")
@@ -782,21 +2949,11 @@ func update_button(newbutton, t_mode = mode):
 		job_button.disabled = true
 	#class
 	newbutton.get_node("state").texture = person.get_class_icon()
+	newbutton.get_node(CARD_STATUS).texture = person.get_class_icon()
 	#gear
 	for slot in ['rhand', 'lhand', 'chest', 'legs']:
 		var titem = person.equipment.gear[slot]
-		if titem == null:
-			newbutton.get_node(slot + "/icon").texture = null
-			newbutton.get_node(slot + "/quality_color").hide()
-		else:
-			var item = ResourceScripts.game_res.items[titem]
-			item.set_icon(newbutton.get_node(slot + "/icon"))
-			if item.quality != "":
-				newbutton.get_node(slot + "/quality_color").show()
-				newbutton.get_node(slot + "/quality_color").texture = variables.quality_colors[item.quality]
-			else:
-				newbutton.get_node(slot + "/quality_color").hide()
-			globals.connectitemtooltip_v2(newbutton.get_node(slot), item)
+		_update_gear_slot(newbutton.get_node(slot), titem)
 	
 	#checks
 	if ResourceScripts.game_globals.weekly_dates_left <= 0:
@@ -817,16 +2974,11 @@ func update_button(newbutton, t_mode = mode):
 		newbutton.get_node("TrainIcon").texture = TEX_NO
 	else:
 		newbutton.get_node("TrainIcon").texture = TEX_YES
+	_update_card_action_states(newbutton, person)
 	
 	#rules
-	for rl in ['lock', 'ration', 'shifts', 'constrain', 'luxury', 'contraceptive', 'nudity', 'personality_lock', 'relationship', 'masturbation']:
+	for rl in ['lock', 'ration', 'shifts', 'constrain', 'contraceptive', 'nudity', 'relationship', 'masturbation']:
 		newbutton.get_node('rule_' + rl).pressed = person.check_work_rule(rl)
-#	newbutton.get_node('rule_luxury').visible = !person.is_master()
-	newbutton.get_node('rule_luxury').disabled = (luxury_rooms_taken >= ResourceScripts.game_res.upgrades.luxury_rooms + 1) and !person.check_work_rule("luxury") or person.is_master()
-	var text = "[center]"+tr("WORKRULELUXURY") + "[/center]\n" + person.translate(tr('WORKRULELUXURYDESCRIPT'))
-	text += "\n"
-	text += "Rooms used %d/%d" % [luxury_rooms_taken, ResourceScripts.game_res.upgrades.luxury_rooms + 1]
-	globals.connecttexttooltip(newbutton.get_node('rule_luxury'), text)
 	newbutton.get_node('rule_relationship').disabled = person.is_master()
 	newbutton.get_node('rule_nudity').disabled = !person.has_status('sexservice')
 	newbutton.get_node('rule_contraceptive').disabled = person.check_trait('undead')
@@ -834,70 +2986,164 @@ func update_button(newbutton, t_mode = mode):
 	#services
 	for rl in ['petting', 'oral', 'anal', 'pussy', 'group', 'sextoy']:
 		newbutton.get_node('rule_' + rl).pressed = person.check_brothel_rule(rl)
+		#nobody here buys it, or their own gear is in the way
+		newbutton.get_node('rule_' + rl).disabled = !person.xp_module.service_rule_offered(rl)
 		if person.is_master() == false:
 			if !person.has_status(tasks.gold_tasks_data[rl].req_training):
 				if person.get_stat('slave_class') == 'slave':
 					newbutton.get_node('rule_' + rl).disabled = true
-	for rl in ['waitress', 'hostess', 'dancer', 'stripper', 'males', 'females', 'futa']:
+	for rl in ['waitress', 'hostess', 'dancer', 'stripper']:
 		newbutton.get_node('rule_' + rl).pressed = person.check_brothel_rule(rl)
-	#food. the per-character tooltips need a fresh demand, which is expensive, so they are
-	#only built while the food column is actually on screen
-	if t_mode == 'food':
-		person.get_food_demand()
-	for f_id in ['meat', 'fish', 'grain', 'vegetables', 'bread', 'meatsoup', 'curry', 'friedfish', 'fishcakes']:
-		var allowed = person.get_filter_for_food(f_id)
-		var label = newbutton.get_node('ff_%s/Label' % f_id)
-		label.text = tr("FOODFILTERALLOWED" if allowed else "FOODFILTERFORBIDDEN")
-		label.set("custom_colors/font_color", Color(variables.hexcolordict['green' if allowed else 'gray']))
-		if t_mode == 'food':
-			globals.connectmaterialtooltip(newbutton.get_node('ff_' + f_id), Items.materiallist[f_id],
-				globals.get_food_char_text(Items.materiallist[f_id], person))
-	#filter columns
+		newbutton.get_node('rule_' + rl).disabled = !person.xp_module.service_rule_offered(rl)
+	for rl in ['males', 'females', 'futa']:
+		newbutton.get_node('rule_' + rl).pressed = person.check_brothel_rule(rl)
+	#The card and legacy row trees are cached; only the selected presentation is shown.
 	for nd in newbutton.get_children():
-		nd.visible = nd.is_in_group(t_mode)
+		if nd.name == "CardLayout":
+			nd.visible = t_mode == 'default'
+		elif t_mode == 'default':
+			nd.visible = false
+		else:
+			nd.visible = nd.is_in_group(t_mode)
 	
 	#postprocess
 	if person.is_master():
 		newbutton.get_node('DateIcon').visible = false
-		newbutton.get_node('rule_luxury').visible = false
 		newbutton.get_node('rule_relationship').visible = false
 		newbutton.get_node('rule_constrain').visible = false
 	if person.check_trait('undead'):
 		newbutton.get_node('rule_contraceptive').visible = false
 		newbutton.get_node('rule_ration').visible = false
 	update_food_icon(newbutton, person)
+	_update_card_work_type(newbutton, person, job_label.text)
+	newbutton.get_node(CARD_WORK_LABEL).set("custom_colors/font_color", job_label.get("custom_colors/font_color"))
+	var card_info = newbutton.get_node(CARD_ACTIONS + "/CharInfo")
+	_set_card_action_available(card_info, true)
+	globals.connecttexttooltip(card_info, tr("MSMNAME"))
+	globals.connecttexttooltip(newbutton.get_node(CARD_SEX), tr("MSLMSex") + ": " + tr("SLAVESEX" + person.get_stat('sex').to_upper()))
+	globals.connecttexttooltip(newbutton.get_node(CARD_STATUS), _get_character_type_tooltip(person))
+	globals.connecttexttooltip(newbutton.get_node(CARD_RACE), "[center]{color=green|" + races.racelist[person.get_stat('race')].name + "}[/center]\n\n" + person.show_race_description())
+	_update_card_warnings(newbutton, person)
+	_refresh_card_visual(newbutton)
+
+
+#The two badges beside the portrait: what the estate is about to fail to give this character
+#when the turn ends - a meal they will not get, or one below their demand, and the same for
+#the bed they will sleep in. Both are read from state that will not change by itself before
+#then, so the badge is a promise rather than a report of last night.
+#
+#The card tree is reused between characters, so every path out of here has to say what each
+#badge does - a badge left over from the previous occupant would warn about the wrong person.
+func _update_card_warnings(card_root, person):
+	if person == null or !is_instance_valid(card_root):
+		return
+	var food_node = _find_card_node(card_root, CARD_WARN_FOOD)
+	var bed_node = _find_card_node(card_root, CARD_WARN_BED)
+	if food_node == null or bed_node == null:
+		return
+	var food_state = globals.get_food_warning(person)
+	var bed_state = globals.get_sleep_warning(person)
+	_set_card_warning(food_node, person, food_state,
+		TEX_FOOD_STARVING if food_state == 'starve' else TEX_WARN_FOOD_POOR)
+	_set_card_warning(bed_node, person, bed_state, TEX_WARN_BED)
+
+
+#The enlarged copy of a card is the CardLayout itself rather than the button that holds one,
+#so the same badge answers to two different paths depending on which of the two is written to.
+func _find_card_node(root, path):
+	if root.has_node(path):
+		return root.get_node(path)
+	return root.get_node_or_null(path.trim_prefix("CardLayout/"))
+
+
+#Redoes only the two badges, for every card on screen and for the enlarged copy if one is
+#open. Far cheaper than update(), which rebuilds every portrait, bar and strip on the list -
+#and this runs on gestures the player repeats, like moving somebody between beds.
+func refresh_upkeep_warnings():
+	if !is_instance_valid(CardContainer):
+		return
+	for card in CardContainer.get_children():
+		#The container's first child is the template every row is duplicated from, and it never
+		#gets a character. Asking it for one is not free: get_meta with a null default still
+		#prints "does not have any 'meta' values" on every sweep before handing back the null.
+		if !card.has_meta("slave"):
+			continue
+		_update_card_warnings(card, card.get_meta("slave"))
+	if is_instance_valid(expanded_card_visual) and is_instance_valid(expanded_card):
+		_update_card_warnings(expanded_card_visual, expanded_card.get_meta("slave", null))
+
+
+func _set_card_warning(node, person, state, texture):
+	node.visible = state != ''
+	if !node.visible:
+		return
+	node.texture = texture
+	if node.material == null:
+		var pulse = ShaderMaterial.new()
+		pulse.shader = WARNING_PULSE_SHADER
+		#cards that all start together read as one flashing column rather than as several
+		#separate warnings, so each is shoved along the cycle by its own character
+		pulse.set_shader_param("phase", float(posmod(int(person.id), 17)) * 0.13)
+		node.material = pulse
+	var tooltip = globals.get_sleep_warning_tooltip(person, state)
+	if node.name == "Food":
+		tooltip = globals.get_food_warning_tooltip(person, state)
+	_set_card_text_tooltip(node, tooltip)
+
+
+func _update_card_progress(bar, label, value, max_value):
+	bar.max_value = max(max_value, 1)
+	bar.value = value
+	_set_card_text_tooltip(bar, "%s %d/%d" % [label, int(round(value)), int(round(max_value))])
+
+
+func _update_gear_slot(slot_node, item_id):
+	if item_id == null:
+		slot_node.get_node("icon").texture = null
+		slot_node.get_node("quality_color").hide()
+		return
+	var item = ResourceScripts.game_res.items[item_id]
+	item.set_icon(slot_node.get_node("icon"))
+	if item.quality != "":
+		slot_node.get_node("quality_color").show()
+		slot_node.get_node("quality_color").texture = variables.quality_colors[item.quality]
+	else:
+		slot_node.get_node("quality_color").hide()
+	globals.connectitemtooltip_v2(slot_node, item)
 
 
 #the food column shows what the character is running on right now - the item they last ate,
 #tinted red when it was below their demand, or the starvation icon when they went without.
 #the cell frame always keeps its place in the row; states with no meal leave it empty
 func update_food_icon(newbutton, person):
-	var node = newbutton.get_node('FoodIcon')
-	if !node.visible:
-		return
-	var icon = node.get_node('icon')
 	var state = person.food.get_state()
-	icon.visible = true
-	icon.modulate = Color(1, 1, 1)
-	match state.state:
-		'undead', 'none':
-			icon.visible = false
-		'starving':
-			icon.texture = TEX_FOOD_STARVING
-		'poor':
-			icon.texture = Items.materiallist[state.meal].icon
-			icon.modulate = Color(1, 0.5, 0.5)
-		_:
-			icon.texture = Items.materiallist[state.meal].icon
-	globals.connecttexttooltip(node, globals.get_food_state_tooltip(person))
+	for node in [newbutton.get_node('FoodIcon')]:
+		if !node.is_visible_in_tree():
+			continue
+		var icon = node.get_node('icon')
+		icon.visible = true
+		icon.modulate = Color(1, 1, 1)
+		match state.state:
+			'undead', 'none':
+				icon.visible = false
+			'starving':
+				icon.texture = TEX_FOOD_STARVING
+			'poor':
+				icon.texture = Items.materiallist[state.meal].icon
+				icon.modulate = Color(1, 0.5, 0.5)
+			_:
+				icon.texture = Items.materiallist[state.meal].icon
+		globals.connecttexttooltip(node, globals.get_food_state_tooltip(person))
 
 
 func set_mode(newmode):
+	_close_expanded_character_immediate()
 	mode = newmode
 	update()
 
 
 func update_header ():
+	header.visible = mode != 'default'
 	for nd in header.get_children():
 		nd.visible = nd.is_in_group(mode)
 
@@ -973,7 +3219,12 @@ func apply_sorting():
 		if !nd.has_meta('slave'):
 			continue
 		nd.drag_enabled = sort_key == ''
-		entries.append({row = nd, base = get_row_base_index(nd), value = null})
+		entries.append({
+			row = nd,
+			base = get_row_base_index(nd),
+			value = null,
+			hidden = nd.get_meta("slave").check_work_rule("hide"),
+		})
 	if sort_key == '':
 		entries.sort_custom(self, 'compare_base_rows')
 	else:
@@ -981,15 +3232,22 @@ func apply_sorting():
 			e.value = get_sort_value(e.row, sort_key)
 		entries.sort_custom(self, 'compare_sort_rows')
 	for i in entries.size():
-		SlaveContainer.move_child(entries[i].row, i)
+		if entries[i].row.get_index() != i:
+			SlaveContainer.move_child(entries[i].row, i)
+
+
+func apply_manual_order():
+	if sort_key == '':
+		apply_sorting()
 
 
 func reset_sorting():
-	sort_key = ''
+	sort_key = SORT_MENU_KEYS[0]
 	sort_desc = false
 	sort_hovered = ''
 	apply_sorting()
 	update_sort_headers()
+	_sync_sort_menu()
 
 
 func get_row_base_index(row):
@@ -998,11 +3256,15 @@ func get_row_base_index(row):
 
 
 func compare_base_rows(a, b):
+	if a.hidden != b.hidden:
+		return !a.hidden
 	return a.base < b.base
 
 
 #ties keep the manual order, so rows with the same value never shuffle between sorts
 func compare_sort_rows(a, b):
+	if a.hidden != b.hidden:
+		return !a.hidden
 	if a.value != b.value:
 		if sort_desc:
 			return a.value > b.value
@@ -1020,7 +3282,16 @@ func get_sort_value(row, key):
 		'name':
 			return person.get_short_name().to_lower()
 		'occupation':
+			if row.get_parent() == CardContainer:
+				return str(row.get_meta("card_job_text", "")).to_lower()
 			return row.get_node("job/Label").text.to_lower()
+		'train_available':
+			var incomplete_slave_training = person.training.is_slave() and person.training.enable
+			return 0 if incomplete_slave_training and person.training.can_be_trained() else 1
+		'date_available':
+			return 0 if _get_date_availability(person)[0] else 1
+		'levelup':
+			return _get_progress_rank(person)
 		'exp':
 			return floor(person.get_stat('base_exp'))
 		'date':
@@ -1076,12 +3347,6 @@ func toggle_service_mass(newbutton_ref, code):
 	toggle_service(newbutton, code)
 	if mass_select_press_effect == null:
 		mass_select_press_effect = true_btn.pressed
-
-
-func press_food(newbutton, code):
-	var person = newbutton.get_meta('slave')
-	person.toggle_food(code)
-	update_button(newbutton)
 
 
 func match_mode():

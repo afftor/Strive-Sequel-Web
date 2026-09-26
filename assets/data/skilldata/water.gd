@@ -56,8 +56,10 @@ var skills = {
 		target_number = 'single',
 		target_range = 'weapon',
 		damage_type = 'water',
-		sfx = [{code = 'water_attack', target = 'target', period = 'predamage'}], 
-		sounddata = {initiate = null, strike = 'blade', hit = null},
+		sfx = [
+			{code = 'water_attack', target = 'target', period = 'predamage'},
+			{code = 'at_sword', target = 'caster', period = 'windup', is_cast = true}], 
+		sounddata = {initiate = null, strike = 'slap', hit = null},
 		value = 1.0,
 	},
 	water_shield = {
@@ -101,6 +103,7 @@ var skills = {
 		]
 	},
 	frost_prison = {
+		sounddata = {hit = 'slap', hittype = 'static'},
 		code = 'frost_prison',
 		descript = '',
 		icon = "res://assets/images/iconsskills/freeze.png",
@@ -120,7 +123,9 @@ var skills = {
 		target_number = 'single',
 		target_range = 'any',
 		damage_type = 'water',
-		sfx = [{code = 'frost_prison', target = 'target', period = 'predamage'}], 
+		sfx = [
+			{code = 'frost_prison', target = 'target', period = 'predamage'},
+			{code = 'haste', target = 'caster', period = 'windup', is_cast = true}], 
 		sound = [],
 		value = 1.3,
 	},
@@ -183,7 +188,9 @@ var skills = {
 		target_number = 'all',
 		target_range = 'any',
 		damage_type = 'water',
-		sfx = [{code = 'debuff', target = 'target', period = 'predamage'}], 
+		sfx = [
+			{code = 'blizzard', target = 'target_group', period = 'windup'},
+			{code = 'charge_frost', target = 'caster', period = 'windup', is_cast = true}],
 		sound = [],
 		value = 0.9,
 	},
@@ -210,7 +217,9 @@ var skills = {
 		target_number = 'all',
 		target_range = 'any',
 		damage_type = 'water',
-		sfx = [{code = 'debuff', target = 'target', period = 'predamage'}], 
+		sfx = [
+			{code = 'hailstorm', target = 'target_group', period = 'windup'},
+			{code = 'charge_frost', target = 'caster', period = 'windup', is_cast = true}],
 		sound = [],
 		value = 1.5,
 	},
@@ -237,10 +246,12 @@ var skills = {
 		target_number = 'all',
 		target_range = 'any',
 		damage_type = 'water',
-		sfx = [{code = 'debuff', target = 'target', period = 'predamage'}], 
+		#the field-wide weather replaces the red debuff burst that used to sit on
+		#each enemy portrait
+		sfx = [{code = 'rainfall_field', target = 'caster', period = 'windup'}],
 		sound = [],
 		value = 2.1,
-		follow_up = 'hyperborea_1' 
+		follow_up = 'hyperborea_1'
 	},
 	hyperborea_1 = {
 		code = 'hyperborea_1',
@@ -336,7 +347,9 @@ var effects = {
 		tick_event = variables.TR_TURN_F,
 		rem_event = [variables.TR_COMBAT_F, variables.TR_DEATH],
 		duration = 4, #'arg',
-		tags = ['buff'],
+		#the 'clarity' tag is what lets anything find this by name - removals and has_status checks
+		#match tags, and the stack id alone is invisible to both
+		tags = ['buff', 'clarity'],
 		statchanges = {matk_add_part = 0.25, resist_blind = 200, resist_sleep = 200},
 		buffs = [
 			{

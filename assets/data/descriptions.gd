@@ -217,12 +217,12 @@ func piercing(): #currently unused
 	elif person.get_stat('piercing_penis') == 'stud':
 		text += '[His] cock has a [color=aqua]stud[/color] in it. '
 
-	if text != '':
-		#posible bug
-		if globals.state.descriptsettings.piercing == true || showmode != 'default':
-			text = "\n\n[url=piercing][color=#d1b970]Piercing:[/color][/url] " + text
-		else:
-			text = "\n[url=piercing][color=#d1b970]Piercing:[/color][/url] Omitted."
+#	if text != '':
+#		#posible bug
+#		if globals.state.descriptsettings.piercing == true || showmode != 'default':
+#			text = "\n\n[url=piercing][color=#d1b970]Piercing:[/color][/url] " + text
+#		else:
+#			text = "\n[url=piercing][color=#d1b970]Piercing:[/color][/url] Omitted."
 	return text
 
 #var tattoo_descripts = {
@@ -333,7 +333,7 @@ var bodypartsdata = {
 			{code = 'hair_length', value = [['ear', 4], ['neck',2], ['shoulder',0.5],['bald',0.2]], reqs = []},
 			{code = 'hair_length', value = [['bald',1]], reqs = [{code = 'race', race = 'Kobold', check = true}]},
 			{code = 'hair_length', value = [['ear',0.5],['shoulder',2], ['waist', 2], ['hips',0.5]], reqs = [{code = 'one_of_races', value = ['Elf','DarkElf'], check = true}]},
-			{code = 'hair_style',  value = [['straight', 10], ['ponytail',1]], reqs = []},
+			{code = 'hair_style',  value = [['straight', 10], ['ponytail',1],['bob',1],['messy',1],['layered',1],['fringe',1]], reqs = []},
 			{code = 'ass_size', value = [['flat', 1], ['masculine',1]], reqs = []},
 			{code = 'tits_size', value = [['flat', 1], ['masculine', 1]], reqs = []},
 			{code = 'has_womb', value = [[false,1]], reqs = []},
@@ -341,15 +341,27 @@ var bodypartsdata = {
 			{code = 'vaginal_virgin', value = [[false,1]], reqs = []},
 			{code = 'penis_size', value = [['small', 1], ['average', 5], ['big',1]], reqs = []},
 			{code = 'balls_size', value = [['small', 1], ['average', 5], ['big',1]], reqs = []},
-			{code = 'eye_tex', value = [['eyes1m', 1],['eyes2m', 1],['eyes3m', 1],['eyes4m', 1],['eyes5m', 1],], reqs = []},
-			{code = 'chin', value = [['default', 1],['male', 1],['muscle', 1]], reqs = []},
-			{code = 'chin', value = [['beastkin', 1]], reqs = [{code = 'one_of_races', value = ['BeastkinCat','BeastkinWolf', 'BeastkinFox', 'BeastkinBunny', 'BeastkinTanuki'], check = true}]},
+			{code = 'eye_tex', value = [['eyes5m', 1]], reqs = []},
+			{code = 'chin', value = [['default', 1],['male', 1],['muscle', 1],['short', 1]], reqs = []},
+			{code = 'eyeshape', value = [['face_m1', 1],['face_m2', 1],['face_m3', 1],['face_m4', 1],['face_m5', 1]], reqs = []},
+			#`style11` is the round open mouth and is not a face to be born with; it stays
+			#pickable on the doll.  `style12` named `lips_s3`, which neither export has.
+			{code = 'lips', value = [['style6', 1],['style7', 1],['style8', 1],['style9', 1],['style10', 1]], reqs = []},
+			{code = 'lips', value = [['orcish', 1],['orcish_1', 1],['orcish_2', 1],['orcish_3', 1]], reqs = [{code = 'one_of_races', value = ['Orc','Goblin'], check = true}]},
+			{code = 'lips', value = [['none', 1],['beastkin_cry', 1],['beastkin_open', 1],['beastkin_smile', 1]], reqs = [{code = 'one_of_races', value = ['BeastkinCat','BeastkinWolf', 'BeastkinFox', 'BeastkinBunny', 'BeastkinTanuki'], check = true}]},
+			{code = 'chin', value = [['beastkin', 1]], reqs = [{code = 'one_of_races', value = ['BeastkinCat','BeastkinBunny'], check = true}]},
+			{code = 'chin', value = [['muzzle1', 1],['muzzle2', 1],['muzzle3', 1]], reqs = [{code = 'one_of_races', value = ['BeastkinWolf', 'BeastkinFox', 'BeastkinTanuki'], check = true}]},
 			{code = 'chin', value = [['kobold', 1], ['kobold_2', 1]], reqs = [{code = 'race', race = 'Kobold', check = true}]},
-			{code = 'eyebrows', value = [['style1', 1],['style6', 1],['style7', 1]], reqs = []},
+			{code = 'eyebrows', value = [['style1', 1],['style6', 1],['style7', 1],['style8', 1]], reqs = []},
+			# The re-export cut two more noses, and only for the male rig - a woman
+			# who picked one would come out with the default one drawn instead.
+			{code = 'nose', value = [['default', 1],['small', 1],['straight', 1],['feature', 1],['point', 1]], reqs = []},
+			{code = 'nose', value = [['kobold', 1],['kobold_2', 1]], reqs = [{code = 'race', race = 'Kobold', check = true}]},
+			{code = 'nose', value = [['beastkin', 1]], reqs = [{code = 'one_of_races', value = ['BeastkinCat','BeastkinWolf', 'BeastkinFox', 'BeastkinBunny', 'BeastkinTanuki'], check = true}]},
 		]},
 		female = {code = 'female', name = '', chardescript = '', bodychanges = [
 			{code = 'hair_length', value = [['ear', 0.5],['neck',2],['shoulder',3],['waist',1],['hips',0.5]], reqs = []},
-			{code = 'hair_style', value = [['straight', 2],['ponytail',1],['pigtails',1],['braid',1],['twinbraids',1]], reqs = []},
+			{code = 'hair_style', value = [['straight', 4],['ponytail',1],['pigtails',1],['braid',1],['twinbraids',1],['bob',1],['messy',1],['layered',1],['fringe',1],['crownbraid',1],['twintails',1],['curls',1],['hime',1],['messy_eyehide',1],['shaved',1]], reqs = []},
 			{code = 'ass_size', value = [['flat', 1], ['small',1], ['average', 1], ['big', 1], ['huge', 1]], reqs = []},
 			{code = 'tits_size', value = [['flat', 1], ['small',1], ['average', 1], ['big', 1], ['huge', 1]], reqs = []},
 			{code = 'tits_size', value = [['average', 1], ['big', 1], ['huge', 1]], reqs = [{code = 'race', race = 'Taurus', check = true}]},
@@ -362,15 +374,25 @@ var bodypartsdata = {
 #			{code = 'moustache', value = [['no',1]], reqs = []},
 			{code = 'hair_facial_color', value = [['',1]], reqs = []},
 			{code = 'penis_virgin', value = [[false,1]], reqs = []},
-			{code = 'eye_tex', value = [['eyes1', 1],['eyes2', 1],['eyes3', 1],['eyes4', 1],['eyes5', 1],], reqs = []},
-			{code = 'chin', value = [['default', 1],['curve', 1],['small', 1],['skinny', 1]], reqs = []},
-			{code = 'chin', value = [['beastkin', 1]], reqs = [{code = 'one_of_races', value = ['BeastkinCat','BeastkinWolf', 'BeastkinFox', 'BeastkinBunny', 'BeastkinTanuki'], check = true}]},
+			{code = 'eye_tex', value = [['eyes1', 1],['eyes2', 1],['eyes3', 1],['eyes5', 1]], reqs = []},
+			{code = 'chin', value = [['default', 1],['curve', 1],['small', 1],['skinny', 1],['short', 1]], reqs = []},
+			{code = 'eyeshape', value = [['face6', 1],['face7', 1],['face8', 1]], reqs = []},
+			{code = 'lips', value = [['style1', 1],['style2', 1],['style3', 1],['style4', 1],['style5', 1],['style10', 1]], reqs = []},
+			{code = 'lips', value = [['orcish', 1],['orcish_1', 1],['orcish_2', 1],['orcish_3', 1]], reqs = [{code = 'one_of_races', value = ['Orc','Goblin'], check = true}]},
+			{code = 'lips', value = [['none', 1],['beastkin_cry', 1],['beastkin_open', 1],['beastkin_smile', 1]], reqs = [{code = 'one_of_races', value = ['BeastkinCat','BeastkinWolf', 'BeastkinFox', 'BeastkinBunny', 'BeastkinTanuki'], check = true}]},
+			{code = 'chin', value = [['beastkin', 1]], reqs = [{code = 'one_of_races', value = ['BeastkinCat','BeastkinBunny'], check = true}]},
+			{code = 'chin', value = [['muzzle1', 1],['muzzle2', 1],['muzzle3', 1]], reqs = [{code = 'one_of_races', value = ['BeastkinWolf', 'BeastkinFox', 'BeastkinTanuki'], check = true}]},
 			{code = 'chin', value = [['kobold', 1], ['kobold_2', 1]], reqs = [{code = 'race', race = 'Kobold', check = true}]},
 			{code = 'eyebrows', value = [['style1', 1],['style2', 1],['style3', 1],['style4', 1],['style5', 1]], reqs = []},
+			# The re-export cut two more noses, and only for the male rig - a woman
+			# who picked one would come out with the default one drawn instead.
+			{code = 'nose', value = [['default', 1],['small', 1],['straight', 1]], reqs = []},
+			{code = 'nose', value = [['kobold', 1],['kobold_2', 1]], reqs = [{code = 'race', race = 'Kobold', check = true}]},
+			{code = 'nose', value = [['beastkin', 1]], reqs = [{code = 'one_of_races', value = ['BeastkinCat','BeastkinWolf', 'BeastkinFox', 'BeastkinBunny', 'BeastkinTanuki'], check = true}]},
 		]},
 		futa = {code = 'futa', name = '', chardescript = '', bodychanges = [
 			{code = 'hair_length', value = [['ear', 0.5],['neck',2],['shoulder',3],['waist',1],['hips',0.5]], reqs = []},
-			{code = 'hair_style', value = [['straight', 2],['ponytail',1],['pigtails',1],['braid',1],['twinbraids',1]], reqs = []},
+			{code = 'hair_style', value = [['straight', 4],['ponytail',1],['pigtails',1],['braid',1],['twinbraids',1],['bob',1],['messy',1],['layered',1],['fringe',1],['crownbraid',1],['twintails',1],['curls',1],['hime',1],['messy_eyehide',1],['shaved',1]], reqs = []},
 			{code = 'ass_size', value = [['flat', 1], ['small',1], ['average', 1], ['big', 1], ['huge', 1]], reqs = []},
 			{code = 'tits_size', value = [['flat', 1], ['small',1], ['average', 1], ['big', 1], ['huge', 1]], reqs = []},
 			{code = 'tits_size', value = [['average', 1], ['big', 1], ['huge', 1]], reqs = [{code = 'race', race = 'Taurus', check = true}]},
@@ -381,11 +403,21 @@ var bodypartsdata = {
 			{code = 'balls_size', value = [['small', 1], ['average', 3], ['big', 1]], reqs = [{code = 'setting', type = 'futa_balls', value = true}]},
 			{code = 'balls_size', value = [['',1]], reqs = [{code = 'setting', type = 'futa_balls', value = false}]},
 			{code = 'beard', value = [['no',1]], reqs = []},
-			{code = 'eye_tex', value = [['eyes1', 1],['eyes2', 1],['eyes3', 1],['eyes4', 1],['eyes5', 1],], reqs = []},
-			{code = 'chin', value = [['default', 1],['curve', 1],['small', 1],['skinny', 1]], reqs = []},
-			{code = 'chin', value = [['beastkin', 1]], reqs = [{code = 'one_of_races', value = ['BeastkinCat','BeastkinWolf', 'BeastkinFox', 'BeastkinBunny', 'BeastkinTanuki'], check = true}]},
+			{code = 'eye_tex', value = [['eyes1', 1],['eyes2', 1],['eyes3', 1],['eyes5', 1]], reqs = []},
+			{code = 'chin', value = [['default', 1],['curve', 1],['small', 1],['skinny', 1],['short', 1]], reqs = []},
+			{code = 'eyeshape', value = [['face6', 1],['face7', 1],['face8', 1]], reqs = []},
+			{code = 'lips', value = [['style1', 1],['style2', 1],['style3', 1],['style4', 1],['style5', 1],['style10', 1]], reqs = []},
+			{code = 'lips', value = [['orcish', 1],['orcish_1', 1],['orcish_2', 1],['orcish_3', 1]], reqs = [{code = 'one_of_races', value = ['Orc','Goblin'], check = true}]},
+			{code = 'lips', value = [['none', 1],['beastkin_cry', 1],['beastkin_open', 1],['beastkin_smile', 1]], reqs = [{code = 'one_of_races', value = ['BeastkinCat','BeastkinWolf', 'BeastkinFox', 'BeastkinBunny', 'BeastkinTanuki'], check = true}]},
+			{code = 'chin', value = [['beastkin', 1]], reqs = [{code = 'one_of_races', value = ['BeastkinCat','BeastkinBunny'], check = true}]},
+			{code = 'chin', value = [['muzzle1', 1],['muzzle2', 1],['muzzle3', 1]], reqs = [{code = 'one_of_races', value = ['BeastkinWolf', 'BeastkinFox', 'BeastkinTanuki'], check = true}]},
 			{code = 'chin', value = [['kobold', 1], ['kobold_2', 1]], reqs = [{code = 'race', race = 'Kobold', check = true}]},
 			{code = 'eyebrows', value = [['style1', 1],['style2', 1],['style3', 1],['style4', 1],['style5', 1]], reqs = []},
+			# The re-export cut two more noses, and only for the male rig - a woman
+			# who picked one would come out with the default one drawn instead.
+			{code = 'nose', value = [['default', 1],['small', 1],['straight', 1]], reqs = []},
+			{code = 'nose', value = [['kobold', 1],['kobold_2', 1]], reqs = [{code = 'race', race = 'Kobold', check = true}]},
+			{code = 'nose', value = [['beastkin', 1]], reqs = [{code = 'one_of_races', value = ['BeastkinCat','BeastkinWolf', 'BeastkinFox', 'BeastkinBunny', 'BeastkinTanuki'], check = true}]},
 		]},
 	},
 	age = {
@@ -429,6 +461,17 @@ var bodypartsdata = {
 		braid = {code = 'braid', name = '', chardescript = '', bodychanges = []},
 		twinbraids = {code = 'twinbraids', name = '', chardescript = '', bodychanges = []},
 		bun = {code = 'bun', name = '', chardescript = '', bodychanges = []},
+		bob = {code = 'bob', name = '', chardescript = '', bodychanges = []},
+		messy = {code = 'messy', name = '', chardescript = '', bodychanges = []},
+		messy_eyehide = {code = 'messy_eyehide', name = '', chardescript = '', bodychanges = []},
+		layered = {code = 'layered', name = '', chardescript = '', bodychanges = []},
+		fringe = {code = 'fringe', name = '', chardescript = '', bodychanges = []},
+		crownbraid = {code = 'crownbraid', name = '', chardescript = '', bodychanges = []},
+		twintails = {code = 'twintails', name = '', chardescript = '', bodychanges = []},
+		curls = {code = 'curls', name = '', chardescript = '', bodychanges = []},
+		shaved = {code = 'shaved', name = '', chardescript = '', bodychanges = []},
+		undercut = {code = 'undercut', name = '', chardescript = '', bodychanges = []},
+		hime = {code = 'hime', name = '', chardescript = '', bodychanges = []},
 	},
 	#incomplete
 	hair_back = {
@@ -448,6 +491,11 @@ var bodypartsdata = {
 		muscle = {code = "muscle", name = 'style6', chardescript = '', bodychanges = []},
 		short = {code = "short", name = 'style7', chardescript = '', bodychanges = []},
 		beastkin = {code = "beastkin", name = 'beastkin', chardescript = '', bodychanges = []},
+		#the three muzzles the wolves, foxes and tanuki pick from; the older
+		#per-animal snouts stay in the art for the cats and the bunnies
+		muzzle1 = {code = "muzzle1", name = 'muzzle1', chardescript = '', bodychanges = []},
+		muzzle2 = {code = "muzzle2", name = 'muzzle2', chardescript = '', bodychanges = []},
+		muzzle3 = {code = "muzzle3", name = 'muzzle3', chardescript = '', bodychanges = []},
 	},
 	nose = {
 		beastkin =  {code = "beastkin", name = 'beastkin', chardescript = '', bodychanges = []},
@@ -456,6 +504,9 @@ var bodypartsdata = {
 		kobold =  {code = "kobold", name = 'kobold', chardescript = '', bodychanges = []},
 		small =  {code = "small", name = 'style2', chardescript = '', bodychanges = []},
 		straight =  {code = "straight", name = 'style3', chardescript = '', bodychanges = []},
+		feature =  {code = "feature", name = 'style4', chardescript = '', bodychanges = []},
+		point =  {code = "point", name = 'style5', chardescript = '', bodychanges = []},
+		kobold_2 =  {code = "kobold_2", name = 'kobold', chardescript = '', bodychanges = []},
 	},
 	eye_color = {
 		default = {code = 'default', name = '', chardescript = '', bodychanges = []},
@@ -474,10 +525,17 @@ var bodypartsdata = {
 	ears = {
 		human = {code = 'human', name = '', chardescript = '', bodychanges = []},
 		elven = {code = 'elven', name = '', chardescript = '', bodychanges = []},
+		elven2 = {code = 'elven2', name = '', chardescript = '', bodychanges = []},
 		orcish = {code = 'orcish', name = '', chardescript = '', bodychanges = []},
+		goblin = {code = 'goblin', name = '', chardescript = '', bodychanges = []},
 		cat = {code = 'cat', name = '', chardescript = '', bodychanges = []},
 		wolf = {code = 'wolf', name = '', chardescript = '', bodychanges = []},
 		fox = {code = 'fox', name = '', chardescript = '', bodychanges = []},
+		fox2 = {code = 'fox2', name = '', chardescript = '', bodychanges = []},
+		fox_n1 = {code = 'fox_n1', name = '', chardescript = '', bodychanges = []},
+		fox_n2 = {code = 'fox_n2', name = '', chardescript = '', bodychanges = []},
+		fox_n3 = {code = 'fox_n3', name = '', chardescript = '', bodychanges = []},
+		fox_n4 = {code = 'fox_n4', name = '', chardescript = '', bodychanges = []},
 		bunny_standing = {code = 'bunny_standing', name = '', chardescript = '', bodychanges = []},
 		bunny_drooping = {code = 'bunny_drooping', name = '', chardescript = '', bodychanges = []},
 		tanuki = {code = 'tanuki', name = '', chardescript = '', bodychanges = []},
@@ -503,46 +561,47 @@ var bodypartsdata = {
 		teal = {code = 'teal', name = '', chardescript = '', bodychanges = []},
 	},
 	skin_coverage = {
-		plant = {code = 'plant', name = '', chardescript = '', bodychanges = []},
-		scale = {code = 'scale', name = '', chardescript = '', bodychanges = []},
-		scale2 = {code = 'scale2', name = '', chardescript = '', bodychanges = []},
-		scale3 = {code = 'scale3', name = '', chardescript = '', bodychanges = []},
-		kobold = {code = 'kobold', name = '', chardescript = '', bodychanges = []},
-		feathers = {code = 'feathers', name = '', chardescript = '', bodychanges = []},
-		fur_white = {code = 'fur_white', name = '', chardescript = '', bodychanges = [
+		plant = {code = 'plant', name = 'COVERAGE_PLANT', chardescript = '', bodychanges = []},
+		scale = {code = 'scale', name = 'COVERAGE_SCALE', chardescript = '', bodychanges = []},
+		scale2 = {code = 'scale2', name = 'COVERAGE_SCALE2', chardescript = '', bodychanges = []},
+		scale3 = {code = 'scale3', name = 'COVERAGE_SCALE3', chardescript = '', bodychanges = []},
+		kobold = {code = 'kobold', name = 'COVERAGE_KOBOLD', chardescript = '', bodychanges = []},
+		kobold_spots = {code = 'kobold_spots', name = 'COVERAGE_KOBOLD_SPOTS', chardescript = '', bodychanges = []},
+		feathers = {code = 'feathers', name = 'COVERAGE_FEATHERS', chardescript = '', bodychanges = []},
+		fur_white = {code = 'fur_white', name = 'COVERAGE_FUR_WHITE', chardescript = '', bodychanges = [
 			{code = 'body_color_tail', value = [['white2', 1]], reqs = []},
 		]},
-		fur_grey = {code = 'fur_grey', name = '', chardescript = '', bodychanges = [
+		fur_grey = {code = 'fur_grey', name = 'COVERAGE_FUR_GREY', chardescript = '', bodychanges = [
 			{code = 'body_color_tail', value = [['white3', 1]], reqs = []},
 		]},
-		fur_brown = {code = 'fur_brown', name = '', chardescript = '', bodychanges = [
+		fur_brown = {code = 'fur_brown', name = 'COVERAGE_FUR_BROWN', chardescript = '', bodychanges = [
 			{code = 'body_color_tail', value = [['brown3', 1]], reqs = []},
 		]},
-		fur_striped = {code = 'fur_striped', name = '', chardescript = '', bodychanges = [
+		fur_striped = {code = 'fur_striped', name = 'COVERAGE_FUR_STRIPED', chardescript = '', bodychanges = [
 			{code = 'body_color_tail', value = [['orange3', 1]], reqs = []},
 		]},
-		fur_black = {code = 'fur_black', name = '', chardescript = '', bodychanges = [
-			{code = 'body_color_tail', value = [['dark3', 1]], reqs = []},
+		fur_black = {code = 'fur_black', name = 'COVERAGE_FUR_BLACK', chardescript = '', bodychanges = [
+			{code = 'body_color_tail', value = [['#363533', 1]], reqs = []},
 		]},
-		fur_orange = {code = 'fur_orange', name = '', chardescript = '', bodychanges = [
+		fur_orange = {code = 'fur_orange', name = 'COVERAGE_FUR_ORANGE', chardescript = '', bodychanges = [
 			{code = 'body_color_tail', value = [['orange3', 1]], reqs = []},
 		]},
-		fur_orange_white = {code = 'fur_orange_white', name = '', chardescript = '', bodychanges = [
+		fur_orange_white = {code = 'fur_orange_white', name = 'COVERAGE_FUR_ORANGE_WHITE', chardescript = '', bodychanges = [
 			{code = 'body_color_tail', value = [['orange2', 1]], reqs = []},
 		]},
-		fur_tricolor = {code = 'fur_tricolor', name = '', chardescript = '', bodychanges = [
+		fur_tricolor = {code = 'fur_tricolor', name = 'COVERAGE_FUR_TRICOLOR', chardescript = '', bodychanges = [
 			{code = 'body_color_tail', value = [['dark3', 1]], reqs = []},
 		]},
 	},
 	wings = {
-		"": {code = "", name = 'NO', chardescript = '', bodychanges = [{code = 'body_color_wings', value = [['pink1', 1]], reqs = []},]},
-		null: {code = null, name = 'NO', chardescript = '', bodychanges = [{code = 'body_color_wings', value = [['pink1', 1]], reqs = []},]},
+		"": {code = "", name = 'NO', chardescript = '', bodychanges = []},
+		null: {code = null, name = 'NO', chardescript = '', bodychanges = []},
 		feathered_black = {code = 'feathered_black', name = '', chardescript = '', bodychanges = [{code = 'body_color_wings', value = [['dark2', 1]], reqs = []},]},
 		seraph = {code = 'seraph', name = '', chardescript = '', bodychanges = [{code = 'body_color_wings', value = [['white1', 1]], reqs = []},]},
 		feathered_brown = {code = 'feathered_brown', name = '', chardescript = '', bodychanges = [{code = 'body_color_wings', value = [['dark1', 1]], reqs = []},]},
 		fairy = {code = 'fairy', name = '', chardescript = '', bodychanges = []},
-		demon = {code = 'demon', name = '', chardescript = '', bodychanges = [{code = 'body_color_wings', value = [['red3', 1]], reqs = []},]},
-		dragon = {code = 'dragon', name = '', chardescript = '', bodychanges = [{code = 'body_color_wings', value = [['yellow3', 1]], reqs = []},]},
+		demon = {code = 'demon', name = '', chardescript = '', bodychanges = []},
+		dragon = {code = 'dragon', name = '', chardescript = '', bodychanges = []},
 		leather_black = {code = 'leather_black', name = '', chardescript = '', bodychanges = [{code = 'body_color_wings', value = [['dark3', 1]], reqs = []},]},
 		leather_red = {code = 'leather_red', name = '', chardescript = '', bodychanges = [{code = 'body_color_wings', value = [['red1', 1]], reqs = []},]},
 	},
@@ -551,16 +610,18 @@ var bodypartsdata = {
 		null: {code = null, name = 'NO', chardescript = '', bodychanges = []},
 		cat = {code = 'cat', name = '', chardescript = '', bodychanges = []},
 		fox = {code = 'fox', name = '', chardescript = '', bodychanges = []},
+		fox_2 = {code = 'fox_2', name = '', chardescript = '', bodychanges = []},
+		fox_3 = {code = 'fox_3', name = '', chardescript = '', bodychanges = []},
 		wolf = {code = 'wolf', name = '', chardescript = '', bodychanges = []},
 		bunny = {code = 'bunny', name = '', chardescript = '', bodychanges = []},
 		tanuki = {code = 'tanuki', name = '', chardescript = '', bodychanges = []},
 		cow = {code = 'cow', name = '', chardescript = '', bodychanges = []},
-		demon = {code = 'demon', name = '', chardescript = '', bodychanges = [{code = 'body_color_tail', value = [['dark2', 1]], reqs = []},]},
-		dragon = {code = 'dragon', name = '', chardescript = '', bodychanges = [{code = 'body_color_tail', value = [['red2', 1]], reqs = []},]},
-		mouse = {code = 'mouse', name = '', chardescript = '', bodychanges = [{code = 'body_color_tail', value = [['white2', 1]], reqs = []},]},
-		kobold = {code = 'kobold', name = '', chardescript = '', bodychanges = [{code = 'body_color_tail', value = [['green2', 1]], reqs = []},]},
+		demon = {code = 'demon', name = '', chardescript = '', bodychanges = []},
+		dragon = {code = 'dragon', name = '', chardescript = '', bodychanges = []},
+		mouse = {code = 'mouse', name = '', chardescript = '', bodychanges = []},
+		kobold = {code = 'kobold', name = '', chardescript = '', bodychanges = []},
 		avian = {code = 'avian', name = '', chardescript = '', bodychanges = []},
-		fish = {code = 'fish', name = '', chardescript = '', bodychanges = [{code = 'body_color_tail', value = [['blue2', 1]], reqs = []},]},
+		fish = {code = 'fish', name = '', chardescript = '', bodychanges = []},
 		snake = {code = 'snake', name = '', chardescript = '', bodychanges = []},
 		tentacles = {code = 'tentacles', name = '', chardescript = '', bodychanges = []},
 		horse = {code = 'horse', name = '', chardescript = '', bodychanges = []},
@@ -573,6 +634,13 @@ var bodypartsdata = {
 		average = {code = 'average', name = '', chardescript = '', bodychanges = []},
 		tall = {code = 'tall', name = '', chardescript = '', bodychanges = []},
 		towering = {code = 'towering', name = '', chardescript = '', bodychanges = []},
+	},
+	head_size = {
+		tiny = {code = 'tiny', name = '', chardescript = '', bodychanges = []},
+		small = {code = 'small', name = '', chardescript = '', bodychanges = []},
+		average = {code = 'average', name = '', chardescript = '', bodychanges = []},
+		big = {code = 'big', name = '', chardescript = '', bodychanges = []},
+		huge = {code = 'huge', name = '', chardescript = '', bodychanges = []},
 	},
 	tits_size = {
 		flat = {code = 'flat', name = '', chardescript = '', bodychanges = []},
@@ -825,6 +893,9 @@ func make_slave_statreq_text(req):
 		'is_free':
 			if req.check: return tr('STATREQ_IS_FREE')
 			else: return tr('STATREQ_IS_NOT_FREE')
+		'is_unique':
+			if req.value: return tr('STATREQ_IS_UNIQUE')
+			else: return tr('STATREQ_NOT_UNIQUE')
 		'slave_type':
 			var text
 			if req.operant == 'eq': text = "STATREQ_IS_SLAVE_TYPE"
@@ -880,8 +951,13 @@ func make_slave_statreq_text(req):
 						val += bodypartsdata[req.stat][req.value].name
 				
 				return "%s: %s." % [stat_name, val]
+			elif req.stat == 'consent':
+				return "%s: %s %s (%s)." % [stat_name, operant_text, int(req.value), tr("CONSENT" + str(int(req.value)))]
 			else:
 				return "%s: %s %s." % [stat_name, operant_text, req.value]
+		'base_stat':
+			return globals._report_text("STATREQ_BASE_STAT", [
+				globals.get_stat_name(req.stat), input_handler.operant_translation(req.operant), req.value])
 		'sex':
 			var text = "%s: " % tr('STATSEX')
 			if req.has('check') and !req.check:

@@ -1,0 +1,466 @@
+extends Panel
+#The screen behind a piece of work: everybody on it on the left, everybody who could be on it
+#on the right, and a click to move somebody either way.
+#
+#It started as the service trade's own screen, because service takes as many as you send and
+#the interesting part is what each of them is allowed to do. It turned out to be the better
+#way to fill anything: a row of 34px places on a card is a small target to drag onto and says
+#nothing about who is available, while this names them.
+#
+#Service keeps one thing of its own - the rules. Those live in the work panel
+#(Mansion/Scripts/MansionJobModule.gd show_brothel_options), a hundred and fifty lines of
+#per-character conditions about consent, training and boosters, and a second copy would be
+#wrong within a week. Clicking somebody on service opens that panel on them.
+
+const LocationTasks = preload("res://gui_modules/mansion_view/mansion_location_tasks.gd")
+
+var view = null
+var entry = null
+
+
+func setup(view_node):
+	view = view_node
+	visible = false
+	$CloseButton.connect("pressed", self, "close")
+	$AddButton.connect("pressed", self, "toggle_picking")
+	rules_setup(view_node)
+
+
+func open(task_entry):
+	entry = task_entry
+	visible = true
+	picking = false
+	rebuild()
+
+
+func close():
+	visible = false
+	entry = null
+	picking = false
+	rules_close()
+
+
+func is_service():
+	return entry != null and entry.own_screen
+
+
+#Whose rules are open, so the list can show which of them is being looked at.
+func selected_char():
+	return char_id if $Rules.visible else null
+
+
+func workers():
+	return LocationTasks.workers_of(entry.id) if entry != null else []
+
+
+func rebuild():
+	if !visible or entry == null:
+		return
+	$Title.text = tr(entry.name)
+	#the list is under the screen's own title and needs no second heading over it
+	$OnTaskLabel.visible = false
+	var ids = workers()
+	#before the rows: every income line on the screen is read against it
+	fill_pool()
+	fill_limits()
+	$Empty.text = tr("MANSIONVIEW_TASKEMPTY")
+	$Empty.visible = ids.empty() and !picking
+	input_handler.ClearContainer($Scroll/List)
+	for char_id in ids:
+		var cell = input_handler.DuplicateContainerTemplate($Scroll/List)
+		cell.setup(view, char_id, self, true)
+	build_candidates(ids)
+	rules_rebuild()
+
+
+#### the settlement's purse ####
+
+#What the settlement's clients can still pay this week, from LocationTasks.service_pool_state(), or
+#null when that settlement has no limit - in which case the bar and its mark are simply not there.
+var pool = null
+
+
+func fill_pool():
+	pool = LocationTasks.service_pool_state(entry.id) if is_service() else null
+	$PoolTip.visible = pool != null
+	#the bar is the scene's; a scene that has not got one simply shows nothing
+	var bar = get_node_or_null("PoolBar")
+	if bar != null:
+		LocationTasks.fill_service_bar(bar, pool)
+	if pool == null:
+		return
+	#the mark beside the bar and the bar itself answer the same question, so they say the same thing
+	var hint = LocationTasks.service_pool_hint()
+	globals.connecttexttooltip($PoolTip, hint, false, view.get_node("Overlay/TextTooltip"))
+	if bar != null:
+		globals.connecttexttooltip(bar, hint, false, view.get_node("Overlay/TextTooltip"))
+
+
+#One person's estimated turn, read against the purse: as it is while the purse covers everybody's
+#estimate, "up to" once it may not, and at the exhausted rate once it is empty. Not shared out between
+#the rows - who is paid first is decided by the turn's order, not here.
+func earnings_text(value, full_key, low_key, empty_key):
+	var status = pool.status if pool != null else 'ok'
+	if status == 'ok':
+		return globals._report_text(full_key, [str(stepify(value, 0.1))])
+	if status == 'low':
+		return globals._report_text(low_key, [str(stepify(value, 0.1))])
+	return globals._report_text(empty_key, [
+		str(stepify(value * variables.service_gold_exhausted_mult, 0.1)),
+		LocationTasks.service_exhausted_percent()])
+
+
+#What this settlement's clients are after this week and what it will not buy: one mark beside the
+#purse, said in its tooltip. A scene without the mark simply shows nothing.
+func fill_limits():
+	var mark = get_node_or_null("Marks")
+	if mark == null:
+		return
+	var hint = LocationTasks.service_mark_hint(service_code()) if is_service() else ""
+	mark.visible = hint != ""
+	if !mark.visible:
+		return
+	globals.connecttexttooltip(mark, hint, false, view.get_node("Overlay/TextTooltip"))
+
+
+func summary_income(value):
+	var color = {ok = 'aqua', low = 'yellow', empty = 'red'}[pool.status if pool != null else 'ok']
+	return "{color=%s|%s}" % [color,
+		earnings_text(value, "SERVICEESTVALUE", "SERVICEESTVALUE_LIMITED", "SERVICEESTVALUE_EXHAUSTED")]
+
+
+func add_worker(char_id):
+	view.place_character('task', entry.id, char_id, null)
+	rebuild()
+
+
+func remove_worker(worker_id):
+	view.release_character(worker_id, 'work')
+	#somebody else's rules stay open: only the person who just left the work loses their panel
+	if char_id == worker_id:
+		rules_close()
+	rebuild()
+
+
+#### putting somebody new on the work ####
+
+#The screen was meant to name who could be put on the work as well as who already is, and
+#without that the only way onto a task was carrying somebody onto its card. The free people
+#are the same ones the room card offers, on the same cell as the workers - the cell already
+#knows an unassigned click means "put them on" - and they are appended under the list rather
+#than replacing it, so the choice is made while still seeing who is there.
+var picking = false
+
+
+func toggle_picking():
+	picking = !picking
+	rebuild()
+
+
+func build_candidates(ids):
+	$AddButton.text = tr("MANSIONVIEW_HIDEFREE" if picking else "MANSIONVIEW_ADDFREE")
+	if !picking:
+		return
+	var offered = 0
+	for char_id in view.resting_characters():
+		if ids.has(char_id):
+			continue
+		var cell = input_handler.DuplicateContainerTemplate($Scroll/List)
+		cell.setup(view, char_id, self, false)
+		offered += 1
+	if offered == 0:
+		#the label sits over the top of the list, so it can only be used when there is no list
+		if ids.empty():
+			$Empty.text = tr("MANSIONVIEW_NOCANDIDATES")
+			$Empty.visible = true
+		else:
+			input_handler.SystemMessage(tr("MANSIONVIEW_NOCANDIDATES"))
+
+
+#Clicking somebody opens what they are allowed to do, beside the list rather than instead of
+#it - the point of the screen is setting one person's rules while seeing the rest.
+func open_rules(char_id):
+	rules_open(char_id)
+	rebuild()
+
+
+#### the carrying protocol ####
+
+#Somebody let go over the screen joins the work, the same as dropping them on its card.
+func refusal_for(data):
+	if entry == null or !(data is Dictionary) or data.get('kind', '') != 'mansion_char':
+		return 'MANSIONVIEW_ERR_VOID'
+	#already on it: nothing to do, and nothing worth saying about it either
+	if workers().has(data.char_id):
+		return 'MANSIONVIEW_ERR_VOID'
+	if is_service() and !ResourceScripts.game_world.service_takes_race(service_code(), view.get_character(data.char_id)):
+		return 'MANSIONVIEW_ERR_SERVICERACE'
+	return ''
+
+
+func take_carried(data):
+	add_worker(data.char_id)
+	return true
+
+
+func can_drop_data(_position, data):
+	return refusal_for(data) == ''
+
+
+func drop_data(_position, data):
+	take_carried(data)
+
+
+#### what one person on service is allowed to do ####
+
+const NON_SEX = ['waitress', 'hostess', 'dancer', 'stripper']
+const SEXUAL = ['petting', 'oral', 'anal', 'pussy', 'penetration', 'group', 'sextoy']
+const SEXES = ['males', 'females', 'futa']
+
+#whose rules are open, or null when the rules half is shut
+var char_id = null
+
+
+func rules_setup(_view_node):
+	$Rules.visible = false
+	#No close button of its own: the rules open beside the list rather than over it, so the
+	#screen's own close is the only one that means anything - a second one on the inner panel
+	#read as "close the screen" and shut the wrong thing.
+	#the two explanations the work panel carries beside the same two blocks
+	#(Mansion/Scripts/MansionJobModule.gd:17 and :28), on the same keys
+	globals.connecttexttooltip($Rules/RulesTip, tr("BROTHELTOOLTIP"), false,
+		view.get_node("Overlay/TextTooltip"))
+	globals.connecttexttooltip($Rules/Boosters/BoostersTip, tr("SERVICEBOOSTTOOLTIP"), false,
+		view.get_node("Overlay/TextTooltip"))
+
+
+func rules_open(character):
+	char_id = character
+	$Rules.visible = true
+	rules_rebuild()
+
+
+func rules_close():
+	$Rules.visible = false
+	char_id = null
+
+
+func rules_person():
+	return view.get_character(char_id) if char_id != null else null
+
+
+func rules_rebuild():
+	var who = rules_person()
+	if !$Rules.visible or who == null:
+		$Rules.visible = false
+		return
+	$Rules/Title.text = who.get_short_name()
+	input_handler.ClearContainer($Rules/Scroll/Content/Rules)
+	for rule in NON_SEX:
+		if !settlement_allows(rule):
+			continue
+		add_rule(who, rule, false)
+	for rule in SEXUAL:
+		if !offers_rule(who, rule) or !settlement_allows(rule):
+			continue
+		add_rule(who, rule, true)
+	for rule in SEXES:
+		add_rule(who, rule, false)
+	build_boosters(who)
+	update_summary(who)
+
+
+#The settlement this service is sold in, and the acts its clients will not buy at all.
+func service_code():
+	return LocationTasks.task_location(entry.id) if entry != null else LocationTasks.MANSION_CODE
+
+
+func settlement_allows(rule):
+	return ResourceScripts.game_world.service_allows_rule(service_code(), rule)
+
+
+#The acts this person is not asked about at all: nothing to buy them with, or nothing to do
+#it with. Same conditions the work panel hides them under.
+func offers_rule(who, rule):
+	if rule == 'sextoy' and !who.has_profession('sextoy'):
+		return false
+	if rule == 'pussy' and who.get_stat('has_womb') == false:
+		return false
+	if rule == 'penetration' and who.get_stat('penis_size') == '':
+		return false
+	return true
+
+
+func add_rule(who, rule, sexual):
+	var button = input_handler.DuplicateContainerTemplate($Rules/Scroll/Content/Rules)
+	button.text = rule_label(who, rule)
+	button.pressed = who.check_brothel_rule(rule)
+	button.connect('pressed', self, 'switch_rule', [button, rule])
+	var text = tr("BROTHEL" + rule.to_upper() + "DESCRIPT")
+	if !sexual:
+		#marked so the summary can grey these out once sexual work is on
+		if rule in NON_SEX:
+			button.set_meta('non_sex', true)
+		set_rule_tooltip(button, who, text)
+		return
+	text += "\n" + tr("BROTHELMINCONSENT") % tr(variables.consent_dict[
+		tasks.gold_tasks_data[rule].min_consent])
+	#refusals first: somebody who will not do it at all is not asked to
+	if !who.xp_module.service_rule_offered(rule):
+		button.disabled = true
+		button.pressed = false
+		text += "\n" + tr("BROTHELBLOCKEDBYGEAR")
+	elif who.has_status('no_sex'):
+		button.disabled = true
+		text = "[name] " + tr("REFUSE_TO_WHORE_LABEL")
+	elif who.has_status('no_whoring'):
+		button.disabled = true
+		text = "[name] " + tr("REFUSE_THIS_TASK_LABEL")
+	elif !who.has_status('sexservice'):
+		button.disabled = true
+		text += "\n" + tr("LACKSEXTRAINING")
+	elif who.get_stat('consent') < tasks.gold_tasks_data[rule].min_consent:
+		#allowed to set it, but they are being pushed past what they have agreed to
+		for state in ['font_color', 'font_color_pressed', 'font_color_hover',
+				'font_color_hover_pressed', 'font_color_disabled']:
+			button.set("custom_colors/" + state, variables.hexcolordict['red'])
+	set_rule_tooltip(button, who, text)
+
+
+#Every one of these strings carries the game's own [name]/[his] tags, and the pieces added
+#last carried them furthest: LACKSEXTRAINING has "[name]" written into the localization and
+#reached the screen with the brackets still on it. Standing one substitution at the door,
+#after the text is finished, is the only arrangement nobody can forget half of.
+func set_rule_tooltip(button, who, text):
+	globals.connecttexttooltip(button, who.translate(text), false,
+		view.get_node("Overlay/TextTooltip"))
+
+
+#Trained acts wear their level as stars, the way the work panel writes them.
+func rule_label(who, rule):
+	var label = tr("BROTHEL" + rule.to_upper())
+	if who.get_stat('sex') == "male" and tasks.gold_tasks_data.has(rule) \
+			and tasks.gold_tasks_data[rule].tags.has('has_alt_name'):
+		label = tr("BROTHEL" + rule.to_upper() + "ALT")
+	if rule in ['petting', 'oral', 'pussy', 'anal', 'penetration']:
+		match who.get_stat('sex_training_' + rule):
+			'skilled':
+				label += " ★"
+			'mastered':
+				label += " ★★"
+	return label
+
+
+func switch_rule(button, rule):
+	rules_person().set_brothel_rule(rule, button.pressed)
+	#The whole screen, not only the rules half: every line of the list behind carries what that
+	#person is allowed to do and what it earns, and one of them just changed. rules_rebuild()
+	#alone left the line saying the old acts and the old sum until the screen was reopened.
+	rebuild()
+
+
+#What all the ticks add up to, in the same words and the same order the work panel says it -
+#including the warning about sex work with no clients chosen, which is the mistake worth
+#catching. The markup is the game's own, so it goes through TextEncoder like everywhere else.
+func update_summary(who):
+	var sexual = false
+	var penetrative = false
+	var pregnancy = false
+	for rule in SEXUAL:
+		if !who.check_brothel_rule(rule):
+			continue
+		sexual = true
+		if rule in ['anal', 'pussy', 'group', 'sextoy']:
+			penetrative = true
+			if rule != 'anal' and who.get_stat('has_womb') == true:
+				pregnancy = true
+	var text = ""
+	if who.get_work() == '':
+		text = "{color=yellow|" + tr("SERVICEREST") + "}"
+	elif sexual and penetrative:
+		text = "{color=pink|" + tr("SERVICESEXUALPENETRATIVE") + "}"
+		if pregnancy:
+			text += "\n{color=pink|" + tr("SERVICEPREGNANT") + "}"
+	elif sexual:
+		text = "{color=pink|" + tr("SERVICESEXUALNONPENETRATIVE") + "}"
+	else:
+		text = "{color=green|" + tr("SERVICENOSEX") + "}"
+	if sexual:
+		var has_clients = false
+		for sex in SEXES:
+			if who.check_brothel_rule(sex):
+				has_clients = true
+		if !has_clients:
+			text += "\n\n{color=red|" + tr("BROTHELWARNING") + "}"
+		text += "\n\n{color=aqua|" + tr("SERVICEDESIRABILITY") \
+			% str(round(who.get_service_desirability())) + "}"
+		text += "\n" + summary_income(who.get_estimated_service_value())
+	else:
+		var any_non_sex = false
+		for rule in NON_SEX:
+			if who.check_brothel_rule(rule):
+				any_non_sex = true
+		if any_non_sex:
+			text += "\n\n{color=aqua|" + tr("SERVICEDESIRABILITYVALUE") \
+				% str(round(who.get_stat('desirability'))) + "}"
+			text += "\n" + summary_income(who.get_estimated_non_sex_service_value())
+	$Rules/Scroll/Content/Summary.bbcode_text = globals.TextEncoder(who.translate(text))
+	#serving and sleeping with clients are not done at once, the way the work panel has it
+	for box in $Rules/Scroll/Content/Rules.get_children():
+		if box.visible and box.has_meta('non_sex') and !box.disabled:
+			box.disabled = sexual
+
+
+#Three tiers of booster, each a material spent per turn for a share more work. Buying one
+#implies the cheaper ones and dropping one drops the dearer, which is the rule the work panel
+#enforces and the reason these are not three independent switches.
+#
+#Switched on is not the same as working, though. The tiers are paid for bottom up and the first
+#one short of its material stops the rest, so a tier with a full stock still earned nothing while
+#the one below it had run dry - and its line said "Activated" all the same. Every switched-on
+#line from the stopping tier up now says why it is idle, in red.
+func build_boosters(who):
+	input_handler.ClearContainer($Rules/Boosters/List)
+	var boosters = who.xp_module.service_boosters
+	var stop = who.xp_module.get_booster_stop_tier()
+	for id in range(1, 4):
+		var button = input_handler.DuplicateContainerTemplate($Rules/Boosters/List)
+		var boost = boosters['boost%d' % id]
+		var material = Items.materiallist[boost.res]
+		button.get_node('icon').texture = material.icon
+		var text = "%s (%d): %d00%%" % [tr(material.name),
+			int(ResourceScripts.game_res.materials[boost.res]), variables.booster_value[id - 1]]
+		if boost.value:
+			if id < stop:
+				text += " - " + tr("FARMACTIVATED")
+			else:
+				text += " - " + booster_idle_text(boosters, id, stop)
+				button.get_node('Label').set("custom_colors/font_color", variables.hexcolordict['red'])
+		button.get_node('Label').text = text
+		button.pressed = boost.value
+		globals.connectmaterialtooltip(button, material, '', null,
+			view.get_node("Overlay/ItemTooltip"))
+		button.connect('pressed', self, 'switch_booster', [id, !boost.value])
+
+
+#The stopping tier itself is short of its material; the ones above it are waiting on that one.
+#The key goes through the % guard: a locale without the line would otherwise abort the whole list.
+func booster_idle_text(boosters, id, stop):
+	if id == stop:
+		return tr("SERVICEBOOSTNOSTOCK")
+	var blocker = Items.materiallist[boosters['boost%d' % stop].res]
+	return globals._report_text("SERVICEBOOSTNEEDS", [tr(blocker.name)])
+
+
+func switch_booster(id, value, rebuild = true):
+	var boosters = rules_person().xp_module.service_boosters
+	boosters['boost%d' % id].value = value
+	if value and id > 1:
+		switch_booster(id - 1, true, false)
+	if !value and id < 3:
+		switch_booster(id + 1, false, false)
+	#A booster is a multiplier on what service earns, so the figures that print those earnings
+	#go with it - the summary beside the boosters and the person's line in the list - and not
+	#only the booster buttons themselves, which was all this redrew.
+	if rebuild:
+		self.rebuild()
