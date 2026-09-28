@@ -7,12 +7,16 @@ var travel_target = {area = '', location = ''}
 var travel_time = 0
 var initial_travel_time = 0 setget set_travel_time
 var loc_group = 'default'
+#Where this journey started. Nothing else remembers it, and a cleared location may not be removed
+#while somebody is still walking away from it - see game_world.is_location_occupied().
+var travel_origin = ''
 
 
 func remove_from_travel():
 	if travel_time > 0:
 		set_travel_time(0)
 		travel_target = {area = '', location = ''}
+		travel_origin = ''
 		parent.get_ref().xp_module.work = ''
 
 
@@ -23,6 +27,7 @@ func fix_infinite_travel():
 		area = travel_target.area
 		location = travel_target.location
 		travel_target = {area = '', location = ''}
+		travel_origin = ''
 
 
 
@@ -36,6 +41,7 @@ func fix_import():
 	location = ResourceScripts.game_world.mansion_location
 	area = ResourceScripts.game_world.starting_area
 	travel_target = {area = '', location = ''}
+	travel_origin = ''
 	travel_time = 0
 	initial_travel_time = 0
 
@@ -43,7 +49,7 @@ func fix_import():
 func travel_per_tick():
 	var value = 1
 #	if ResourceScripts.game_res.upgrades.has('stables'):
-#		value = 1 + variables.stable_boost_per_level * ResourceScripts.game_res.upgrades.stables
+#		value = 1 + variables.stable_boost_per_level * ResourceScripts.game_res.findupgradelevel('stables')
 	return value
 
 
@@ -58,11 +64,15 @@ func set_travel_time(value):
 
 func check_location(value, completed = false):
 	if completed: return travel_time == 0 && location == value
-	else: 
+	else:
 		if location == 'travel' and value != 'travel':
 			return travel_target.location == value
 		else:
 			return location == value
+
+
+func is_leaving(loc_id):
+	return location == 'travel' and travel_time > 0 and travel_origin == loc_id
 
 
 func same_location_with(ch_travel_mod):
@@ -78,19 +88,14 @@ func tick():
 			travel_time = 0
 			area = travel_target.area
 			location = travel_target.location
+			travel_origin = ''
 			globals.emit_signal("slave_arrived", parent.get_ref())
 			globals.emit_signal("travel_completed")
 			parent.get_ref().remove_from_task(true)
 			input_handler.update_slave_list()
-			if location == ResourceScripts.game_world.mansion_location:
-				# parent.get_ref().return_to_task()
-				globals.text_log_add('travel', parent.get_ref().get_short_name() + " " + tr("RETURNED_TO_MANSION_LABEL") + ". ")
-			else:
-#					if state.capitals.has(location):
-#						state.text_log_add("travel", get_short_name() + " arrived at location: " + state.areas[state.capitals[location].area].capital_name)
-#					else:
-				var loc_data = ResourceScripts.game_world.areas[ResourceScripts.game_world.location_links[location].area][ResourceScripts.game_world.location_links[location].category][location]
-				globals.text_log_add('travel', parent.get_ref().get_short_name() + " " + tr("ARRIVED_AT_LOC_LABEL") + ": " + tr(loc_data.name))
+			#Not a row of its own: everybody who arrives this turn shares one, with the travel
+			#groups folded away behind it. See globals.mansion_activity_arrival().
+			globals.mansion_activity_arrival(parent.get_ref(), location)
 			parent.get_ref().return_to_task()
 
 func make_location_description():
@@ -131,13 +136,16 @@ func return_to_mansion(instant = false):
 				active_location.group.erase(i)
 				break
 	if ResourceScripts.game_globals.instant_travel == false and parent.get_ref().get_work() != 'disabled' and !instant:
+		if location != 'travel':
+			travel_origin = location
 		location = 'travel'
 		parent.get_ref().set_work('travel')
 		travel_target = {area = ResourceScripts.game_world.starting_area, location = ResourceScripts.game_world.mansion_location}
-		travel_time = max(1, abs(round(active_area.travel_time + active_location.travel_time - travel_time - variables.stable_boost_per_level * ResourceScripts.game_res.upgrades.stables)))
+		travel_time = max(1, abs(round(active_area.travel_time + active_location.travel_time - travel_time - variables.stable_boost_per_level * ResourceScripts.game_res.findupgradelevel('stables'))))
 		globals.emit_signal("slave_departed")
 	else:
 		location = ResourceScripts.game_world.mansion_location
+		travel_origin = ''
 		globals.emit_signal("slave_arrived")
 
 func return_recruit():
@@ -145,9 +153,11 @@ func return_recruit():
 		travel_target = {area = ResourceScripts.game_world.starting_area, location = ResourceScripts.game_world.mansion_location}
 		travel_time = input_handler.active_area.travel_time + input_handler.active_location.travel_time
 		parent.get_ref().set_work('travel')
+		travel_origin = input_handler.active_location.id
 		location = 'travel'
 	else:
 		location = ResourceScripts.game_world.mansion_location
+		travel_origin = ''
 		globals.emit_signal("slave_arrived")
 
 #moved here from map.gd for module consistency
@@ -156,6 +166,10 @@ func set_travel_to(from_loc, to_loc):
 	var person = parent.get_ref()
 	person.previous_location = location
 	person.set_work('travel')
+	#from_loc is the map's selection and can be 'adv_mode', so the road is remembered from where
+	#this character actually stands
+	if location != 'travel':
+		travel_origin = location
 	location = 'travel'
 	travel_target = {area = locdata.area, location = to_loc}
 	var travel_cost = globals.calculate_travel_time(from_loc, to_loc)
@@ -165,4 +179,5 @@ func instant_travel(to_loc):
 	var locdata = ResourceScripts.game_world.location_links[to_loc]
 	location = to_loc
 	area  = locdata.area
+	travel_origin = ''
 #--------------

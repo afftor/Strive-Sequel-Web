@@ -94,13 +94,13 @@ var rare_enemy_traits = ['rare_sturdy', 'rare_nimble', 'rare_strong', 'rare_dead
 
 var productivity_mods = ['mod_build','mod_hunt', 'mod_fish','mod_collect','mod_cook','mod_smith','mod_tailor','mod_alchemy','mod_farm','mod_pros', 'mod_service']
 
-var longtails = ['fox','cat','wolf','dragon','demon','tanuki','fish','lizard','kobold','rat']
-var longears = ['fox','cat','wolf','bunny_standing','bunny_drooping','elven','tanuki']
+var longtails = ['fox','fox_2','fox_3','cat','wolf','dragon','demon','tanuki','fish','lizard','kobold','rat']
+var longears = ['fox','fox2','fox_n1','fox_n2','fox_n3','fox_n4','cat','wolf','bunny','bunny_standing','bunny_drooping','elven','elven2','tanuki']
 
 var impregnation_compatibility = ['Human','Elf','DarkElf','TribalElf','Beastkin','Halfkin'] #the rest is only for same race
 var inheritedassets = ['ears','eye_color','eye_shape', 'hair_color', 'horns', 'tail', 'wings', 'skin_coverage', 'arms', 'legs', 'body_shape']
 var inheritedstats = ['growth_factor','magic_factor','physics_factor','wits_factor','charm_factor','sexuals_factor']
-var work_rules = ['lock','ration', 'shifts', 'constrain', 'luxury', 'contraceptive', 'nudity', 'personality_lock','relationship','masturbation']
+var work_rules = ['lock', 'hide', 'ration', 'shifts', 'constrain', 'contraceptive', 'nudity', 'relationship', 'masturbation']
 var brothel_rules = ['waitress', 'hostess', 'dancer', 'stripper', 'petting', 'oral', 'anal', 'penetration', 'pussy', 'group', 'sextoy', 'males', 'females','futa']
 var brothel_non_sex_options = ['waitress','hostess','dancer','stripper']
 var farming_rules = ['milk', 'pheromones', 'seed', 'eggs', 'magic_dust', 'reptile_blood', 'spider_silk', 'draconic_scales', 'light_essence', 'dark_essence', 'lizard_skin', 'leatherdragon']
@@ -126,8 +126,10 @@ var desirability_per_charm_stat = 0.3
 var desirability_per_enabled_action = 4.0
 var desirability_gold_cap = 100.0 #desirability above this no longer affects full-gold chance, only the gold bonus below
 var desirability_overcap_gold_bonus = 0.01 #gold income % per point of desirability above desirability_gold_cap
-var sex_service_base_income_mult = 5.0
+var sex_service_base_income_mult = 8.0
 var sex_service_partial_gold_mult = 0.5 #gold received when the desirability roll fails
+var sex_service_work_gain_mult = 0.5 #share of the usual work experience and stat gain a sex service action gives
+var sex_service_work_stats = ['physics', 'charm'] #stats every sex service action trains, each at sex_service_work_gain_mult
 var sex_service_fluctuation = 0.2 #+-20% randomness on sex service base value
 var consent_lock_gold_mult = 0.6 #gold received when performing a sex action above the character's consent level
 var sex_training_gold_multiplier = {
@@ -148,10 +150,57 @@ var sextoy_tame_factor_bonus = 0.10 #income % per point of tame factor above 1
 var non_sex_service_charm_factor_mult = 3.0
 var non_sex_service_tame_factor_mult = 2.5
 var non_sex_desirability_threshold = 50.0 #desirability above this boosts non-sex service income
-var non_sex_desirability_gold_bonus = 0.02 #gold income % per point of desirability above non_sex_desirability_threshold
+var non_sex_desirability_gold_bonus = 0.01 #gold income % per point of desirability above non_sex_desirability_threshold
 var waitress_training_point_chance = 0.5 #chance for a slave currently in training to gain 1 training point from waitress work
 var petbeast_desirability_per_tame_factor = 2.0 #extra desirability per tame factor, petbeast class only
 var petbeast_service_tame_factor_mult = 1.0 #extra non-sex service income per tame factor, petbeast class only
+
+#service gold pool: what a settlement's clients can pay out over one week, refilled every week start.
+#max = base + randi_range(0, random), rolled again at every refill. A settlement with no entry here has no limit.
+var service_gold_limits = {
+	aliron = {base = 5000, random = 500},
+	elf_capital = {base = 4000, random = 400},
+	dwarf_capital = {base = 6500, random = 650},
+	empire_capital = {base = 12000, random = 1200},
+	beastkin_capital = {base = 2500, random = 250},
+}
+var service_gold_exhausted_mult = 0.1 #share of a payout still paid for the part the settlement's pool cannot cover
+
+#What a settlement will not buy and whom it will not take. No entry here means it buys everything from anybody.
+var service_settlement_limits = {
+	elf_capital = {
+		banned_rules = ['hostess', 'stripper', 'petting', 'oral', 'anal', 'penetration', 'pussy', 'group', 'sextoy'],
+		races = ['Elf', 'TribalElf', 'Fairy', 'Dryad'],
+		no_race_bonus = true,
+	},
+	beastkin_capital = {
+		banned_rules = ['waitress', 'hostess', 'petting'],
+	},
+	dwarf_capital = {
+		banned_rules = ['group'],
+		races = ['Dwarf', 'Gnome', 'Fairy', 'Kobold', 'Goblin'],
+	},
+}
+
+#Every week a settlement's clients are after something in particular, and whoever fits earns more.
+var service_bonus_types = ['race', 'personality', 'rule', 'factor']
+var service_bonus_two_chance = 0.7 #the week rolls two bonuses instead of one
+var service_bonus_gold_mult = {1: 0.4, 2: 0.7} #extra gold for matching one of them, or both
+var service_bonus_picks = [2, 3] #how many races or rules a bonus of that kind names
+var service_bonus_monster_chance = 0.25 #a race bonus asks for the monster races as one instead of naming some
+var service_bonus_factors = ['physics_factor', 'charm_factor', 'sexuals_factor', 'tame_factor', 'authority_factor']
+var service_bonus_factor_level = 5 #factor a character needs to match a factor bonus
+
+#Gear that takes a service action off the table for whoever wears it, whatever the settlement allows.
+var service_gear_blocks = {chastity_belt = ['pussy']}
+
+#A client who would rather buy what the house is not selling. Offered after a turn of sex work to
+#somebody who sells no penetration at all and still has her maidenhead.
+var penetrative_service_rules = ['pussy', 'anal', 'group', 'sextoy']
+var virginity_offer_chance = 0.1
+var virginity_offer_mult = [6.0, 8.0] #what he pays, as a multiple of what that turn was worth
+var virginity_offer_affection_loss = 50
+var virginity_offer_affection_gain = 20
 
 #harlot & courtesan trait perks
 var harlot_desirability_cap = 75.0
@@ -290,19 +339,17 @@ var growth_factor_cost_mod = {
 	6 : 5
 }
 
-var basestat_factor_upgrade = {
-1 : 0,
-2 : 100,
-3 : 300,
-4 : 500,
-5 : 750,
-6 : 1500,
-}
-
 #slave & quest timings
 
 var guild_slave_update_time = 7
 var guild_quest_update_time = 3
+
+#locations
+var location_cap_per_area = 8
+#A cleared location is removed once it has stood empty this long. Anything still worth a visit -
+#unexplored rooms, resources, captives - buys it the longer wait.
+var location_removal_days_empty = 1
+var location_removal_days_leftovers = 3
 
 
 #mansion & ugprades
@@ -336,6 +383,15 @@ var slave_starting_stats = 15
 
 var minimum_factor_value = 1
 var maximum_factor_value = 6
+#Ceiling on the factors a captive taken in a dungeon is rolled with, keyed by that dungeon's own
+#difficulty tier (char_roll_data.diff). Applied once, after the difficulty bonus loop has run -
+#see ch_dyn_stats.generate_random_character_from_data(). A tier left out of this dict is not
+#capped beyond maximum_factor_value. Combat that never names a tier falls back to 'medium',
+#which is the same default its difficulty already uses.
+var dungeon_factor_caps = {
+	easy = 4,
+	medium = 5,
+}
 var body_upgrade_points_per_growth_factor = 25
 
 var basic_character_atk = 15
@@ -352,11 +408,14 @@ var power_adjustments_per_difficulty = {
 }
 var difficulty_per_level = 0.05 #% enemy stat increase
 var difficulty_per_level_survival = 0.1 #% enemy stat increase
-var survival_cap_main = 4.0 # added base 1 to max + 300%
-var survival_cap_secondary = 2.5 # added base 1 to max + 150%
+var survival_cap_main = 2.5 # added base 1 to max + 300%
+var survival_cap_secondary = 1.5 # added base 1 to max + 150%
 
 var slave_class_list = ['slave', 'slave_trained', 'servant', 'heir', 'master']
 var servant_unlock_traits = ['training_s_working', 'training_s_combat', 'training_s_relation', 'training_s_sexservice', 'training_s_sexservice_adv']
+#the slave-side equivalent. The training courses in ch_leveling grant exactly this set, and
+#finishing training under a trainer now does the same - it used to be bought a trait at a time.
+var slave_unlock_traits = ['training_relation', 'training_callmaster', 'training_sexservice', 'training_sexservice_adv']
 #sex chances
 
 var teen_age_weight = 1
@@ -419,13 +478,14 @@ var base_loan_dates = [15, 29, 50, 99]
 #var authority_threshold_per_timid = 25
 
 
+#the same scale as the reputation bonus below
 var master_charm_quests_gold_bonus = {
 	1 : 0,
 	2 : 0.05,
 	3 : 0.1,
-	4 : 0.2,
-	5 : 0.3,
-	6 : 0.4,
+	4 : 0.15,
+	5 : 0.2,
+	6 : 0.25,
 }
 var master_charm_quests_rep_bonus = {
 	1 : 0,
@@ -448,6 +508,19 @@ var additional_subroom_chance = 0.2
 var allow_remote_intereaction = false
 var no_event_wait_time = false
 var ignore_quest_requirements = false
+#Animation sandbox: combat never ends and never moves on. The turn stays with
+#the same fighter, enemies never act, the dead are revived once the queue drains,
+#and skills cost nothing and never go on cooldown. Set by the checkbox in
+#test_combat; always false in a normal game.
+var anim_sandbox = false
+#Forces every hit roll while set: 'hit', 'crit' or 'miss'. The combat lab's trace runs use
+#it, because the roll draws from the global RNG that ShakeAnimation also burns once per
+#frame - so the same seed gives a crit on one run and not on the next. Null in the game.
+var anim_force_outcome = null
+#Animation trace: dumps the queue and every card's transform, frame by frame, to
+#stdout. Read the log to check timings as numbers instead of by eye. Noisy, so
+#it is its own checkbox in test_combat rather than part of the sandbox.
+var anim_trace = false
 
 var generate_test_chars = true
 var combat_tests = false #for combat testing
@@ -652,28 +725,15 @@ var breakdown_info = {
 	brk_shrine_enslave = {chance = 1.0, text = "BREAKDOWN_SHRINE"},
 	brk_enthrall = {chance = 0.1, text = "BREAKDOWN_ENTHRALL"},
 	brk_enthrall_release = {chance = 0.5, text = "BREAKDOWN_ENTHRALLRELEASE"},
+	#certain: the night's own roll has already decided it
+	brk_no_bed = {chance = 1.0, text = "BREAKDOWN_NOBED"},
 }
 
-const base_stat_upg_price = 100
-const stat_upg_unique_bonus = 0.2
+#a night without a bed: the chance it brings trouble, and the share of that which is an escape
+var unhoused_night_trouble_chance = 0.2
+var unhoused_night_escape_share = 0.25
 
 const mastery_train_limit = 8
-
-var race_stat_upg_bonuses = {
-	common = 0.0,
-	uncommon = 0.25,
-	rare = 0.4,
-	monster = 0.5,
-	top = 1.0
-}
-var race_stat_upg_bonus_priority = ['top', 'monster', 'rare', 'uncommon', 'common']
-var level_stat_upg_bonuses = {
-	2 : 0.2,
-	3 : 0.4,
-	4 : 0.6,
-	5 : 0.8,
-	6 : 1.0,
-}
 
 var value_upkeep_rate = 0.1
 
@@ -749,10 +809,6 @@ var fame_rise_events = {#and max fame
 }
 const fame_rise_chance_service = 0.05
 
-var SQ_random_reward = [-0.1, 0.1]
-const SQ_req_num_mod_start = 4
-const SQ_req_num_mod = 0.1
-
 var damage_shake = [#order matters! Low max_damage first. No max_damage means infinity
 	{max_damage = 15, time = 0.1, magnitude = 1},
 	{max_damage = 120, time = 0.1, magnitude = 3},
@@ -776,6 +832,8 @@ var food_starve_affection = -5
 var food_demand_respect = [-5, -3]
 #the extra rations work rule burns through food faster
 var food_ration_drain = 2
+#units of food a meal takes for a character with an extreme metabolism (upgrade_metabolism)
+var food_metabolism_portion = 3
 
 var minor_trainings_base = 3
 var minor_trainings_per_growth = 0.5

@@ -26,6 +26,14 @@ const EFFECT_FEEDBACK_CHARACTER_CODES = [
 	"affect_unique_character",
 ]
 const UNFADE_COMIC_PANEL_TIME = 0.5
+const TEXT_REVEAL_TIME = 1.4
+
+var text_reveal_effect = load("res://gui_modules/Universal/Scripts/TextRevealEffect.gd").new()
+#already shown text, kept without the [reveal] tags so that only the newest block is animated
+var shown_text_base = ''
+#amount of characters in shown_text_base, counted by the label itself - a new block starts right after them
+var shown_chars = 0
+var reveal_counter = 0
 
 onready var bg_T1 = $BackgroundT1
 onready var bg_T2 = $BackgroundT2
@@ -36,6 +44,13 @@ onready var opt_cont_T1 = $BackgroundT1/ScrollContainer/VBoxContainer
 onready var opt_cont_T2 = $BackgroundT2/ScrollContainer/VBoxContainer
 var cur_opt_cont
 var select_blocking_nodes = []
+#One input hold per open scene, released exactly once. set_disable_input is a single global
+#bool and this module used to poke it raw from two places: open() took it as the scene started
+#drawing and handed the release to show_buttons(), which dies on the first freed button
+#whenever the scene advances while it is still fading the options in. The release was then
+#never reached and the whole game stayed deaf to mouse and keyboard. input_handler counts its
+#holders on a singleton nothing can free, so route through it and release on the way out too.
+var input_held = false
 onready var comic_panel = $ComicPanel
 
 var dialogue_type_exceptions = ["church_event"]
@@ -49,6 +64,8 @@ func _ready():
 		$CharacterImage2.material = load("res://assets/silouette_shader.tres").duplicate()
 	base_text_size = text_label_T1.rect_size
 	base_text_position = text_label_T1.rect_position
+	text_label_T1.install_effect(text_reveal_effect)
+	text_label_T2.install_effect(text_reveal_effect)
 	cur_text_label = text_label_T1
 	cur_opt_cont = opt_cont_T1
 	#$BackgroundT2/UnhideButton.connect('pressed', self, 'hide_dialogue', ['unhide'])
@@ -64,6 +81,16 @@ func tut_get_second_opt():
 func hide_dialogue(action = "hide"):
 	$BackgroundT2.visible = action != "hide"
 	$ShowPanel.visible = action == "hide"
+
+#Hiding belongs to the one scene that asked for it. The number keys answer straight through the
+#hidden box, so a scene could close or move on without its Show button ever being pressed, and
+#nothing else took the Show bar down - it then sat over the options of every later dialogue.
+func restore_hidden_dialogue():
+	if !$ShowPanel.visible:
+		return
+	$ShowPanel.hide()
+	if dialogue_window_type == 2:
+		$BackgroundT2.show()
 
 func determine_dialogue_type(scene):
 	next_dialogue_type = 1
@@ -81,8 +108,9 @@ func open(scene):
 	if gui_controller.dialogue == null:
 		gui_controller.dialogue = self
 	if scene.has("variations"):
-		select_scene_variation_based_on_data(scene)
-		return
+		#a scene with no body of its own is a pure dispatcher - it relies on a reqs = [] catch-all
+		if select_scene_variation_based_on_data(scene) or !scene.has("text"):
+			return
 #	if get_tree().get_root().get_node_or_null("ANIMLoot") && get_tree().get_root().get_node("ANIMLoot").is_visible():
 #		get_tree().get_root().get_node("ANIMLoot").raise()
 	input_handler.PlaySound("speech")
@@ -91,6 +119,8 @@ func open(scene):
 		determine_dialogue_type(scene)
 		preset_dialogue_type(next_dialogue_type)
 		cur_text_label.bbcode_text = ''
+		shown_text_base = ''
+		shown_chars = 0
 		previous_text = ''
 		if scene.has("music"):
 			saved_music = input_handler.explore_sound
@@ -99,7 +129,7 @@ func open(scene):
 	if is_just_started == false && scene.has("music"):
 		input_handler.SetMusic(scene.music)
 	
-	get_tree().get_root().set_disable_input(true)
+	hold_input()
 	if scene.has("save_scene_to_gallery") && scene.save_scene_to_gallery:
 		save_scene_to_gallery(scene)
 	if scene.has("unlocked_char_sprites"):
@@ -149,11 +179,11 @@ func open(scene):
 	
 	#handle transition
 	var opt_scroll = cur_opt_cont.get_parent()
+	#text label is not faded as a whole anymore - it gets a top-to-bottom reveal instead
+	cur_text_label.modulate.a = 1
 	if is_just_started:
-		cur_text_label.modulate.a = 0
 		opt_scroll.modulate.a = 0
 	else:
-		cur_text_label.modulate.a = 1
 		opt_scroll.modulate.a = 1
 	var no_screen_transition = false
 	if scene.tags.has("blackscreen_transition_common"):
@@ -185,6 +215,8 @@ func open(scene):
 	doing_transition = false
 	
 	#prepare screen while (if) in dark
+	#ahead of common_effects, so a scene that hides its box again starts from a clean state
+	restore_hidden_dialogue()
 	if is_type_changing:
 		new_background.show()
 		if no_screen_transition:
@@ -204,7 +236,7 @@ func open(scene):
 	
 	clear_character_images()
 	$BackgroundT1/ImagePanel.hide()
-	yield(handle_scene_backgrounds(scene), "completed")
+	handle_scene_backgrounds(scene)
 	handle_characters_sprites(scene)
 	handle_loots(scene)
 	update_scene_characters()
@@ -246,15 +278,40 @@ func preset_dialogue_type(new_type):
 	$Shading.hide()
 
 
+func hold_input():
+	if input_held:
+		return
+	input_held = true
+	input_handler.lock_input()
+
+
+func release_input():
+	if !input_held:
+		return
+	input_held = false
+	input_handler.unlock_input()
+
+
+#the node can be freed while open() or show_buttons() is parked on a timer, and then neither
+#of them ever comes back to release the hold
+func _exit_tree():
+	release_input()
+
+
 func show_buttons():
-	get_tree().get_root().set_disable_input(true)
+	hold_input()
 	for button in cur_opt_cont.get_children():
 		if button.name == "Button":
 			continue
 		ResourceScripts.core_animations.UnfadeAnimation(button, 0.3)
 		yield(get_tree().create_timer(0.3), "timeout")
+		#handle_scene_options() clears this container on every scene change, so anything the
+		#loop is still holding across the wait may already be gone. Touching a freed button
+		#aborts the coroutine, and the release below is what the game needs to stay playable.
+		if !is_instance_valid(button):
+			break
 		button.set("modulate", Color(1, 1, 1, 1))
-	get_tree().get_root().set_disable_input(false)
+	release_input()
 
 func complete_skirmish():
 	hold_selection = true
@@ -447,14 +504,15 @@ func collect_effect_feedback(effects, clear_existing = true):
 				input_handler.append_not_duplicate(pending_effect_feedback, feedback)
 
 
-func show_pending_effect_feedback():
+func get_pending_effect_feedback():
 	var feedback_lines = []
 	for feedback in pending_effect_feedback:
 		if feedback != "":
 			feedback_lines.append(feedback)
-	if !feedback_lines.empty():
-		cur_text_label.bbcode_text += "\n\n" + PoolStringArray(feedback_lines).join("\n")
 	pending_effect_feedback.clear()
+	if feedback_lines.empty():
+		return ""
+	return "\n\n" + PoolStringArray(feedback_lines).join("\n")
 
 
 func chest_mimic_force_open():
@@ -899,6 +957,8 @@ func close(args = {}):
 			ResourceScripts.core_animations.BlackScreenTransition(screen_duration * 0.5)
 			yield(get_tree().create_timer(transition_duration + screen_duration * 0.25), "timeout")
 		cur_text_label.bbcode_text = ''
+		shown_text_base = ''
+		shown_chars = 0
 	else:
 		if !args.has("hold_scene"):
 			ResourceScripts.core_animations.FadeAnimation(self, 0.2)
@@ -944,13 +1004,6 @@ func capture_from_scene(order = 0):
 
 func recruit(capture = false):
 	hold_selection = true
-#	if ResourceScripts.game_party.characters.size() >= ResourceScripts.game_res.get_pop_cap():
-#		if ResourceScripts.game_res.get_pop_cap() < variables.max_population_cap:
-#			input_handler.SystemMessage("You don't have enough rooms")
-#		else:
-#			input_handler.SystemMessage("Population limit reached")
-#		hold_selection = false
-#		return
 	input_handler.active_character.recruit(capture)
 	close()
 
@@ -965,6 +1018,7 @@ func create_location_recruit(args):
 	var newchar = ResourceScripts.scriptdict.class_slave.new("location_recruit")
 	input_handler.active_character = newchar
 	newchar.generate_random_character_from_data(input_handler.active_location.races)
+	shown_text_base = newchar.translate(shown_text_base)
 	cur_text_label.bbcode_text = newchar.translate(cur_text_label.bbcode_text)
 
 func execute():
@@ -1087,11 +1141,22 @@ func save_scene_to_gallery(scene):
 					input_handler.update_progress_data(progress_field, addition)
 
 
+#returns whether a variation took over. scenes ending with a reqs = [] catch-all always do;
+#a scene whose variations are all conditional falls back to its own body instead.
 func select_scene_variation_based_on_data(scene):
 	for i in scene.variations:
 		if globals.checkreqs(i.reqs):
-			open(i)
-			break
+			#'scene_code' points at a named event instead of inlining its body, so a questline scene
+			#can stay in its own file and still replace this one - used for scenes written as
+			#'you enter X and Y happens', which can't be an option inside X
+			if i.has('scene_code'):
+				if !ResourceScripts.game_progress.seen_events.has(i.scene_code):
+					ResourceScripts.game_progress.seen_events.push_back(i.scene_code)
+				open(scenedata.scenedict[i.scene_code].duplicate(true))
+			else:
+				open(i)
+			return true
+	return false
 
 func clear_character_images():
 	$CharacterImage.hide()
@@ -1100,7 +1165,7 @@ func clear_character_images():
 func handle_scene_backgrounds(scene):
 	var node = $CustomBackground
 	if scene.has("custom_background"):
-		var newtexture = yield(images.get_background_async(scene.custom_background), "completed")
+		var newtexture = images.get_background(scene.custom_background)
 		if !node.visible:
 			node.texture = newtexture
 			node.modulate.a = 0
@@ -1122,7 +1187,6 @@ func handle_scene_backgrounds(scene):
 		yield(get_tree().create_timer(0.2), "timeout")
 		shading.set_meta("fading", false)
 		shading.hide()
-	yield(get_tree(), "idle_frame")
 
 func try_hide_scene_backgrounds(scene, time):
 	var node = $CustomBackground
@@ -1144,12 +1208,13 @@ var ch2_shade = false
 func get_spouse_sprite():
 	var spousechar = characters_pool.get_char_by_id(ResourceScripts.game_progress.spouse)
 	if spousechar == null: return null
-	else:
-		match spousechar.get_stat('unique'):
-			'anastasia': return 'anastasia'
-			'daisy': return 'daisy_maid'
-			#2add
-			_: return null
+	var unique_code = str(spousechar.get_stat('unique')).to_lower()
+	if unique_code == '': return null
+	# wedding dress first, its paperdoll body next, plain sprite as the last resort
+	for variant in [unique_code + '_wed', unique_code + '_wed_body', unique_code]:
+		if images.sprites.has(variant):
+			return variant
+	return null
 
 func get_unique_character_from_sprite_code(sprite_code):
 	if sprite_code == null or !sprite_code.begins_with("$"):
@@ -1186,7 +1251,7 @@ func handle_characters_sprites(scene):
 		$CharacterImage.hide()
 		if scene.has('image') && scene.image != '' && scene.image != null:
 			image_panel.show()
-			image_panel.get_node("SceneImage").texture = yield(images.get_scene_async(scene.image), "completed")
+			image_panel.get_node("SceneImage").texture = images.get_scene(scene.image)
 			input_handler.update_progress_data("monochrome", scene.image)
 			if dialogue_window_type == 1:
 				hide_long_text()
@@ -1332,8 +1397,8 @@ func handle_characters_sprites(scene):
 		if ResourceScripts.game_progress.spouse != null && globals.valuecheck({type = 'has_spouse', check = true}) and !ResourceScripts.game_progress.marriage_completed:
 			# set wed sprite here
 			var spouse_person = characters_pool.get_char_by_id(ResourceScripts.game_progress.spouse)
-			var spouse_unique_name = spouse_person.get_stat('unique')
-			if scene_char == spouse_unique_name and worlddata.pregen_character_sprites[scene_char].has("wed"):
+			var spouse_unique_name = (spouse_person.get_stat('unique') if spouse_person != null else null)
+			if scene_char == spouse_unique_name and worlddata.pregen_character_sprites.has(scene_char) and worlddata.pregen_character_sprites[scene_char].has("wed"):
 				var image_name = worlddata.pregen_character_sprites[scene_char].wed.path
 				$CharacterImage.texture = images.get_sprite(image_name)
 				for_gallery = image_name
@@ -1452,7 +1517,6 @@ func generate_scene_text(scene):
 	if scene.tags.has("location_resource_info"):
 		scenetext = add_location_resource_info()
 	if is_just_started:
-		ResourceScripts.core_animations.UnfadeAnimation(cur_text_label,1)
 		ResourceScripts.core_animations.UnfadeAnimation(cur_opt_cont.get_parent(),1)
 	input_handler.ClearContainer(cur_opt_cont)
 	if scene.tags.has("scene_characters_sell"):#
@@ -1465,13 +1529,38 @@ func generate_scene_text(scene):
 		scenetext += "\n\n" + text
 
 	var result_text = globals.TextEncoder(scenetext)
+	var new_text = ''
 	if !scene.has("comic_scene") or !scenetext.empty():
-		if cur_text_label.bbcode_text != '':
-			cur_text_label.bbcode_text += "\n\n" +  globals.TextEncoder("{color=gray_text_dialogue|"+previous_text+"}") + "\n\n" + result_text
+		if shown_text_base != '':
+			new_text = "\n\n" +  globals.TextEncoder("{color=gray_text_dialogue|"+previous_text+"}") + "\n\n" + result_text
 		else:
-			cur_text_label.bbcode_text = result_text
-	show_pending_effect_feedback()
+			new_text = result_text
+	new_text += get_pending_effect_feedback()
+	append_revealed_text(new_text)
 	return result_text
+
+
+#adds a new text block and makes it appear from top to bottom, leaving the previous one as is
+func append_revealed_text(new_text):
+	if new_text == '':
+		return
+	cur_text_label.modulate.a = 1
+	cur_text_label.bbcode_text = shown_text_base + "[reveal]" + new_text + "[/reveal]"
+	shown_text_base += new_text
+	#new_text still holds bbcode tags, so its length is only a starting guess for the block size
+	text_reveal_effect.start(shown_chars, new_text.length(), TEXT_REVEAL_TIME)
+	reveal_counter += 1
+	var this_reveal = reveal_counter
+	yield(get_tree(), 'idle_frame')
+	if this_reveal != reveal_counter:
+		return
+	var total_chars = cur_text_label.get_total_character_count()
+	text_reveal_effect.set_block_size(total_chars - shown_chars)
+	shown_chars = total_chars
+	yield(get_tree().create_timer(TEXT_REVEAL_TIME * 1.4 + 0.15), "timeout")
+	#an installed effect makes the label redraw itself every frame, so tags are dropped when it's over
+	if this_reveal == reveal_counter and cur_text_label.bbcode_text != shown_text_base:
+		cur_text_label.bbcode_text = shown_text_base
 
 
 func set_enemy(scene):

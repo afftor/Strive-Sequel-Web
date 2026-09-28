@@ -1,10 +1,50 @@
 extends Panel
 
+# The doll's undress buttons are the Nudity rule on this screen too, and a unique
+# character - shown as a painted sprite, with no doll under it - gets the same
+# button over the picture.
+const NUDITY_TOGGLE = preload("res://gui_modules/Universal/Scripts/NudityToggle.gd")
+
 var person
+var nudity_toggle
 
 #func _ready():
 #	update()
 var body_visible = true
+# the buff column shares the doll's corner with its Custom menu and gives way to it
+var buffs_wanted = true
+var hair_menu_open = false
+
+
+func _ready():
+	$ragdoll.undress_is_a_rule = true
+	$ragdoll.connect("hair_menu_toggled", self, "_on_hair_menu_toggled")
+	nudity_toggle = NUDITY_TOGGLE.new()
+	nudity_toggle.connect("nudity_changed", self, "_on_nudity_changed")
+	add_child(nudity_toggle)
+
+
+func show_buffs():
+	buffs_wanted = true
+	_refresh_buffs_visibility()
+
+
+func hide_buffs():
+	buffs_wanted = false
+	_refresh_buffs_visibility()
+
+
+func _on_hair_menu_toggled(open):
+	hair_menu_open = open
+	_refresh_buffs_visibility()
+
+
+func _refresh_buffs_visibility():
+	$buffscontainer.visible = buffs_wanted and !hair_menu_open
+
+
+func _on_nudity_changed(changed_person):
+	update(changed_person)
 
 func body_show(value):
 	body_visible = value
@@ -38,34 +78,40 @@ func update(person = null):
 		):
 			person = gui_controller.exploration.person_to_hire
 	# if person != null:
-	var stored_image = person.get_stored_body_image() 
-	if stored_image != null: 
+	var stored_image = person.get_stored_body_image()
+	if stored_image != null:
 		$Body.texture = stored_image
 		$Body.visible = body_visible
 		$ragdoll.visible = false
-		#ragdoll part commented for now
-#	elif !input_handler.globalsettings.disable_paperdoll:
-#		$Body.visible = false
-#		$ragdoll.visible = body_visible
-#		$ragdoll.test_mode = false
-#		$ragdoll.rebuild(person)
-#		$ragdoll.rebuild_cloth(!person.has_work_rule('nudity'))
-##		$ragdoll.rebuild_underwear()
+	elif !input_handler.globalsettings.disable_paperdoll:
+		$Body.visible = false
+		$ragdoll.visible = body_visible
+		$ragdoll.test_mode = false
+		$ragdoll.rebuild(person)
+		$ragdoll.rebuild_cloth(!person.has_work_rule('nudity'))
+#		$ragdoll.rebuild_underwear()
 	else:
 		$Body.texture = person.get_body_image()
 		$Body.visible = body_visible
 		$ragdoll.visible = false
 	
+	#a unique character switched to the doll has no sprite on show, so neither swap applies
+	var drawn_unique = person != null && person.get_stat('unique') != null && !person.uses_paperdoll()
 	# nudity check
-	if person != null && person.get_stat('unique') != null && person.has_work_rule('nudity'):
+	if drawn_unique && person.has_work_rule('nudity'):
 		if worlddata.pregen_character_sprites[person.get_stat('unique')].has("nude"):
 			$Body.texture = images.get_sprite(worlddata.pregen_character_sprites[person.get_stat('unique')].nude.path)
 	# wed check
-	if person != null && person.get_stat('unique') != null:
+	if drawn_unique:
 		if ResourceScripts.game_progress.spouse != null && globals.valuecheck({type = 'has_spouse', check = true}) && !ResourceScripts.game_progress.marriage_completed:
 			var spouse_person = characters_pool.get_char_by_id(ResourceScripts.game_progress.spouse)
 			if spouse_person.get_stat('unique') == person.get_stat('unique') and worlddata.pregen_character_sprites[person.get_stat('unique')].has("wed"):
 				$Body.texture = images.get_sprite(worlddata.pregen_character_sprites[person.get_stat('unique')].wed.path)
+	
+	if nudity_toggle != null:
+		nudity_toggle.bind(person)
+		if nudity_toggle.visible:
+			nudity_toggle.raise()
 	
 	globals.build_buffs_for_char(person, $buffscontainer, 'mansion')
 	

@@ -18,6 +18,13 @@ var date = false
 var jail = false
 var drunkness = 0.0
 var actionhistory = []
+#Presumption prompt: the date ended without [name] ever being made wary of you. Instead of
+#docking respect silently, the player decides whether to correct that or let it stand.
+var presumption_asked = false
+var presumption_choice = ''
+var presumption_respect = 0
+var presumption_text = ''
+var end_extra_text = ''
 var categories = ['Affection','Discipline','Location','Items']
 var locationarray = ['livingroom','town','dungeon','garden','bedroom']
 var location_changed = false
@@ -122,6 +129,8 @@ func _ready():
 	#globals.connecttexttooltip($panel/categories/Training,"Training together will end the encounter.")
 	$end/sexbutton.connect("pressed", self, 'start_sex')
 	$StopButton.connect("pressed",self,'doaction', ["stop"])
+	$presumption/optdiscipline.connect("pressed", self, 'presumption_discipline')
+	$presumption/optendorse.connect("pressed", self, 'presumption_endorse')
 	gui_controller.add_close_button($Items)
 #	initiate(person)
 
@@ -133,11 +142,17 @@ func initiate(tempperson):
 	self.turn = 10
 	self.consStart = tr(variables.consent_dict[int(tempperson.get_stat('consent'))])
 	self.finish_encounter = false
+	presumption_asked = false
+	presumption_choice = ''
+	presumption_respect = 0
+	presumption_text = ''
+	end_extra_text = ''
 	date = false
 	public = false
 	observing_slaves.clear()
 	$sexswitch.visible = false
 	$end.visible = false
+	$presumption.visible = false
 	$textfield/RichTextLabel.clear()
 	location_changed = false
 	$background.texture = images.get_background('mansion')
@@ -166,17 +181,21 @@ func initiate(tempperson):
 
 	self.fear = 0#person.fear
 	var stored_image = person.get_stored_body_image()
+	var unique_code = person.get_stat("unique")
+	if stored_image != null and person.has_work_rule("nudity") and worlddata.pregen_character_sprites.has(unique_code):
+		var sprite_data = worlddata.pregen_character_sprites[unique_code]
+		if sprite_data.has("nude"):
+			stored_image = images.get_sprite(sprite_data.nude.path)
 	if stored_image != null:
 		$fullbody.texture = stored_image
 		$fullbody.visible = true
 		$ragdoll.visible = false
-	#ragdoll part commented
-#	elif !input_handler.globalsettings.disable_paperdoll:
-#		$fullbody.visible = false
-#		$ragdoll.visible = true
-#		$ragdoll.test_mode = false
-#		$ragdoll.rebuild(person)
-#		$ragdoll.rebuild_cloth(true)
+	elif !input_handler.globalsettings.disable_paperdoll:
+		$fullbody.visible = false
+		$ragdoll.visible = true
+		$ragdoll.test_mode = false
+		$ragdoll.rebuild(person)
+		$ragdoll.rebuild_cloth(true)
 	else:
 		$fullbody.texture = person.get_body_image()
 		$fullbody.visible = true
@@ -272,9 +291,46 @@ func selectcategory(button):
 func endencounter():
 	input_handler.get_spec_node(input_handler.NODE_TEXTTOOLTIP).hide()
 	if $sexswitch.visible == false && $end.visible == false:
-		var text = calculateresults()
-		$end/RichTextLabel.bbcode_text = text
-		$end.visible = true
+		#A date that never gave [name] a reason to be wary asks the player what to do about it
+		#before the tally is drawn. show_results() runs from the popup's callbacks instead.
+		if ask_presumption() == true:
+			return
+		show_results()
+
+func show_results():
+	$end/RichTextLabel.bbcode_text = calculateresults() + end_extra_text
+	$end.visible = true
+
+
+func ask_presumption():
+	if presumption_asked == true:
+		return false
+	if floor(self.fear) > 0 || floor(self.mood) <= 0:
+		return false
+	if ResourceScripts.game_globals.easytrain:
+		return false
+	presumption_asked = true
+	$presumption/RichTextLabel.bbcode_text = globals.TextEncoder(person.translate(tr("DATING_PRESUMPTION_ASK")))
+	$presumption/optdiscipline.text = person.translate(tr("DATING_PRESUMPTION_DISCIPLINE"))
+	$presumption/optendorse.text = person.translate(tr("DATING_PRESUMPTION_ENDORSE"))
+	$presumption.visible = true
+	ResourceScripts.core_animations.OpenAnimation($presumption)
+	return true
+
+func presumption_discipline():
+	$presumption.visible = false
+	presumption_choice = 'discipline'
+	presumption_text = tr("DATING_PRESUMPTION_DISCIPLINE_RESULT")
+	presumption_text += "\n\n{color=aqua|" + person.get_short_name() + "}: " + person.translate(input_handler.get_random_chat_line(person, 'date_put_in_place'))
+	show_results()
+
+func presumption_endorse():
+	$presumption.visible = false
+	presumption_choice = 'endorse'
+	presumption_respect = -globals.rng.randi_range(30, 40)
+	presumption_text = tr("DATING_PRESUMPTION_ENDORSE_RESULT")
+	presumption_text += "\n\n{color=aqua|" + person.get_short_name() + "}: " + person.translate(input_handler.get_random_chat_line(person, 'date_presumptuous'))
+	show_results()
 
 func check_location(array):
 	if array.size() == 0:
@@ -292,7 +348,7 @@ func updatelist():
 	#$panel/categories/Location.visible = !location_changed
 	if category == 'Location':
 		for i in locationdicts.values():
-			if i.code == location || (i.code == 'dungeon' && ResourceScripts.game_res.upgrades.torture_room == 0):
+			if i.code == location || (i.code == 'dungeon'):# && ResourceScripts.game_res.upgrades.torture_room == 0):
 				continue
 			var newnode = $panel/ScrollContainer/GridContainer/Button.duplicate()
 			$panel/ScrollContainer/GridContainer.add_child(newnode)
@@ -315,6 +371,12 @@ func updatelist():
 			var text = i.descript
 			if dislike_same_sex() == true && i.effect in ['flirt','kiss','propose']:
 				text += globals.TextEncoder(tr("DATING_DISLIKE_SAME_SEX"))
+			#Drilling somebody needs somewhere to drill them. Greyed with the reason rather than
+			#taken off the list: the estate can build one, and a choice that quietly vanishes
+			#does not say that.
+			if i.has('needs_practice_room') and !ResourceScripts.game_res.has_room_with_tag('practice'):
+				newnode.disabled = true
+				text = tr("DATING_NEEDS_PRACTICE_ROOM")
 			globals.connecttexttooltip(newnode, person.translate(text))
 			if i.has('disablereqs'):
 				newnode.disabled = true
@@ -351,7 +413,7 @@ func decoder(text):
 var stopactions = false
 
 func doaction(action):
-	if stopactions == true:
+	if stopactions == true || $presumption.visible == true:
 		return
 	input_handler.get_spec_node(input_handler.NODE_TEXTTOOLTIP).hide()
 	stopactions = true
@@ -1544,8 +1606,8 @@ func beer(person):
 func drunkness():
 	var capacity = variables.slave_heights.find(person.get_stat('height'))
 	if drunkness > capacity + 3:
+		end_extra_text += decoder(tr("DATING_ALCO_OVERDOSE_1"))
 		endencounter()
-		$end/RichTextLabel.bbcode_text += decoder(tr("DATING_ALCO_OVERDOSE_1"))
 
 func strChange(value):
 	if value > 0:
@@ -1568,11 +1630,7 @@ func calculateresults():
 	)
 	if endmood > endfear / 2.0:
 		affection = int(min(floor(endmood / 4.0), 25))
-		if endfear < 10:
-			respect = -globals.rng.randi_range(15, 25)
 		text += tr("DATING_AFFECTIONATE_RESULT_1")
-		if endfear < 10:
-			text += tr("DATING_LOW_FEAR_WARNING")
 	else:
 		affection = int(min(floor(endmood / 2.0), 20))
 		if endfear < endmood * 2.5:
@@ -1580,6 +1638,15 @@ func calculateresults():
 		else:
 			respect = int(min(endfear, 25))
 		text += tr("DATING_FEARFUL_RESULT_1")
+
+	#Letting it stand costs respect; correcting [him] simply avoids that.
+	if presumption_choice != '':
+		respect += presumption_respect
+		text += presumption_text
+
+	if ResourceScripts.game_globals.easytrain:
+		affection = int(max(affection, 0))
+		respect = int(max(respect, 0))
 
 	if affection != 0:
 		person.add_stat("affection", affection)
@@ -1927,6 +1994,7 @@ var actionsdict = {
 	train = {
 		group = 'Training',
 		name = tr("DATING_TRAIN"),
+		needs_practice_room = true,
 		reqs = [],
 		location = [],
 		descript = tr("DATING_TRAIN_DESC_1"),
@@ -1935,6 +2003,7 @@ var actionsdict = {
 	study = {
 		group = 'Training',
 		name = tr("DATING_STUDY"),
+		needs_practice_room = true,
 		reqs = [],
 		location = [],
 		descript = tr("DATING_STUDY_DESC_1"),
@@ -1943,6 +2012,7 @@ var actionsdict = {
 	practice_charm = {
 		group = 'Training',
 		name = tr("DATING_PRACTICE_CHARM"),
+		needs_practice_room = true,
 		reqs = [],
 		location = [],
 		descript = tr("DATING_PRACTICE_CHARM_DESC_1"),

@@ -28,6 +28,7 @@ var current_screen #reference to the current scene visible (Mansion, Exploration
 var previous_screen #reference to the just-closed scene (Mansion, Exploration, etc.). Sometimes needed gui_controller to handle modules visibility.
 var windows_opened = [] #an array of references to opened sub-modules (MansionJournal, GameMenu, etc.)
 var window_button_connections = {} #a dictionary that contains pairs of sub-modules and corresponding buttons. A depth explanation can be found below.
+var screen_refresh_queued = false #see request_screen_refresh()
 
 signal screen_changed # You can call this if you need to force mudules update
 
@@ -65,10 +66,16 @@ func revert_scenes_data():
 	previous_screen = null
 	windows_opened.clear()
 	window_button_connections.clear()
+	screen_refresh_queued = false
 	if dialogue and is_instance_valid(dialogue):
 		dialogue.dialogue_window_type = 1
 		dialogue.is_just_started = true
 	input_handler.CloseableWindowsArray.clear() #maybe obsolete, but for safety reason
+	#panels that own the keyboard or the input lock are about to be thrown away with the
+	#world - whatever they were holding has to be released here or the game stays deaf
+	input_handler.text_field_input = false
+	input_handler.reset_input_lock()
+	hotkeys.capturing = false
 	input_handler.CurrentScene = null # the same as prev
 	input_handler.slave_list_node = null
 	input_handler.skill_list_node = null
@@ -93,6 +100,31 @@ func revert_scenes_data():
 	
 
 
+const CACHED_NODE_FIELDS = ['mansion', 'nav_panel', 'clock', 'exploration', 'exploration_city',
+	'exploration_dungeon', 'explore_slaveinfo', 'slavepanel', 'inventory', 'spells', 'game_menu',
+	'classinfo', 'sex_panel', 'date_panel', 'mansion_tutorial_panel', 'cheat_panel', 'char_creation',
+	'dialogue', 'travel', 'upgrades', 'combat', 'current_screen', 'previous_screen']
+
+
+#a freed node still passes != null: forget it, and the panels inside it, at once
+func forget_nodes(nodes):
+	var dropped = []
+	for node in nodes:
+		if is_instance_valid(node):
+			input_handler.append_not_duplicate(dropped, node)
+	for field in CACHED_NODE_FIELDS:
+		var value = get(field)
+		if value == null:
+			continue
+		if !is_instance_valid(value):
+			set(field, null)
+			continue
+		for node in dropped:
+			if value == node or (value is Node and node.is_a_parent_of(value)):
+				set(field, null)
+				break
+
+
 func update_modules():
 	if current_screen == null:
 		return
@@ -110,15 +142,54 @@ func update_modules():
 	clock_visibility()
 
 
+#Closing a window can leave the screen underneath showing what was true before it opened - a class
+#bought in the progression popup still carries its level-up mark on the mansion card. RMB and ESC
+#always swept the screen after closing the top window; a panel's own X button closes the panel
+#directly and never did. Both routes ask here instead. The ask is deferred and folded into one, so
+#a close that takes several panels down with it still pays for a single sweep.
+func request_screen_refresh():
+	if screen_refresh_queued:
+		return
+	screen_refresh_queued = true
+	call_deferred("flush_screen_refresh")
+
+
+func flush_screen_refresh():
+	if !screen_refresh_queued:
+		return
+	screen_refresh_queued = false
+	refresh_current_screen()
+
+
+#The sweep itself: the same one the RMB path has always run. Deliberately not update_modules() -
+#that one also re-judges the clock, which the popups hide and put back themselves.
+func refresh_current_screen():
+	if current_screen == null or !is_instance_valid(current_screen):
+		return
+	if current_screen == combat:
+		return
+	for subscene in current_screen.get_children():
+		if subscene.get_class() == "Tween":
+			continue
+		if subscene.has_method("update"):
+			subscene.update()
+
+
 func clock_visibility():
-	if input_handler.combat_node != null or !current_screen in [mansion, exploration_city, game_menu]:
+	#Choosing who a spell lands on is a window over whatever screen asked for it, not a journey to
+	#another screen - so the clock is judged by what stands underneath. Cast from the estate it
+	#stays up; cast from a character's own screen, which never has a clock, it stays away.
+	var screen = current_screen
+	if screen == spells and screen != null and previous_screen != null:
+		screen = previous_screen
+	if input_handler.combat_node != null or !screen in [mansion, exploration_city, game_menu]:
 		if clock != null:
 			clock.visible = false
 		return
 	if exploration == null:
-		clock.visible = current_screen == mansion || current_screen == game_menu
+		clock.visible = screen == mansion || screen == game_menu
 	else:
-		clock.visible = current_screen == mansion || current_screen == exploration_city || current_screen == game_menu
+		clock.visible = screen == mansion || screen == exploration_city || screen == game_menu
 
 
 func add_close_button(scene, position = "snap", offset = null):
@@ -179,13 +250,16 @@ func close_scene(scene):
 			&& window_button_connections[scene] != null
 			&& is_instance_valid(window_button_connections[scene])):
 		window_button_connections[scene].pressed = false
+		request_screen_refresh()
 		return
 	if scene.has_method("_custom_gui_controller_close"):
 		scene._custom_gui_controller_close()
+		request_screen_refresh()
 		return
 	scene.hide()
 	if windows_opened.has(scene):
 		windows_opened.erase(scene)
+		request_screen_refresh()
 		return
 	if previous_screen != null && (previous_screen in [mansion, slavepanel]):
 		current_screen = previous_screen
@@ -236,11 +310,11 @@ func show_class_info(classcode, person = null):
 		person = mansion.active_person
 	var node = input_handler.get_spec_node(input_handler.NODE_CLASSINFO)  #get_class_info_panel()
 	node.open(classcode, person)
-	get_tree().get_root().set_disable_input(true)
+	input_handler.lock_input()
 	ResourceScripts.core_animations.UnfadeAnimation(node, 0.3)
 	yield(get_tree().create_timer(0.15), "timeout")
 	node.show()
-	get_tree().get_root().set_disable_input(false)
+	input_handler.unlock_input()
 	input_handler._reset_mouse_events()
 	if ! windows_opened.has(node):
 		windows_opened.append(node)
@@ -252,6 +326,7 @@ func close_top_window():
 	if window_button_connections.keys().has(node) && is_instance_valid(window_button_connections[node]):
 		window_button_connections[node].pressed = false
 		windows_opened.erase(node)
+		request_screen_refresh()
 		return
 	if typeof(node) == TYPE_STRING:
 		return
@@ -259,10 +334,12 @@ func close_top_window():
 #        return
 	if node.has_method("_custom_gui_controller_close"):
 		node._custom_gui_controller_close()
+		request_screen_refresh()
 		return
 	if node != null:
 		node.hide()
 	windows_opened.erase(node)
+	request_screen_refresh()
 	#CloseableWindowsArray.pop_back(); #i think this is required #It's not, breaks multiple windows order
 
 

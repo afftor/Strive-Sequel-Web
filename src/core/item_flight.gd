@@ -34,7 +34,7 @@ var defaults = {
 	end_scale = 0.3,
 	spin = 25.0, #max degrees turned over the flight; direction and amount rolled per sprite
 	fade_out = 0.78, #fraction of the flight after which it fades out; 1.0 never fades
-	sound = 'itemget', #played once per call as the first sprite lands, null for silence
+	sound = null, #item acquisition flights are silent by default
 	pop = true, #briefly scale up whatever node the sprites landed on
 	count = 1, #sprites to spawn
 	amount = 0, #how many things were acquired - picks 'count' for you when count is not given
@@ -59,7 +59,7 @@ func _ready():
 
 
 func is_enabled():
-	return !input_handler.globalsettings.get("no_item_flight", false)
+	return input_handler.globalsettings.get("item_flight_animation", false)
 
 
 #icon accepts a Texture, a resource path, a material code or an Item; start accepts a

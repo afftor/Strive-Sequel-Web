@@ -56,7 +56,30 @@ var buffs_on_pause = false
 #		emit_signal("signal_RMB_release")
 #		RMBpressed = false
 
+#Floating of the active fighter: the card gently rises and sinks while a shadow
+#breathes under it. The rest position is not captured from the live node, we know
+#it for sure: every slot is a Container exactly the size of the card, and
+#make_fighter_panel places it at zero. A snapshot of the current position would
+#cement any foreign shift that hasn't been played out yet.
+const FLOAT_RISE = 8.0
+const FLOAT_PERIOD = 1.6
+const FLOAT_SHADOW_ALPHA = 0.45
+const FLOAT_HOME = Vector2(0, 0)
+
+var float_on = false
+#var float_shadow = null
+#var float_shadow_y = 0.0
+var float_time = 0.0
+var float_shifted = false
+
+const STEALTH_DESAT = 0.7
+const STEALTH_TINT = Color(0.62, 0.74, 1.0)
+
+var stealth_on = false
+
+
 func _ready():
+	set_process(false)
 	connect("gui_input", self, "_on_Button_gui_input")
 	if has_node("Buffs"):
 		buffs_timer = $Buffs/Timer
@@ -143,9 +166,11 @@ func update_shield():
 	var data = {node = self, time = input_handler.combat_node.turns, type = 'shield_update',slot = 'SHIELD', params = args}
 	animation_node.add_new_data(data)
 
-func process_sfx(code):
+func process_sfx(code, params = {}):
 	if fighter == null: return
-	var data = {node = self, time = input_handler.combat_node.turns,type = code, slot = 'SFX', params = {}}
+	#a copy: start_animation writes sprite_name / video_name into params, and params here can be
+	#a dictionary straight from the effect data
+	var data = {node = self, time = input_handler.combat_node.turns, type = code, slot = 'SFX', params = params.duplicate(true)}
 	animation_node.add_new_data(data)
 
 func process_sound(sound):
@@ -187,6 +212,7 @@ func noq_rebuildbuffs():
 	buffs = fighter.get_combat_buffs()
 	if fighter.hp <= 0:
 		buffs.clear()
+	set_stealth(fighter.hp > 0 and fighter.has_status('hide'))
 	if buffs.empty():
 		buff_scroll_max_page = 0
 	else:
@@ -340,7 +366,8 @@ func update_mp_label(newmp, newmpp):
 		$bars/MP/mplabel.text = str(floor(newmpp)) + '%%'
 
 func noq_defeat():
-	if !visible: 
+	set_floating(false)
+	if !visible:
 		return
 	if fighter.is_active:
 		turn_overlay(true)
@@ -362,6 +389,9 @@ func check_active():
 #		if fighter != null:
 		fighter.displaynode = null
 		fighter = null
+		#rename before deleting, same as in transform_fighter: queue_free is
+		#deferred, but the slot must count as empty right away
+		name = 'temp'
 		queue_free()
 
 
@@ -426,11 +456,110 @@ func setup_overlay(type):
 				nd.queue_free()
 		_:
 			print("no damage type - %s" % type)
+	#the Icon material was just swapped for a fresh one - restore desaturation
+	refresh_icon_desat()
 
 
 func turn_overlay(val):
 	$overlay.visible = val
-	if val:
+	refresh_icon_desat()
+
+
+#"In the shadows" status (e_t_hide2, tag hide): the portrait fades out and shifts
+#to a cold moonlit tone. Desaturation comes from the same desaturate.shader that
+#already sits on Icon, and the tint from the portrait's own modulate - no extra
+#nodes needed.
+func set_stealth(val):
+	if stealth_on == val: return
+	stealth_on = val
+	$Icon.modulate = STEALTH_TINT if val else Color(1, 1, 1, 1)
+	refresh_icon_desat()
+
+
+#Death is shown through the same percent and takes priority. For the 'mind'
+#damage type Icon carries swirl_shader, whose parameter of the same name drives
+#both the swirl and the greying out - that is the whole mind kill effect, since
+#that branch leaves the overlay without a texture. So death does touch it, and
+#only stealth stays desaturate-only.
+func refresh_icon_desat():
+	if $Icon.material == null or $Icon.material.shader == null: return
+	var shader_path = $Icon.material.shader.resource_path
+	var is_desat = shader_path.ends_with('desaturate.shader')
+	if !is_desat and !shader_path.ends_with('swirl.shader'): return
+	if $overlay.visible:
 		$Icon.material.set_shader_param('percent', 1.0)
+	elif stealth_on and is_desat:
+		$Icon.material.set_shader_param('percent', STEALTH_DESAT)
 	else:
 		$Icon.material.set_shader_param('percent', 0.0)
+
+
+#The shadow is created lazily and only for whoever's turn it is: other cards
+#don't need it.
+#func make_float_shadow():
+#	if float_shadow != null: return
+#	var t = TextureRect.new()
+#	t.name = 'FloatShadow'
+#	t.texture = load("res://assets/sfx/float_shadow.png")
+#	t.expand = true
+#	t.stretch_mode = TextureRect.STRETCH_SCALE
+#	t.mouse_filter = Control.MOUSE_FILTER_IGNORE
+#	#Portraits are almost always opaque, so there is nothing to put behind the
+#	#card - we draw the shadow on top and push it below the bottom edge, where
+#	#nothing overlaps it.
+#	t.rect_position = Vector2(26, 196)
+#	t.rect_size = Vector2(130, 26)
+#	t.rect_pivot_offset = t.rect_size / 2
+#	t.modulate.a = 0.0
+#	add_child(t)
+#	float_shadow = t
+#	float_shadow_y = t.rect_position.y
+
+
+func set_floating(val):
+	if float_on == val: return
+	float_on = val
+	if val:
+#		make_float_shadow()
+		float_time = 0.0
+	else:
+		float_stop()
+	set_process(val)
+
+
+#Clears the shift but not the mode itself: floating resumes once the card is
+#free again.
+func float_stop():
+	if float_shifted:
+		rect_position = FLOAT_HOME
+		float_shifted = false
+#	if float_shadow != null:
+#		float_shadow.modulate.a = 0.0
+#		float_shadow.rect_position.y = float_shadow_y
+#		float_shadow.rect_scale = Vector2(1, 1)
+
+
+#While the card is playing its own animation, floating yields: the node has a
+#single rect_position, and the tween and _process would fight over it.
+func float_busy():
+	if has_node('tween') and $tween.is_active(): return true
+	if animation_node != null and animation_node.animation_delays.has(self): return true
+	for i in ResourceScripts.core_animations.ShakingNodes:
+		if i.node == self: return true
+	return false
+
+
+func _process(delta):
+	if !float_on: return
+	if float_busy():
+		float_stop()
+		return
+	float_shifted = true
+	float_time += delta
+	var k = 0.5 - 0.5 * cos(float_time / FLOAT_PERIOD * TAU)
+	var rise = FLOAT_RISE * k
+	rect_position = FLOAT_HOME + Vector2(0, -rise)
+#	if float_shadow != null:
+#		float_shadow.rect_position.y = float_shadow_y + rise
+#		float_shadow.rect_scale = Vector2(1.0 - 0.18 * k, 1.0 - 0.18 * k)
+#		float_shadow.modulate.a = FLOAT_SHADOW_ALPHA * (1.0 - 0.25 * k)

@@ -1,10 +1,16 @@
 extends Reference
 
+# Colour tables only - no singletons - so this is safe in the preload chain.
+const DOLL_COLORS = preload("res://Character_generator/Doll2Spine/universal/doll_colors.gd")
+const DOLL_COVERAGE = preload("res://Character_generator/Doll2Spine/universal/doll_coverage.gd")
+
 var parent: WeakRef = null
 
 var statlist = Statlist_init.template_direct.duplicate(true) 
 var exterior = Statlist_init.sex_binded_exterior.duplicate(true) 
 var exterior_alt = {}
+#The first name the character has gone by as each sex - see custom_effects.swap_sex_of().
+var sex_names = {}
 var sexexp = Statlist_init.sexexp.duplicate(true)
 var sex_skills = Statlist_init.sex_skills.duplicate(true)
 var sex_training = Statlist_init.sex_training.duplicate(true)
@@ -43,6 +49,8 @@ func deserialize(savedict):
 				exterior_alt[stat] = savedict.exterior_alt[stat]
 			elif savedict.statlist.has(stat):
 				exterior_alt[stat] = savedict.statlist[stat]
+	if savedict.has('sex_names'):
+		sex_names = savedict.sex_names.duplicate()
 	for stat in sexexp:
 		if savedict.sexexp.has(stat):
 			sexexp[stat] = savedict.sexexp[stat].duplicate(true)
@@ -100,6 +108,16 @@ func swap_alternate_exterior(): #only on sex change due to current implementatio
 	else:
 		exterior = exterior_alt
 		exterior_alt = tmp
+
+
+#The first name kept for a sex: remember_name_for_sex() files the current name under the sex the
+#character has now (or the one given), name_for_sex() hands it back, '' when none was ever filed.
+func remember_name_for_sex(sex = null):
+	sex_names[str(statlist.sex if sex == null else sex)] = statlist.name
+
+
+func name_for_sex(sex):
+	return str(sex_names.get(str(sex), ''))
 
 
 func recreate_exterior(): #only on sex change
@@ -266,102 +284,292 @@ func get_hair_facial_color():
 		return get_stat('hair_base_color_1')
 
 
+# What a tail is made of decides what colours it.  Fur follows the hair - it is
+# the same coat - unless the character wears a fur pattern, which brings its own
+# colour.  A demon's and a dragon's tail belongs to the covering their wings and
+# scales are, so it follows those; a kobold's and a nereid's is their own hide,
+# which is the skin.
+const FUR_TAILS = ['cat', 'fox', 'fox_2', 'fox_3', 'wolf', 'tanuki', 'cow', 'rat']
+# Tails the export has no art for: `doll_character_map.gd` sends these to the
+# empty part, or the prefix rule finds nothing for them.  A colour for a tail
+# nobody can see is a row that does nothing, so they are not asked about.
+const TAILS_WITHOUT_ART = ['cow', 'horse', 'snake', 'avian', 'bunny', 'tentacles', 'spider']
+const COVERING_TAILS = ['demon', 'dragon', 'dragon2']
+const SKIN_TAILS = ['kobold']
+# A nereid's tail is webbing rather than hide: it takes the fin that belongs
+# to the skin - `nereid2` wears `nereid_fins2` - and so do the matching ears.
+const FIN_TAILS = ['fish']
+const FUR_COLOURS = {
+	'fur_orange': 'orange3', 'fur_orange_white': 'orange2', 'fur_striped': 'orange3',
+	'fur_white': 'white2', 'fur_grey': 'white3', 'fur_brown': 'brown3',
+	#not the near-black of the coat's head: ear and tail art is drawn darker than the
+	#body's, so that shade came out solid black - this is the black coat's body fur
+	'fur_black': '#363533',
+}
+
+
+# The colours of the coat itself, when the player painted it rather than wearing
+# the artist's own: one "#rrggbb" per colour the pattern has, in the order
+# `doll_coverage` lists them, with '' where the artist's colour still stands.
+func get_coat_colours():
+	var raw = str(statlist.get('body_color_coat', ''))
+	if raw == '':
+		return []
+	return Array(raw.split(','))
+
+
+func get_coat_colour(index):
+	var list = get_coat_colours()
+	if index < 0 or index >= list.size():
+		return ''
+	return str(list[index])
+
+
+func set_coat_colour(index, value):
+	if index < 0:
+		return
+	var list = get_coat_colours()
+	while list.size() <= index:
+		list.append('')
+	list[index] = str(value)
+	#a list of nothing but the artist's own colours is no list at all
+	while !list.empty() and str(list[list.size() - 1]) == '':
+		list.remove(list.size() - 1)
+	statlist.body_color_coat = PoolStringArray(list).join(',')
+	statlist.portrait_update = true
+
+
+# Every colour back to the artist's own.
+func clear_coat_colours():
+	statlist.body_color_coat = ''
+
+
+# What a repainted coat lends the parts that take after it: its first colour,
+# which is the base where the pattern has one and the first mask where it has
+# none. '' while the coat is still the artist's, and for a body with no fur.
+func painted_coat_colour():
+	if !str(statlist.skin_coverage).begins_with('fur'):
+		return ''
+	for value in get_coat_colours():
+		if str(value) != '':
+			return str(value)
+	return ''
+
+
 func get_body_color_tail():
 	if statlist.body_color_tail != '':
-		return statlist.body_color_tail 
-	match statlist.tail:
-		'cat', 'fox', 'wolf', 'tanuki':
-			var res = get_hairs_data().hair_base_color_1
-			if statlist.hair_base_color_1 != "":
-				res = statlist.hair_base_color_1
-			res = res.replace('_', '')
-			if statlist.skin_coverage.begins_with('fur'):
-				match statlist.skin_coverage:
-					'fur_orange':
-						return 'orange3'
-					'fur_orange_white':
-						return 'orange2'
-					'fur_striped':
-						return 'orange3'
-					'fur_white':
-						return 'white2'
-					'fur_grey':
-						return 'white3'
-					'fur_brown':
-						return 'brown3'
-					'fur_black':
-						return 'dark3'
-			return res
-		'demon', 'cow', 'rat', 'fish':
-			var res = get_hairs_data().hair_base_color_1
-			if statlist.hair_base_color_1 != "":
-				res = statlist.hair_base_color_1
-			res = res.replace('_', '')
-			return res
-		'dragon', 'dragon2', 'kobold':
-			return statlist.body_color_skin
+		return statlist.body_color_tail
+	if statlist.tail in FUR_TAILS:
+		#a coat the player repainted answers for the tail growing out of it
+		var painted = painted_coat_colour()
+		if painted != '':
+			return painted
+		if FUR_COLOURS.has(statlist.skin_coverage):
+			return FUR_COLOURS[statlist.skin_coverage]
+		return hair_colour_as_body_part()
+	if statlist.tail in COVERING_TAILS:
+		return get_covering_colour()
+	if statlist.tail in FIN_TAILS:
+		return fin_colour()
+	if statlist.tail in SKIN_TAILS:
+		return statlist.body_color_skin
+	return ''
+
+
+# The webbing that goes with this skin, falling back to the skin itself where
+# the palette has no fin for it.
+func fin_colour():
+	var code = DOLL_COLORS.fins_code_for_skin(statlist.body_color_skin)
+	return code if code != '' else statlist.body_color_skin
+
+
+# A hair colour under the name the body parts use for it: the two palettes are
+# the same eleven families, and hair spells them with an underscore.
+func hair_colour_as_body_part():
+	var res = get_hairs_data().hair_base_color_1
+	if statlist.hair_base_color_1 != "":
+		res = statlist.hair_base_color_1
+	return res.replace('_', '')
+
+
+# Colours the game works out for itself.  Character creation rolls every stat it
+# offers, so a colour that has a rule behind it must not be offered at all - a
+# rolled `purple` on the lips is what put blue lips on a centaur.
+func derives_colour(stat):
+	match stat:
+		'body_color_lips', 'body_color_eyebrows':
+			# both are offered, with "follow the rule" as their first value: an
+			# empty stat still takes the skin (a beastkin's fur) and the hair, so nothing is derived
+			# behind the player's back
+			return false
+		'body_color_ears':
+			# offered like the lips and the brows above: an empty stat still follows
+			# the rule - the hair for fur, the skin for a shaped ear, the fin for a
+			# nereid's.  Which ears get the row at all is `has_ear_art()`.
+			return false
+		'body_color_tail', 'body_color_horns':
+			# Offered the way the ears are.  An empty stat still follows the rule - a
+			# fur tail takes the hair, a demon's tail and horns the hide its wings
+			# are, a kobold's the skin, a nereid's tail the fin - so a pick is made
+			# on top of the rule rather than over a colour derived behind the
+			# player's back.  Which tails get the row at all is `has_tail_art()`.
+			return false
+		'body_color_animal':
+			return get_covering_colour() != ''
+	return false
+
+
+# Eyebrows are hair, and follow the hair unless the player says otherwise.
+func get_body_color_eyebrows():
+	if statlist.body_color_eyebrows != '':
+		return statlist.body_color_eyebrows
+	if statlist.hair_base_color_1 != '':
+		return statlist.hair_base_color_1
+	return get_hairs_data().hair_base_color_1
 
 
 func get_body_color_lips():
 	if statlist.body_color_lips != '':
-		return statlist.body_color_lips 
-	match statlist.body_color_skin:
-		'blue3', 'blue4', 'blue5':
-			return 'blue'
-		'blue1', 'blue2':
-			return 'cyan'
-		'green5', 'human5', 'human6', 'red4', 'yellow4', 'yellow5':
-			return 'brown'
-		'green1', 'green2', 'green3', 'green4':
-			return 'green'
-		'pink1', 'pink2', 'pink3':
-			return 'pink'
-		'pink4', 'pink5', 'purple1', 'purple2', 'purple3', 'purple4', 'purple5', 'red5':
-			return 'purple'
-		'human3', 'human4', 'red1', 'red2', 'red3':
-			return 'red'
-		'yellow1', 'yellow2', 'yellow3':
-			return 'yellow'
-		'human1', 'human2', 'grey1', 'grey2', 'grey3', 'grey4':
-			return 'grey'
-		'human7', 'grey5':
-			return 'black'
-	return 'purple'
+		return statlist.body_color_lips
+	# Lips are skin - but not the skin's exact shade.  The mouth art is a dark
+	# violet line, and the shader keeps the art's own darkness, so painting it
+	# `human1` still reads as a dark mouth on a pale face.  `lips_code_for_skin`
+	# lifts the skin into flesh, and hands back an authored `lips_<skin>` colour
+	# where the palette carries one.
+	# A beastkin's mouth is not on skin at all: it sits in the fur of the muzzle,
+	# and takes a darker shade of that fur - see `lips_code_for_fur`.
+	var fur = mouth_fur_colour()
+	if fur != '':
+		return DOLL_COLORS.lips_code_for_fur(fur)
+	var lips = DOLL_COLORS.lips_code_for_skin(statlist.body_color_skin)
+	return lips if lips != '' else statlist.body_color_skin
 
 
+# The fur a beastkin's mouth sits in: the coat colour its pattern lays over the
+# lips, as the player repainted it or as the artist drew it.  '' where the mouth
+# is on bare skin - a body the doll does not draw furred, or a pattern with no
+# fur there.
+func mouth_fur_colour():
+	if str(statlist.race).find('Beastkin') < 0:
+		return ''
+	var pattern = str(statlist.skin_coverage)
+	var index = DOLL_COVERAGE.mouth_index(pattern)
+	var drawn = DOLL_COVERAGE.default_colors(pattern)
+	if index < 0 or index >= drawn.size():
+		return ''
+	var painted = get_coat_colour(index)
+	if painted != '':
+		return painted
+	return '#' + drawn[index].to_html(false)
+
+
+# Ears that are shaped skin rather than grown fur.  Their art is drawn in skin
+# tone and the doll paints them with the skin, so they have no colour of their
+# own and are not asked about.
+#
+# A list of the skin ones rather than of the furry ones on purpose: a new cut -
+# the four fox ears the artist added - is furry without anybody remembering to
+# add it anywhere.  Getting that backwards is what left the second elven ear
+# wearing fur colour on bare skin until it was noticed.  `doll2_view.gd` keeps
+# the same list in the doll's own part ids, as HUMANOID_EARS.
+#`normal` is the human ear the races roll; `human` is its name in the descriptions
+const SKIN_EARS = ['normal', 'human', 'elven', 'elven2', 'orcish', 'goblin']
+# Ears the export has no art for at all.  `doll_character_map.gd` maps both of
+# these to the empty part on purpose - `03_ears/` in the atlas carries twenty
+# pairs and neither of them is among them - so the doll wears nothing there and
+# there is nothing to colour.
+const EARS_WITHOUT_ART = ['demon', 'feathered']
+# A nereid's ear is a fin, and a fin's shade is worked out from the skin rather
+# than picked - see fin_colour().
+const EARS_TAKING_THE_FIN = ['fish']
+
+
+# Whether this character has a tail with a colour of its own: grown fur, drawn,
+# and not answering to some other rule.
+func has_fur_tail():
+	var tail = str(statlist.tail)
+	return tail in FUR_TAILS and !(tail in TAILS_WITHOUT_ART)
+
+
+# Whether this character has a pair of ears with a colour of their own: grown
+# fur, drawn, and not answering to some other rule.
+func has_animal_ears():
+	var ears = str(statlist.ears)
+	if ears == '' or ears in SKIN_EARS or ears in EARS_WITHOUT_ART:
+		return false
+	return !(ears in EARS_TAKING_THE_FIN)
+
+
+# Whether the doll draws any ears at all - skin, fur or fin.  Every drawn pair is
+# offered a colour: an empty stat still follows its rule (get_body_color_ears),
+# and a pick paints the pair whatever it is made of.
+func has_ear_art():
+	var ears = str(statlist.ears)
+	return !(ears in ['', 'no', 'none']) and !(ears in EARS_WITHOUT_ART)
+
+
+# Whether the doll draws a tail at all.  Offered a colour on the ears' terms: fur,
+# hide, skin or fin, an empty stat follows the rule get_body_color_tail works out.
+func has_tail_art():
+	var tail = str(statlist.tail)
+	return !(tail in ['', 'no', 'none']) and !(tail in TAILS_WITHOUT_ART)
+
+
+# What colour a pair of animal ears is.  The player's own choice wins; with none
+# made, they take the hair - or the fur, when the character is covered in it,
+# because ears sticking out of a striped coat are the coat's colour and not the
+# hair's.
 func get_body_color_ears():
-	match statlist.ears: 
-		'cat', 'fox', 'tanuki', 'wolf', 'mouse', 'bunny', 'bunny_standing', 'bunny_dropping', 'cow':
-			var res = get_hairs_data().hair_base_color_1
-			if statlist.hair_base_color_1 != "":
-				res = statlist.hair_base_color_1
-			res = res.replace('_', '')
-			if statlist.skin_coverage.begins_with('fur'):
-				match statlist.skin_coverage:
-					'fur_orange':
-						return 'orange3'
-					'fur_orange_white':
-						return 'orange2'
-					'fur_striped':
-						return 'orange3'
-					'fur_white':
-						return 'white2'
-					'fur_grey':
-						return 'white3'
-					'fur_brown':
-						return 'brown3'
-					'fur_black':
-						return 'dark3'
-			return res
-		'fish': 
-			return 'blue1'
-		_: 
-			return 'yellow2'
+	# a pick wins over every rule below, the fin's included
+	if statlist.body_color_ears != '':
+		return statlist.body_color_ears
+	if statlist.ears in EARS_TAKING_THE_FIN:
+		return fin_colour()
+	if !has_animal_ears():
+		return '' #shaped skin, or no ear art at all: nothing here to paint
+	var res = get_hairs_data().hair_base_color_1
+	if statlist.hair_base_color_1 != "":
+		res = statlist.hair_base_color_1
+	res = res.replace('_', '')
+	#a coat the player repainted answers for the ears sticking out of it
+	var painted = painted_coat_colour()
+	if painted != '':
+		return painted
+	#the same fur the tail takes - see FUR_COLOURS
+	if FUR_COLOURS.has(statlist.skin_coverage):
+		return FUR_COLOURS[statlist.skin_coverage]
+	return res
+
+
+# A demon and a dragon wear a covering that is not their skin: the wings, the
+# horns, the tail and the scales are one hide with a colour of its own, and the
+# wings are where it is kept.  A kobold is the other way round - it is scaled all
+# over, so its parts take the skin.  Everyone else keeps their parts apart: a
+# fairy's wing is not made of her skin either.
+const COVERING_FROM_WINGS = ['Demon', 'Dragonkin']
+const COVERING_FROM_SKIN = ['Kobold']
+
+
+func get_covering_colour():
+	if statlist.race in COVERING_FROM_WINGS:
+		return statlist.body_color_wings
+	if statlist.race in COVERING_FROM_SKIN:
+		return statlist.body_color_skin
+	return ''
+
+
+func get_body_color_horns():
+	if statlist.body_color_horns != '':
+		return statlist.body_color_horns
+	return get_covering_colour()
 
 
 func get_body_color_animal(): #2move to bodychanges
 	if statlist.body_color_animal != "":
 		return statlist.body_color_animal
+	var covering = get_covering_colour()
+	if covering != '':
+		return covering
 	match statlist.body_lower: #feel free to change values and stat
 		'horse':
 			return 'red3'
@@ -607,18 +815,73 @@ func set_hair_stat(st, value):
 		statlist[st] = value
 		var tdata = get_hairs_data()
 		for h_stat in ['hair_base', 'hair_assist', 'hair_back', 'hair_fringe', 'hair_base_length', 'hair_fringe_length', 'hair_back_length', 'hair_assist_length',]:
-			statlist[h_stat] = tdata[h_stat]
+			write_derived_hair(h_stat, tdata[h_stat])
 	if st in ['hair_color']: #legacy stub
 		statlist[st] = value
 		var tdata = get_hairs_data()
 		for h_stat in ['hair_base_color_1', 'hair_fringe_color_1', 'hair_back_color_1', 'hair_assist_color_1', 'hair_base_color_2', 'hair_fringe_color_2', 'hair_back_color_2', 'hair_assist_color_2']:
-			statlist[h_stat] = tdata[h_stat]
+			write_derived_hair(h_stat, tdata[h_stat])
 	if st.ends_with('virgin'):
 		#tot a hairs but obsolete stats
 		if value:
 			statlist[st + '_lost'] = null
 		else:
 			statlist[st + '_lost'] = 'unknown'
+
+
+#One of the stats `get_hairs_data` derives, put where that stat actually lives.
+#The four lengths are declared `container = 'exterior'` in statdata and are read
+#back out of it; the cuts and the colours sit in `statlist`.  Writing all of them
+#to `statlist` dropped every length on the floor - a style was worn at whatever
+#length the race had rolled, and `bald` never took the hair off at all.
+func write_derived_hair(h_stat, value):
+	if str(statdata.statdata[h_stat].get('container', '')) == 'exterior':
+		exterior[h_stat] = value
+	else:
+		statlist[h_stat] = value
+
+
+#What the hair the description speaks of - hair_length, hair_style, hair_color - is written into. Trying one of
+#their values writes all of these, so they are what is put back when no value changes anything.
+const DESCRIBED_HAIR_SOURCES = {
+	hair_length = ['hair_length', 'hair_style', 'hair_base', 'hair_assist', 'hair_back', 'hair_fringe',
+		'hair_base_length', 'hair_fringe_length', 'hair_back_length', 'hair_assist_length'],
+	hair_style = ['hair_length', 'hair_style', 'hair_base', 'hair_assist', 'hair_back', 'hair_fringe',
+		'hair_base_length', 'hair_fringe_length', 'hair_back_length', 'hair_assist_length'],
+	hair_color = ['hair_color', 'hair_base_color_1', 'hair_fringe_color_1', 'hair_back_color_1', 'hair_assist_color_1',
+		'hair_base_color_2', 'hair_fringe_color_2', 'hair_back_color_2', 'hair_assist_color_2'],
+}
+
+
+#The description's hair is worked back out of the doll's (get_combined_hairs_data), and several of its names come
+#out as the same hair: `shoulder` can read back `neck`, and twin braids read `ear` at any length. Tries
+#values[index], then the next ones in `direction`, and keeps the first that changes what is said, returning its
+#index. When none does, the hair is put back exactly as it was - the doll's own cuts and colours as well, which
+#trying the values overwrote - and -1 comes back.
+func step_described_hair(stat, values, index, direction):
+	var person = parent.get_ref()
+	var kept = {}
+	for h_stat in DESCRIBED_HAIR_SOURCES[stat]:
+		kept[h_stat] = _stored_hair(h_stat)
+	var shown = str(person.get_stat(stat))
+	for _attempt in range(values.size()):
+		person.set_stat(stat, values[index])
+		if str(person.get_stat(stat)) != shown:
+			return index
+		index = wrapi(index + (1 if direction >= 0 else -1), 0, values.size())
+	for h_stat in kept:
+		if str(statdata.statdata[h_stat].get('container', '')) == 'exterior':
+			exterior[h_stat] = kept[h_stat]
+		else:
+			statlist[h_stat] = kept[h_stat]
+	return -1
+
+
+#A hair stat as it is stored, wherever write_derived_hair keeps it.
+func _stored_hair(h_stat):
+	if str(statdata.statdata[h_stat].get('container', '')) == 'exterior':
+		return exterior.get(h_stat)
+	return statlist.get(h_stat)
 
 
 func get_combined_hairs_data():
@@ -628,22 +891,68 @@ func get_combined_hairs_data():
 		hair_length = '',
 	}
 	var lenghthes = ['bald', 'ear', 'neck', 'shoulder', 'waist', 'hips' ]
-	var color_parts = ['hair_fringe_color_1', 'hair_back_color_2', 'hair_assist_color_1']
+	var color_parts = ['hair_base_color_1', 'hair_back_color_2', 'hair_assist_color_1']
 	var length = 0
-	match statlist.hair_fringe: #adjust as you see fit, length is not reverse-compartible with presets autoset
+	match statlist.hair_base: #adjust as you see fit, length is not reverse-compartible with presets autoset
 	#i hate this conversion to older constants, but we are using those - until descriptions are totally rewritten we need this
 		'braids' :
 			res.hair_style = 'twinbraids'
-			match exterior.hair_fringe_length:
+			match exterior.hair_base_length:
 				'long':
 					length = int(max(length, 1))
 				'middle':
 					length = int(max(length, 1))
 				'short', 'default':
 					length = int(max(length, 1))
-		'dopple', 'lion', 'parting', 'default', 'fringe':
+		#a monofringe cut is its plain cut with a single lock of fringe, and reads as that cut
+		'dopple', 'lion', 'default', 'default_monofringe':
 			res.hair_style = 'straight'
-			match exterior.hair_fringe_length:
+			match exterior.hair_base_length:
+				'long':
+					length = int(max(length, 2))
+				'middle':
+					length = int(max(length, 1))
+				'short', 'default':
+					length = int(max(length, 1))
+		'parting':
+			res.hair_style = 'layered'
+			match exterior.hair_base_length:
+				'long':
+					length = int(max(length, 2))
+				'middle':
+					length = int(max(length, 1))
+				'short', 'default':
+					length = int(max(length, 1))
+		'fringe', 'fringe_monofringe':
+			res.hair_style = 'fringe'
+			match exterior.hair_base_length:
+				'long':
+					length = int(max(length, 2))
+				'middle':
+					length = int(max(length, 1))
+				'short', 'default':
+					length = int(max(length, 1))
+		'fringe2', 'fringe_2', 'fringe_2_monofringe':
+			res.hair_style = 'crownbraid'
+			match exterior.hair_base_length:
+				'long':
+					length = int(max(length, 2))
+				'middle':
+					length = int(max(length, 1))
+				'short', 'default':
+					length = int(max(length, 1))
+		'disheveled', 'disheveled_monofringe':
+			res.hair_style = 'messy'
+			match exterior.hair_base_length:
+				'long':
+					length = int(max(length, 2))
+				'middle':
+					length = int(max(length, 1))
+				'short', 'default':
+					length = int(max(length, 1))
+		'disheveled_eyehide':
+			res.hair_style = 'messy_eyehide'
+			match exterior.hair_base_length:
 				'long':
 					length = int(max(length, 2))
 				'middle':
@@ -652,7 +961,7 @@ func get_combined_hairs_data():
 					length = int(max(length, 1))
 		'back':
 			res.hair_style = 'straight'
-			match exterior.hair_fringe_length:
+			match exterior.hair_base_length:
 				'long':
 					length = int(max(length, 1))
 				'middle':
@@ -661,36 +970,46 @@ func get_combined_hairs_data():
 					length = int(max(length, 1))
 		'straight' :
 			res.hair_style = 'straight'
-			match exterior.hair_fringe_length:
+			match exterior.hair_base_length:
 				'long':
 					length = int(max(length, 3))
-					color_parts.push_back('hair_fringe_color_2')
+					color_parts.push_back('hair_base_color_2')
 				'middle':
 					length = int(max(length, 3))
-					color_parts.push_back('hair_fringe_color_2')
+					color_parts.push_back('hair_base_color_2')
 				'short', 'default':
 					length = int(max(length, 2))
 		'irokez':
-			res.hair_style = 'irokez'
-			match exterior.hair_fringe_length:
+			res.hair_style = 'straight' #nor is the irokez
+			match exterior.hair_base_length:
 				'long':
 					length = int(max(length, 1))
 				'middle':
 					length = int(max(length, 1))
 				'short', 'default':
 					length = int(max(length, 1))
-		'kare':
-			res.hair_style = 'kare'
-			match exterior.hair_fringe_length:
+		#`kare` is the name the bob was offered under before the September export renamed the art
+		'bobcut', 'kare', 'bobcut_monofringe':
+			res.hair_style = 'bob'
+			match exterior.hair_base_length:
 				'long':
 					length = int(max(length, 2))
+				'middle':
+					length = int(max(length, 2))
+				'short', 'default':
+					length = int(max(length, 2))
+		'hime':
+			res.hair_style = 'hime'
+			match exterior.hair_base_length:
+				'long':
+					length = int(max(length, 3))
 				'middle':
 					length = int(max(length, 2))
 				'short', 'default':
 					length = int(max(length, 2))
 		'lamb':
-			res.hair_style = 'curved'
-			match exterior.hair_fringe_length:
+			res.hair_style = 'straight' #the lamb cut is not in the export any more
+			match exterior.hair_base_length:
 				'long':
 					length = int(max(length, 2))
 				'middle':
@@ -699,7 +1018,7 @@ func get_combined_hairs_data():
 					length = int(max(length, 2))
 		'slave':
 			res.hair_style = 'shaved'
-			match exterior.hair_fringe_length:
+			match exterior.hair_base_length:
 				'long':
 					length = int(max(length, 1))
 				'middle':
@@ -708,7 +1027,7 @@ func get_combined_hairs_data():
 					length = int(max(length, 1))
 		'undercut':
 			res.hair_style = 'undercut'
-			match exterior.hair_fringe_length:
+			match exterior.hair_base_length:
 				'long':
 					length = int(max(length, 1))
 				'middle':
@@ -745,7 +1064,7 @@ func get_combined_hairs_data():
 		'ponytail_2', 'ponytail_3': 
 			res.hair_style = 'ponytail'
 		'twin_tails', 'twin_tails_3':
-			res.hair_style = 'twinbraids'
+			res.hair_style = 'twintails'
 			match exterior.hair_assist_length:
 				'long':
 					length = int(max(length, 3))
@@ -755,8 +1074,12 @@ func get_combined_hairs_data():
 					color_parts.push_back('hair_assist_color_2')
 				'short', 'default':
 					length = int(max(length, 2))
-		'twin_tails_2', 'twin_tails_4', 'twin_tails_5':
+		'twin_braids':
 			res.hair_style = 'twinbraids'
+		'spiral':
+			res.hair_style = 'curls'
+		'twin_tails_2', 'twin_tails_4', 'twin_tails_5':
+			res.hair_style = 'twintails'
 		_:
 			color_parts.erase('hair_assist_color_1')
 	
@@ -809,16 +1132,149 @@ func get_combined_hairs_data():
 	else:
 		res.hair_color = colors[0] 
 	
-	res.hair_length = lenghthes[length]
+	#A bald head cannot be read back off the cut: the cut is still named, it is
+	#simply not drawn.  The length is the only place that says so, and without
+	#this the doll showed a bare scalp while the description called it neck length.
+	if str(exterior.get('hair_base_length', '')) == 'bald':
+		res.hair_length = 'bald'
+	else:
+		res.hair_length = lenghthes[length]
 	
 	return res
+
+
+# The styles the redrawn doll brought, as data rather than as another seven
+# copies of the match below.  The older branches each bend their pieces by length
+# in their own way and are left alone; these do not - a bob is a bob at any
+# length - so a table says the same thing in a tenth of the lines.
+#
+# `pieces` is what the style always wears.  Lengths come from the ladder below,
+# and `by_length` then overrides any of the six for the lengths where the art
+# actually changes.  The values are the doll's own: see `doll_character_map.gd`
+# for how each reaches a part.
+const HAIR_STYLES = {
+	"bob": {
+		# chin length however long the hair grows, which is what a bob is
+		"pieces": {"hair_base": "bobcut", "hair_assist": "no", "hair_back": "bobcut"},
+		"by_length": {
+			"shoulder": {"hair_base_length": "middle"},
+			"waist": {"hair_base_length": "middle", "hair_back_length": "middle"},
+			"hips": {"hair_base_length": "middle", "hair_back_length": "middle"},
+		},
+	},
+	"messy": {
+		"pieces": {"hair_base": "disheveled", "hair_assist": "no", "hair_back": "no"},
+		"by_length": {
+			"shoulder": {"hair_back": "straight"},
+			"waist": {"hair_back": "straight"},
+			"hips": {"hair_back": "wave"},
+		},
+	},
+	"messy_eyehide": {
+		# the same tangle with the fringe fallen over one eye; female art only, so only
+		# the women's roll carries it (a man handed it wears the plain tangle, see
+		# STAND_INS in doll_character_map.gd)
+		"pieces": {"hair_base": "disheveled_eyehide", "hair_assist": "no", "hair_back": "no"},
+		"by_length": {
+			"shoulder": {"hair_back": "straight"},
+			"waist": {"hair_back": "straight"},
+			"hips": {"hair_back": "wave"},
+		},
+	},
+	"layered": {
+		"pieces": {"hair_base": "parting", "hair_assist": "no", "hair_back": "no"},
+		"by_length": {
+			"shoulder": {"hair_back": "straight"},
+			"waist": {"hair_back": "straight"},
+			"hips": {"hair_back": "very_long"},
+		},
+	},
+	"fringe": {
+		"pieces": {"hair_base": "fringe", "hair_assist": "no", "hair_back": "no"},
+		"by_length": {
+			"neck": {"hair_back": "straight"},
+			"shoulder": {"hair_back": "straight"},
+			"waist": {"hair_back": "straight"},
+			"hips": {"hair_back": "very_long"},
+		},
+	},
+	"crownbraid": {
+		# the braid is drawn into the base cut, so the length only moves what hangs
+		"pieces": {"hair_base": "fringe2", "hair_assist": "no", "hair_back": "no"},
+		"by_length": {
+			"shoulder": {"hair_back": "straight"},
+			"waist": {"hair_back": "wave"},
+			"hips": {"hair_back": "very_long"},
+		},
+	},
+	"twintails": {
+		# three cuts of the same idea: tufts, short bunches, then the long pair
+		"pieces": {"hair_base": "back", "hair_assist": "twin_tails_3", "hair_back": "no"},
+		"by_length": {
+			"shoulder": {"hair_assist": "twin_tails_2"},
+			"waist": {"hair_assist": "twin_tails"},
+			"hips": {"hair_assist": "twin_tails"},
+		},
+	},
+	"hime": {
+		"pieces": {"hair_base": "hime", "hair_assist": "no", "hair_back": "no"},
+		"by_length": {
+			"neck": {"hair_back": "straight"},
+			"shoulder": {"hair_back": "straight"},
+			"waist": {"hair_back": "straight"},
+			"hips": {"hair_back": "very_long"},
+		},
+	},
+	"undercut": {
+		# short on top, shaved at the sides; the back keeps out of the way
+		"pieces": {"hair_base": "undercut", "hair_assist": "no", "hair_back": "bobcut"},
+		"by_length": {
+			"ear": {"hair_back": "no"},
+			"waist": {"hair_base_length": "short", "hair_back_length": "middle"},
+			"hips": {"hair_base_length": "short", "hair_back_length": "middle"},
+		},
+	},
+	"shaved": {
+		# the scraped-back cut; female art only, so only the women's roll carries it (a
+		# man handed it wears a swept-back cut, see STAND_INS in doll_character_map.gd)
+		"pieces": {"hair_base": "slave", "hair_assist": "no", "hair_back": "no"},
+	},
+	"curls": {
+		"pieces": {"hair_base": "default", "hair_assist": "spiral", "hair_back": "no"},
+		"by_length": {
+			"shoulder": {"hair_back": "wave"},
+			"waist": {"hair_back": "wave"},
+			"hips": {"hair_back": "wave"},
+		},
+	},
+}
+
+# How long each layer is worn at a given hair length.  The older styles each
+# spell this out per branch; the new ones share one ladder.
+const HAIR_STYLE_LADDER = {
+	"ear": "short", "neck": "short", "shoulder": "middle",
+	"waist": "long", "hips": "long",
+}
+
+
+# One of the table's styles, written into the hair data the caller is building.
+func _apply_hair_style(res, style):
+	for stat in style.pieces:
+		res[stat] = style.pieces[stat]
+	var tier = str(HAIR_STYLE_LADDER.get(statlist.hair_length, "short"))
+	res.hair_base_length = tier
+	res.hair_assist_length = tier
+	res.hair_back_length = tier
+	var bent = style.get("by_length", {}).get(statlist.hair_length, {})
+	for stat in bent:
+		res[stat] = bent[stat]
 
 
 func get_hairs_data():
 	var res = {
 		hair_base = 'dopple', 
 		hair_fringe = 'dopple', 
-		hair_assist = 'bun', 
+		hair_assist = 'no', #there is no bun in the export
 		hair_back = 'very_long', 
 		hair_base_color_1 = 'blue_2', 
 		hair_fringe_color_1 = 'blue_2', 
@@ -924,6 +1380,8 @@ func get_hairs_data():
 		res.hair_back = 'no'
 		res.hair_assist_length = 'short'
 		res.hair_back_length = 'short'
+	elif HAIR_STYLES.has(statlist.hair_style):
+		_apply_hair_style(res, HAIR_STYLES[statlist.hair_style])
 	else:
 		match statlist.hair_style:
 			'straight':
@@ -931,7 +1389,7 @@ func get_hairs_data():
 					'ear':
 						res.hair_base = 'undercut'
 						res.hair_assist = 'no'
-						res.hair_back = 'care'
+						res.hair_back = 'bobcut'
 						res.hair_base_length = 'short'
 						res.hair_assist_length = 'short'
 						res.hair_back_length = 'short'
@@ -993,13 +1451,13 @@ func get_hairs_data():
 						res.hair_back_length = 'short'
 					'waist':
 						res.hair_assist = 'ponytail'
-						res.hair_back = 'no'
+						res.hair_back = 'ponytail_long'
 						res.hair_base_length = 'short'
 						res.hair_assist_length = 'middle'
 						res.hair_back_length = 'middle'
 					'hips':
 						res.hair_assist = 'ponytail'
-						res.hair_back = 'no'
+						res.hair_back = 'ponytail_long'
 						res.hair_base_length = 'short'
 						res.hair_assist_length = 'long'
 						res.hair_back_length = 'long'
@@ -1010,9 +1468,11 @@ func get_hairs_data():
 						res.hair_assist_length = 'short'
 						res.hair_back_length = 'short'
 			'pigtails':
-				res.hair_base = 'lamb'
+				res.hair_base = 'back'
 				res.hair_assist = 'pigtails'
 				res.hair_back = 'no'
+				if statlist.hair_length in ['waist', 'hips']:
+					res.hair_back = 'double_tail' #past the waist the pair hangs
 				match statlist.hair_length:
 					'ear':
 						res.hair_base_length = 'short'
@@ -1069,8 +1529,8 @@ func get_hairs_data():
 						res.hair_back_length = 'short'
 			'twinbraids':
 				res.hair_base = 'braids'
-				res.hair_assist = 'no'
-				res.hair_back = 'twin_braids'
+				res.hair_assist = 'twin_braids'
+				res.hair_back = 'no'
 				match statlist.hair_length:
 					'ear':
 						res.hair_base_length = 'short'
@@ -1098,7 +1558,7 @@ func get_hairs_data():
 						res.hair_back_length = 'short'
 			'bun':
 				res.hair_base = 'back'
-				res.hair_assist = 'bun'
+				res.hair_assist = 'ponytail' #no bun art in the export
 				res.hair_back = 'no'
 				res.hair_base_length = 'short'
 				res.hair_assist_length = 'short'
@@ -1406,6 +1866,129 @@ func get_racial_features(race):
 		update_personality(input_handler.weightedrandom(array))
 
 
+#### the furry form ####
+
+#BeastkinX and HalfkinX are the same animal with the fur on or off: two stat-identical entries in
+#races.gd that differ only in the coat, the muzzle and the limbs. The game itself renames one to
+#the other at creation when the furry setting is off (create(), above), and these do the same
+#for a character that already exists - rewriting only what the two entries roll differently, so
+#the hair, the ears, the tail, the eyes and every chosen colour stay. Not get_racial_features():
+#that re-rolls the whole body. Data only: whoever calls it reshoots the portrait.
+
+#a head wearing any of these keeps a muzzle whatever the race says (doll_character_map.resolve)
+const FURRY_STALE_CHINS = ['beastkin', 'muzzle1', 'muzzle2', 'muzzle3']
+const FURRY_PENIS_TYPES = ['feline', 'canine']
+
+
+func is_furry_form():
+	return str(statlist.race).begins_with('Beastkin')
+
+
+#The race code of the other form, or '' when this race has no pair. Only a Beastkin entry tagged
+#has_halfkin_counterpart qualifies - Ratkin, Kobold and the rest have nothing to flip to.
+func furry_counterpart_race():
+	var race = str(statlist.race)
+	var other = ''
+	if race.begins_with('Beastkin'):
+		other = race.replace('Beastkin', 'Halfkin')
+	elif race.begins_with('Halfkin'):
+		other = race.replace('Halfkin', 'Beastkin')
+	if other == '' or !races.racelist.has(other):
+		return ''
+	var beast = race if race.begins_with('Beastkin') else other
+	if !races.racelist[beast].get('tags', []).has('has_halfkin_counterpart'):
+		return ''
+	return other
+
+
+#a race's bodyparts list as plain values - weighted entries are [value, weight] pairs
+func _race_part_values(template, stat):
+	var res = []
+	for entry in template.get('bodyparts', {}).get(stat, []):
+		res.append(entry[0] if entry is Array else entry)
+	return res
+
+
+#the same two-branch roll get_racial_features() makes
+func _pick_race_part(template, stat):
+	var list = template.bodyparts[stat]
+	if typeof(list[0]) in [TYPE_STRING, TYPE_BOOL, TYPE_INT]:
+		return input_handler.random_from_array(list)
+	return input_handler.weightedrandom(list)
+
+
+#A beastkin mouth: one of the expressions, or 'none' - which the beastkin lips table also rolls, as the muzzle
+#draws a mouth of its own. On a human face 'none' leaves no mouth at all.
+func _is_beast_mouth(lips):
+	return str(lips).begins_with('beastkin') or str(lips) == 'none'
+
+
+#first_coat gives a new beastkin the first coat its race lists instead of a rolled one (the ritual
+#room's form change, body_rites.gd).
+func set_furry_form(furry, first_coat = false):
+	furry = bool(furry)
+	if is_furry_form() == furry:
+		return false
+	var target = furry_counterpart_race()
+	if target == '':
+		return false
+	update_stat('race', target, 'set')
+	var template = races.racelist[target]
+	var parts = template.get('bodyparts', {})
+	if furry:
+		#a coat the character already wears is kept when the race lists it, else one is rolled;
+		#going through the setter also gives the tail the coat's colour, as creation does
+		if parts.has('skin_coverage') and !(str(statlist.skin_coverage) in _race_part_values(template, 'skin_coverage')):
+			var coat = _race_part_values(template, 'skin_coverage')[0] if first_coat else _pick_race_part(template, 'skin_coverage')
+			update_stat('skin_coverage', coat, 'set')
+			#the paint belonged to the coat that was just replaced
+			statlist.body_color_coat = ''
+		#the muzzle and the limbs, only where the face is still a human one; a Bunny or a Tanuki
+		#lists no penis_type, so the human one stays
+		for stat in ['chin', 'nose', 'lips', 'arms', 'legs', 'penis_type']:
+			if !parts.has(stat):
+				continue
+			if str(get_stat(stat)) in _race_part_values(template, stat):
+				continue
+			update_stat(stat, _pick_race_part(template, stat), 'set')
+		if template.get('tags', []).has('multibreasts') and input_handler.globalsettings.furry_multiple_nipples:
+			statlist.multiple_tits = variables.furry_multiple_nipples_number
+	else:
+		#written raw: the coat's custom setter looks its value up in the descriptions, which have
+		#no entry for 'none' - and a bare halfkin carries exactly this
+		statlist.skin_coverage = ''
+		#pinned by the coat's bodychange; back to following the hair
+		statlist.body_color_tail = ''
+		statlist.body_color_ears = ''
+		#the paint belonged to a coat this body no longer wears
+		statlist.body_color_coat = ''
+		if str(get_stat('chin')) in FURRY_STALE_CHINS:
+			update_stat('chin', 'default', 'set')
+		#the other sex's stored face would bring the muzzle back after a swap
+		if exterior_alt is Dictionary and exterior_alt.has('chin') and str(exterior_alt.chin) in FURRY_STALE_CHINS:
+			exterior_alt.chin = 'default'
+		if exterior_alt is Dictionary and str(exterior_alt.get('nose', '')) == 'beastkin':
+			exterior_alt.nose = 'default'
+		if exterior_alt is Dictionary and _is_beast_mouth(exterior_alt.get('lips', '')):
+			exterior_alt.lips = 'style1' if str(statlist.sex) == 'male' else 'style6'
+		if str(get_stat('nose')) == 'beastkin':
+			update_stat('nose', 'default', 'set')
+		if _is_beast_mouth(get_stat('lips')):
+			#the first human mouth of each sex's own table
+			update_stat('lips', 'style6' if str(statlist.sex) == 'male' else 'style1', 'set')
+		if str(statlist.penis_type) in FURRY_PENIS_TYPES:
+			update_stat('penis_type', 'human', 'set')
+		for limb in ['arms', 'legs']:
+			if str(statlist[limb]) == 'fur':
+				update_stat(limb, 'normal', 'set')
+		statlist.multiple_tits = 0
+		statlist.multiple_tits_developed = false
+	#neither race nor the coat carries the update_portrait tag, so the shot on file is retired by hand
+	statlist.portrait_update = true
+	parent.get_ref().reset_rebuild()
+	return true
+
+
 func apply_custom_bodychange(target, part, update = true):
 	if update:
 		update_stat(target, part, 'set')
@@ -1439,10 +2022,9 @@ func get_random_age():
 
 
 func get_random_name(keep_surname = false):
-	var text = statlist.race.to_lower() + statlist.sex.replace("futa",'female')
-	if !Namedata.namelist.has(text):
-		text = 'human'+ statlist.sex.replace("futa",'female')
-	statlist.name = Namedata.namelist[text][randi() % Namedata.namelist[text].size()]
+	var generated = Namedata.random_first_name(statlist.race, statlist.sex)
+	if generated != '':
+		statlist.name = generated
 	if keep_surname and statlist.surname != '': 
 		return
 	if Namedata.namelist.has(statlist.race.to_lower() + 'surname'):
@@ -1473,15 +2055,25 @@ func random_icon():
 		statlist.dynamic_portrait = false
 
 func get_icon():
+	if uses_paperdoll():
+		#the booth's shot, asked for by path rather than through icon_image, which still
+		#holds the drawn portrait for the day the toggle goes back off
+		var shot = input_handler.get_portrait(parent.get_ref().doll_portrait_path())
+		if shot != null:
+			return shot
 	if statlist.icon_image in ['', null]:
 		return null
 	if statlist.icon_image is String:
+		if statlist.icon_image.begins_with(variables.portraits_folder):
+			return input_handler.get_portrait(statlist.icon_image)
 		return input_handler.loadimage(statlist.icon_image, 'portraits')
 	else:
 		return statlist.icon_image
 
 
 func get_icon_path():
+	if uses_paperdoll():
+		return parent.get_ref().doll_portrait_path()
 	if typeof(statlist.icon_image) != TYPE_STRING:
 		return null
 	if statlist.icon_image in ['', null]:
@@ -1489,8 +2081,15 @@ func get_icon_path():
 	return statlist.icon_image
 
 
-func get_stored_body_image(): 
-	var tmp 
+func uses_paperdoll():
+	var owner = parent.get_ref()
+	return owner != null and owner.uses_paperdoll()
+
+
+func get_stored_body_image():
+	if uses_paperdoll(): #no stored picture means the doll, on every screen that asks
+		return null
+	var tmp
 	if images.sprites.has(statlist.body_image):
 		tmp = input_handler.loadimage(images.sprites[statlist.body_image], 'shades')
 	else:
@@ -1719,12 +2318,10 @@ func add_tattoo(slot, code) -> bool:
 
 
 func remove_tattoo(slot):
-	if tattoo[slot] == null: 
+	if tattoo[slot] == null:
 		return
-	var arr = parent.get_ref().find_eff_by_tattoo(slot, tattoo[slot])
-	for e in arr:
-		var eff = effects_pool.get_effect_by_id(e)
-		eff.remove()
+	#the bonuses are re-derived from this dict on every rebuild (ch_dyn_stats.generate_data), so
+	#nothing is torn down by hand here
 	tattoo[slot] = null
 	parent.get_ref().reset_rebuild()
 

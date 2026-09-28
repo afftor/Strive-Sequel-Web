@@ -69,7 +69,11 @@ func fix_old_save():
 	for code in food_filter.keys():
 		if !Items.materiallist.has(code) or Items.materiallist[code].type != 'food':
 			food_filter.erase(code)
-	if !(fed is int) or fed < 0:
+	#JSON restores every number as a float. Keep a valid saved ration count instead of
+	#mistaking its post-load type for corrupted data and clearing the active food buff.
+	if typeof(fed) in [TYPE_INT, TYPE_REAL]:
+		fed = max(int(fed), 0)
+	else:
 		fed = 0
 	#no update_demand() here - the stat containers are still mid-load. the first meal
 	#after loading recomputes it anyway
@@ -172,6 +176,28 @@ func get_drain():
 	return 1
 
 
+#Units of food one meal takes from storage: one, or more for an extreme metabolism. It changes
+#what a meal costs, not how long it lasts.
+func get_portion():
+	if parent.get_ref().check_trait('upgrade_metabolism'):
+		return variables.food_metabolism_portion
+	return 1
+
+
+#The meal the storage can serve: the best allowed food there is a whole portion of - or, when there
+#is no whole portion of anything, the best food there is any of, eaten to the last unit.
+func choose_meal(order):
+	var portion = get_portion()
+	var stock = ResourceScripts.game_res.materials
+	var fallback = null
+	for code in order:
+		if stock[code] >= portion:
+			return code
+		if fallback == null and stock[code] >= 1:
+			fallback = code
+	return fallback
+
+
 func tick():
 	var person = parent.get_ref()
 	if person.check_trait('undead'):
@@ -194,16 +220,19 @@ func get_food():
 	update_demand()
 	#a forager feeds themselves off the land, without touching the storage
 	var forager = person.check_trait('forager')
+	var order = build_meal_order()
 	var meal = null
-	for code in build_meal_order():
-		if forager or ResourceScripts.game_res.materials[code] >= 1:
-			meal = code
-			break
+	if forager:
+		meal = null if order.empty() else order[0]
+	else:
+		meal = choose_meal(order)
 	if meal == null:
 		starve()
 		return
 	if !forager:
-		ResourceScripts.game_res.materials[meal] -= 1
+		var stock = ResourceScripts.game_res.materials
+		var portion = get_portion()
+		stock[meal] -= portion if stock[meal] >= portion else int(stock[meal])
 	consume(meal)
 
 
@@ -215,6 +244,12 @@ func consume(code):
 		value = int(ceil(value * variables.food_liked_value_mod))
 
 	fed += value
+	#A household that eats together gets a turn more out of every meal - so the food lasts
+	#longer and, since the buff rides on being fed, so does the buff. Counted in drain rather
+	#than in food value: a character on extra rations burns through a meal faster, and one
+	#turn has to mean one turn for them too.
+	if ResourceScripts.game_res.has_room_with_tag('dining'):
+		fed += get_drain()
 	last_meal = code
 	last_meal_poor = get_food_rank(code) < get_demand_rank() and !ignores_demand()
 	starvation = false
@@ -237,7 +272,7 @@ func consume(code):
 #		person.apply_effect_code('e_food_demand', {duration = turns})
 		person.add_stat('respect', globals.rng.randi_range(
 			variables.food_demand_respect[0], variables.food_demand_respect[1]))
-		globals.text_log_add('char', tr("FOODLOGBELOWDEMAND") % [person.get_short_name(), item.name])
+		globals.mansion_activity_log_add("food", tr("MANSION_ACTIVITY_FOOD_DISSATISFIED") % person.get_short_name())
 
 
 func starve():
@@ -268,6 +303,40 @@ func get_state():
 	return {state = 'poor' if last_meal_poor else 'fed', fed = fed, meal = last_meal}
 
 
+#What the coming meal will be, asked before it happens - this is what the warning on the
+#character card reads. It has to answer exactly what tick() and get_food() will do: nobody
+#eats until their ration runs out, and what they get is the best allowed food the storage
+#actually holds.
+#	''         - nothing to warn about
+#	'starve'   - they will eat this turn and there is nothing left they may eat
+#	'poor'     - they will eat this turn and the best that is left is below their demand
+func predict_meal_problem():
+	var person = parent.get_ref()
+	if person == null or person.check_trait('undead'):
+		return ''
+	#away from the estate they neither eat nor grow hungry, so there is nothing to promise
+	if person.is_unavaliable():
+		return ''
+	#tick() drops the ration first and only eats once it is spent
+	if fed - get_drain() > 0:
+		return ''
+	var forager = person.check_trait('forager')
+	update_demand()
+	var demand_rank = get_demand_rank()
+	var ignore_demand = ignores_demand()
+	var order = build_meal_order()
+	var meal = null
+	if forager:
+		meal = null if order.empty() else order[0]
+	else:
+		meal = choose_meal(order)
+	if meal == null:
+		return 'starve'
+	if !ignore_demand and get_food_rank(meal) < demand_rank:
+		return 'poor'
+	return ''
+
+
 func predict_food():
 	if parent.get_ref().check_trait('undead'):
 		return {}
@@ -281,7 +350,7 @@ func predict_food():
 	if is_liked(code):
 		value = int(ceil(value * variables.food_liked_value_mod))
 	var res = {}
-	res[code] = float(variables.HoursPerDay * get_drain()) / float(value)
+	res[code] = float(variables.HoursPerDay * get_drain() * get_portion()) / float(value)
 	return res
 
 
@@ -289,6 +358,9 @@ func toggle_food(foodcode):
 	if !food_filter.has(foodcode):
 		food_filter[foodcode] = true
 	food_filter[foodcode] = !food_filter[foodcode]
+	#what they may be served just changed, and so may the warning on their card - see the
+	#signal's own note for why nothing else would refresh it
+	globals.emit_signal("upkeep_changed")
 
 
 func get_filter_for_food(code):

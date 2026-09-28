@@ -21,9 +21,9 @@ var skills = {
 		target_range = 'weapon',
 		damage_type = 'weapon',
 		sfx = [
-			{code = 'draw_blood', target = 'target', period = 'predamage'},
+			{code = 'draw_blood', target = 'target', period = 'predamage', sync_to_hit = true, hit_motion = 'squash'},
 			{code = 'cast_weapon', target = 'caster', period = 'windup', is_cast = true}], 
-		sounddata = {initiate = null, strike = 'fleshhit', hit = null},
+		sounddata = {initiate = null, strike = 'melee_attack', hit = null},
 		value = 1.1,
 		variations = [
 			{
@@ -52,9 +52,9 @@ var skills = {
 		target_range = 'melee',
 		damage_type = 'weapon',
 		sfx = [
-			{code = 'sunder', target = 'target', period = 'predamage'},
+			{code = 'sunder', target = 'target', period = 'predamage', sync_to_hit = true, hit_motion = 'tilt'},
 			{code = 'cast_weapon', target = 'caster', period = 'windup', is_cast = true}], 
-		sounddata = {initiate = null, strike = 'blade', hit = null},
+		sounddata = {initiate = null, strike = 'melee_attack', hit = null},
 		value = 0.85,
 		variations = [
 			{
@@ -91,9 +91,9 @@ var skills = {
 		value = 0.9,
 		random_factor_p = 0.1,
 		sfx = [
-			{code = 'cleave', target = 'target_line', period = 'windup'},
+			{code = 'cleave', target = 'target_line', period = 'predamage', sync_to_hit = true, hit_motion = 'push'},
 			{code = 'cast_weapon', target = 'caster', period = 'windup', is_cast = true}], 
-		sounddata = {initiate = null, strike = 'blade', hit = null},
+		sounddata = {initiate = null, strike = 'melee_attack', hit = null},
 #		variations = [
 #			{
 #				reqs = [{code = 'has_status', status = 'assassin_hide', check = true}],
@@ -152,9 +152,9 @@ var skills = {
 		value = 1.1,
 		random_factor_p = 0.1,
 		sfx = [
-			{code = 'strike_through', target = 'target_row', period = 'windup'},
+			{code = 'strike_through', target = 'target_row', period = 'predamage', sync_to_hit = true, hit_motion = 'push'},
 			{code = 'cast_weapon', target = 'caster', period = 'windup', is_cast = true}], 
-		sounddata = {initiate = null, strike = 'blade', hit = null},
+		sounddata = {initiate = null, strike = 'melee_attack', hit = null},
 #		variations = [
 #			{
 #				reqs = [{code = 'has_status', status = 'assassin_hide', check = true}],
@@ -183,9 +183,9 @@ var skills = {
 		target_range = 'weapon',
 		damage_type = 'weapon',
 		sfx = [
-			{code = 'execution', target = 'target', period = 'predamage'},
-			{code = 'cast_weapon', target = 'caster', period = 'windup', is_cast = true}], 
-		sounddata = {initiate = null, strike = 'blade', hit = null},
+			{code = 'execution', target = 'target', period = 'predamage', sync_to_hit = true, hit_motion = 'tilt'},
+			{code = 'cast_weapon', target = 'caster', period = 'windup', is_cast = true, motion = 'execution_leap'}],
+		sounddata = {initiate = null, strike = 'melee_attack', hit = null},
 		value = 2.25,
 		variations = [
 			{
@@ -214,7 +214,7 @@ var skills = {
 		target_range = 'any',
 		damage_type = 'weapon',
 		sfx = [{code = 'execution', target = 'target', period = 'postdamage'}], 
-		sounddata = {initiate = 'avalanche', strike = null, hit = null, hittype = 'bodyarmor'},
+		sounddata = {initiate = 'avalanche', strike = null, hit = null, hittype = 'dynamic'},
 		value = [['0']],
 		damagestat = ['no_stat'],
 		not_final = true,
@@ -250,8 +250,8 @@ var skills = {
 		damage_type = 'light',
 		sfx = [
 			{code = 'targetattack', target = 'target', period = 'predamage'},
-			{code = 'cast_light', target = 'caster', period = 'windup', is_cast = true}], 
-		sounddata = {initiate = null, strike = 'blade', hit = null},
+			{code = 'holy_lance_step', target = 'caster', period = 'windup'}],
+		sounddata = {initiate = null, strike = 'melee_attack', hit = null},
 		value = 1.0,
 #		variations = [
 #			{

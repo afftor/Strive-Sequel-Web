@@ -2,6 +2,8 @@ extends Panel
 
 var ReloadPanel
 var SwitchLanguage
+var NGPlusButton
+var NGPlusButtonY #its place in the scene, kept so the button can be moved back to it
 
 #warning-ignore-all:return_value_discarded
 # var cheats = ['instant_travel','skip_combat','free_upgrades','instant_upgrades','invincible_player','show_enemy_hp','social_skill_unlimited_charges']
@@ -10,7 +12,8 @@ func _ready():
 	$TabContainer.set_tab_title(1, tr("OPTNAME2"))
 	$TabContainer.set_tab_title(2, tr("OPTNAME5"))
 	$TabContainer.set_tab_title(3, tr("OPTNAME3"))
-	$TabContainer.set_tab_title(4, tr("OPTNAME4"))
+	$TabContainer.set_tab_title(4, tr("OPTNAMEHOTKEYS"))
+	$TabContainer.set_tab_title(5, tr("OPTNAME4"))
 	for i in $TabContainer/Audio/VBoxContainer.get_children():
 		i.connect("value_changed", self, 'soundsliderchange',[i.name])
 		i.get_node("CheckBox").connect('pressed', self, 'mutepressed', [i.get_node("CheckBox")])
@@ -36,13 +39,19 @@ func _ready():
 	for i in ['furry','furry_multiple_nipples', 'futa_balls', 'show_full_consent', 'disable_mods_on_update']:
 		get_node("TabContainer/Gameplay/Scroll/Box/" + i).connect("pressed", self, "gameplay_rule", ['Gameplay/Scroll/Box', i])
 		get_node("TabContainer/Gameplay/Scroll/Box/" + i).pressed = input_handler.globalsettings[i]
-	for i in ['diff_gf_only_upg','diff_permadeath', 'diff_bonus_taskmod', 'diff_bonus_loot', 'diff_stop_loan', 'diff_free_gather','easytrain']:
+	for i in ['diff_permadeath', 'diff_bonus_taskmod', 'diff_bonus_loot', 'diff_stop_loan', 'diff_free_gather','easytrain']:
 		get_node("TabContainer/Gameplay2/Scroll/Box/" + i).connect("pressed", self, "gamestate_rule",  [i])
 		get_node("TabContainer/Gameplay2/Scroll/Box/" + i).pressed = ResourceScripts.game_globals.get(i)
 		globals.connecttexttooltip(get_node("TabContainer/Gameplay2/Scroll/Box/" + i), tr("SETTING"+i.trim_prefix('diff_').to_upper() + '_DESCRIPT'))
-	for i in ['generate_portraits', 'factors_as_words', 'disable_paperdoll', 'no_damage_shake', 'no_item_flight']:
+	for i in ['generate_portraits', 'factors_as_words', 'no_damage_shake', 'item_flight_animation', 'fps_meter', 'fast_combat']:
 		get_node("TabContainer/Visuals/" + i).connect("pressed", self, "gameplay_rule", ['Visuals', i])
 		get_node("TabContainer/Visuals/" + i).pressed = input_handler.globalsettings[i]
+	# The doll's own section. `disable_paperdoll` moved in here: it decides whether
+	# the doll is drawn at all, so the two settings that only mean anything while
+	# it is belong beside it rather than three rows away.
+	for i in ['disable_paperdoll', 'doll_idle_animation', 'darker_pregnancy_nipples']:
+		get_node("TabContainer/Visuals/Doll/" + i).connect("pressed", self, "doll_rule", [i])
+		get_node("TabContainer/Visuals/Doll/" + i).pressed = input_handler.globalsettings[i]
 
 	$TabContainer/Gameplay/Scroll/Box/enable_tutorials.connect("toggled", self, "enable_tutorials")
 
@@ -51,7 +60,11 @@ func _ready():
 	$TabContainer/Cheats/EnterCodeMenu/LineEdit.connect("text_changed", self, "text_changed")
 	$TabContainer/Cheats/EnterCodeMenu/Activate.connect("pressed", self, "go_for_code")
 	$TabContainer/Cheats/OpenCheatsMenu/CheatsMenu.connect("pressed", self, "open_cheats_menu")
-	
+	NGPlusButton = $TabContainer/Cheats/OpenCheatsMenu/UnlockNGP
+	NGPlusButtonY = NGPlusButton.rect_position.y
+	NGPlusButton.connect("pressed", self, "unlock_ngplus")
+	globals.connecttexttooltip(NGPlusButton, tr("OPTCHEATUNLOCKNGPTOOLTIP"))
+
 
 func enable_tutorials(pressed):
 	ResourceScripts.game_progress.show_tutorial = pressed
@@ -72,32 +85,54 @@ func open_cheats_menu():
 func text_changed(_text):
 	pass
 
-	# $TabContainer/Cheats/EnterCodeMenu/Activate.disabled = !ResourceScripts.game_progress.cheat_code == text
+	# $TabContainer/Cheats/EnterCodeMenu/Activate.disabled = text.sha256_text() != variables.cheat_code_hash
 
 
 func activate_cheats():
-	ResourceScripts.game_globals.cheats_active = true
 	$TabContainer/Cheats/EnterCodeMenu.hide()
 	$TabContainer/Cheats/OpenCheatsMenu.show()
+	update_ngplus_button()
+
+
+#Lifts the achievement gate on the New Game+ panel. It is a one-way switch, so the button
+#reports the state it left behind rather than offering to do the same thing twice.
+func unlock_ngplus():
+	input_handler.unlock_ngplus()
+	update_ngplus_button()
+
+
+func update_ngplus_button():
+	#the cheat menu button above this one is only there while a game is running - with no game
+	#the NG+ switch takes its slot instead of leaving a hole under the label
+	var cheats_button = $TabContainer/Cheats/OpenCheatsMenu/CheatsMenu
+	NGPlusButton.rect_position.y = NGPlusButtonY if cheats_button.visible else cheats_button.rect_position.y
+	var unlocked = input_handler.ngplus_cheat_active()
+	NGPlusButton.disabled = unlocked
+	NGPlusButton.get_node("Label").text = tr("OPTCHEATNGPUNLOCKED") if unlocked else tr("OPTCHEATUNLOCKNGP")
 
 
 func go_for_code():
-	if OS.has_feature('editor'):
-		$TabContainer/Cheats/EnterCodeMenu/LineEdit.text = ResourceScripts.game_globals.cheat_code
+	if OS.has_feature('editor'): #editor builds skip the code, the password itself is not in the build
+		input_handler.unlock_cheats()
 		activate_cheats()
 		return
-	if $TabContainer/Cheats/EnterCodeMenu/LineEdit.text == ResourceScripts.game_globals.cheat_code:
+	if input_handler.try_cheat_password($TabContainer/Cheats/EnterCodeMenu/LineEdit.text):
 		activate_cheats()
 		return
-	OS.shell_open("https://www.patreon.com/posts/new-password-18830450")
+	$SupporterLinks.open()
 
 
 func open():
-	$TabContainer/Gameplay/Scroll/Box/enable_tutorials.pressed = ResourceScripts.game_progress.show_tutorial
+	$TabContainer/Hotkeys.update_labels()
+	#the old tutorial is retired, so its switch is not offered any more
+	$TabContainer/Gameplay/Scroll/Box/enable_tutorials.hide()
 	# $TabContainer/Cheats/EnterCodeMenu/Activate.disabled = true
-	$TabContainer/Cheats/EnterCodeMenu.visible = !ResourceScripts.game_globals.cheats_active
-	$TabContainer/Cheats/OpenCheatsMenu.visible = ResourceScripts.game_globals.cheats_active
-	$TabContainer/Cheats/OpenCheatsMenu/CheatsMenu.visible = get_parent().name != "Menu_v2"
+	$TabContainer/Cheats/EnterCodeMenu.visible = !input_handler.cheats_unlocked()
+	$TabContainer/Cheats/OpenCheatsMenu.visible = input_handler.cheats_unlocked()
+	#the cheat menu operates on the running game (party, resources), so it is only
+	#reachable in-game - the main menu shows the "cheats unlocked" line without the button
+	$TabContainer/Cheats/OpenCheatsMenu/CheatsMenu.visible = is_instance_valid(gui_controller.mansion)
+	update_ngplus_button()
 	male_rate_change(input_handler.globalsettings.malechance)
 	futa_rate_change(input_handler.globalsettings.futachance)
 	autosave_amount_change(input_handler.globalsettings.autosave_number)
@@ -184,6 +219,13 @@ func gameplay_rule(tab, rule):
 	if rule == "turn_based_time_flow":
 		if gui_controller.clock != null:
 			gui_controller.clock.set_time_buttons()
+
+
+# A doll on screen reads these live, so the change is announced instead of waited
+# for: this panel opens over the character it repaints.
+func doll_rule(rule):
+	input_handler.globalsettings[rule] = get_node("TabContainer/Visuals/Doll/%s" % rule).pressed
+	input_handler.emit_signal("doll_settings_changed")
 
 
 func gamestate_rule(rule):

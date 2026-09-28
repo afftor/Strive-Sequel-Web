@@ -1,15 +1,11 @@
 extends Control
 
 
-var task_options = ["resources", "upgrades"]
-var task_index = 0
-
-onready var TaskContainer = $TaskList/ScrollContainer/VBoxContainer
-onready var WorkersContainer = $Tooltip/VBoxContainer
+onready var TaskContainer = $TaskList/ScrollContainer/GridContainer
 
 
 func _ready():
-	$Button.connect("pressed", self, "change_button")
+	$Button/Label.text = tr("TASKINFORESOURCES")
 	globals.connect("hour_tick", self, "update_progresses")
 	globals.connect("task_removed", self, "update_progresses")
 
@@ -21,6 +17,8 @@ var refresh_queued = false
 #used to clear and refill the whole task container. Coalesce to one refresh per frame via
 #the deferred message queue, which still flushes before the frame is drawn.
 func update_progresses():
+	if _turn_production_layout_locked():
+		return
 	if refresh_queued:
 		return
 	refresh_queued = true
@@ -29,68 +27,131 @@ func update_progresses():
 
 func flush_queued_refresh():
 	refresh_queued = false
+	if _turn_production_layout_locked():
+		return
 	show_task_info()
 
 
-func change_button():
-	if task_index == task_options.size() - 1:
-		task_index = 0
-	else:
-		task_index += 1
-	$Button/Label.text = tr("TASKINFO" + task_options[task_index].to_upper())
-	# $Button.icon = icon # Should change Icon
-	show_task_info()
+func _turn_production_layout_locked():
+	var clock = get_parent().get_node_or_null("MansionClockModule")
+	return clock != null and clock.turn_production_layout_locked
+
 
 func show_task_info():
-	match task_options[task_index]:
-		"upgrades":
-			ClearContainerCustom(TaskContainer)
-			show_upgrades_info()
-		"resources":
-			ClearContainerCustom(TaskContainer)
-			show_resources_info()
+	input_handler.ClearContainer(TaskContainer)
+	show_resources_info()
 
-func ClearContainerCustom(container):
-	for i in container.get_children():
-		if i.name == "Button" || i.name == "VBoxContainer":
+
+func _create_task_node(task_id):
+	var node = input_handler.DuplicateContainerTemplate(TaskContainer)
+	node.set_meta("task_id", str(task_id))
+	node.set_meta("tooltip", "")
+	#The card is the thing the player points at, so the card is what answers. Everything drawn on
+	#it sits over it and would take the mouse off it - which is how the card came to have two
+	#hover zones with two different tooltips, one of them a figure twenty pixels across that most
+	#players never found. Measured rather than assumed: the picture really does take the mouse.
+	for path in ['Stats', 'Stats/WorkerStat', 'Task', 'Task/TaskIcon']:
+		if node.has_node(path):
+			node.get_node(path).mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return node
+
+
+#One tooltip for the whole card, built up a piece at a time as the card is filled in. The title
+#goes to the front and everything else falls in behind it; connecttexttooltip drops the previous
+#connection, so re-hanging the fuller text as each piece arrives is what keeps it one tooltip
+#rather than several fighting over the same rectangle.
+func _add_card_tooltip(node, text, at_front = false):
+	if text == "":
+		return
+	var whole = str(node.get_meta("tooltip", ""))
+	if whole == "":
+		whole = text
+	elif at_front:
+		whole = text + "\n" + whole
+	else:
+		whole += "\n" + text
+	node.set_meta("tooltip", whole)
+	globals.connecttexttooltip(node, whole)
+
+
+func _set_worker_display(node, worker_ids, tooltip_text = ""):
+	var valid_workers = []
+	for worker_id in worker_ids:
+		if ResourceScripts.game_party.characters.has(worker_id):
+			valid_workers.append(worker_id)
+	var worker_stat = node.get_node("Stats/WorkerStat")
+	worker_stat.get_node("Workers").text = str(valid_workers.size())
+	if valid_workers.empty():
+		return
+	if tooltip_text == "":
+		tooltip_text = tr("TASKINFOWORKERS")
+		for worker_id in valid_workers:
+			tooltip_text += "\n" + ResourceScripts.game_party.characters[worker_id].get_short_name()
+	_add_card_tooltip(node, tooltip_text)
+
+
+func _set_output(node, text):
+	node.get_node("Stats/Production").text = text
+
+
+func _format_production(value):
+	return "+~" + ResourceScripts.custom_text.transform_number(stepify(value, 0.1))
+
+
+func _set_inventory_amount(node, amount):
+	var amount_label = node.get_node("Task/TaskIcon/Label")
+	amount_label.text = ResourceScripts.custom_text.transform_number(amount)
+	amount_label.show()
+
+
+#What this piece of work is called, at the head of its card's tooltip. It used to hang on the
+#picture itself, which is a TextureRect and lets the mouse straight through - so it was never
+#shown at all.
+func _connect_task_tooltip(node, name, description = ""):
+	var text = "[center]" + tr(name) + "[/center]"
+	if description != "":
+		text += "\n" + tr(description)
+	_add_card_tooltip(node, text, true)
+
+
+func get_turn_animation_target(task_id):
+	return get_turn_animation_targets().get(str(task_id), null)
+
+
+func get_turn_animation_targets():
+	var targets = {}
+	for node in TaskContainer.get_children():
+		if !node.visible or node.get_meta("task_id", "") == "":
 			continue
-		i.hide()
-		i.queue_free()
-
-func show_upgrades_info():
-	var first = true
-	for upgrade in ResourceScripts.game_res.crafting_lists.building:
-		var progress_data = ResourceScripts.game_res.tasks_progresses[upgrade]
-		var upgrade_product = upgradedata.upgradelist[upgrade]
-		
-		var upgrade_name = upgrade_product.name
-		var newupgrade = input_handler.DuplicateContainerTemplate(TaskContainer)
-		newupgrade.get_node("Task").text = tr(upgrade_name)
-		newupgrade.get_node("Task/TaskIcon").texture = load("res://assets/Textures_v2/MANSION/icon_upgrade_64.png")
-		newupgrade.get_node("ProgressBar").visible = false #or swap with next one for new crafting system
-		newupgrade.get_node("progress").visible = true
-		
-		newupgrade.get_node('progress').text = "%d / %d" % [progress_data.progress, progress_data.progress_limit]
-		newupgrade.get_node("ProgressBar").value = progress_data.progress / (progress_data.progress_limit  * 0.01)
-
-#		globals.connecttexttooltip(newupgrade, text)
-
-
-
-
-func show_workers(task, button): #obsolete
-	input_handler.ClearContainer(WorkersContainer)
-	var text
-	for worker in task.workers:
-		var newworker = input_handler.DuplicateContainerTemplate(WorkersContainer)
-		newworker.text = ResourceScripts.game_party.characters[worker].get_short_name()
-	$Tooltip.rect_position.y = button.rect_position.y + button.rect_size.y * 2
-	yield(get_tree(), 'idle_frame')
-	$Tooltip.rect_size.y = int(WorkersContainer.get_child(WorkersContainer.get_child_count() - 1).rect_size.y) * WorkersContainer.get_child_count() + 20
-	$Tooltip.show()
-
+		if node.has_node("Task/TaskIcon"):
+			var icon = node.get_node("Task/TaskIcon")
+			if $TaskList/ScrollContainer.get_global_rect().intersects(icon.get_global_rect()):
+				targets[node.get_meta("task_id")] = icon.get_global_rect().get_center()
+	return targets
 
 func show_resources_info():
+	#service - one task per settlement that buys it
+	for service_id in ResourceScripts.game_res.active_tasks.service:
+		if !ResourceScripts.game_res.tasks_progresses.has(service_id):
+			continue
+		var progress_data = ResourceScripts.game_res.tasks_progresses[service_id]
+		for worker in progress_data.workers.duplicate():
+			if !ResourceScripts.game_party.characters.has(worker):
+				progress_data.workers.erase(worker)
+		if !progress_data.workers.empty():
+			var newtask = _create_task_node(service_id)
+			var text = tr("TASKINFOWORKERS") + "\n"
+			var value = 0.0
+			for worker in progress_data.workers:
+				var ch = ResourceScripts.game_party.characters[worker]
+				var worker_value = ch.get_estimated_current_service_value()
+				text += "%s: + ~%.1f\n" % [ch.get_short_name(), worker_value]
+				value += worker_value
+			text += tr("TASKINFOINVENTORY") + " " + ResourceScripts.custom_text.transform_number(ResourceScripts.game_res.money)
+			newtask.get_node("Task/TaskIcon").texture = load("res://assets/images/iconsitems/gold.png")
+			_set_inventory_amount(newtask, ResourceScripts.game_res.money)
+			_set_worker_display(newtask, progress_data.workers, text)
+			_set_output(newtask, _format_production(value))
 	#special
 	for task_id in ResourceScripts.game_res.active_tasks.special:
 		var progress_data = ResourceScripts.game_res.tasks_progresses[task_id]
@@ -99,18 +160,14 @@ func show_resources_info():
 				progress_data.workers.erase(worker)
 		if progress_data.workers.empty():
 			continue
-		var newtask = input_handler.DuplicateContainerTemplate(TaskContainer)
-		var text = tr("TASKINFOWORKERS") + "\n"
-		for worker in progress_data.workers:
-			var ch = ResourceScripts.game_party.characters[worker]
-			text += ch.get_short_name() + '\n'
+		var newtask = _create_task_node(task_id)
 		newtask.get_node("Task/TaskIcon").texture = load(progress_data.icon)
 		newtask.get_node("ProgressBar").visible = true
-		newtask.get_node("progress").visible = false
 		newtask.get_node("ProgressBar").max_value = progress_data.progress_limit
 		newtask.get_node("ProgressBar").value = progress_data.progress
-		newtask.get_node("Task").text = tr(progress_data.name)
-		globals.connecttexttooltip(newtask, text)
+		_set_worker_display(newtask, progress_data.workers)
+		_set_output(newtask, "%d/%d" % [progress_data.progress, progress_data.progress_limit])
+		_connect_task_tooltip(newtask, progress_data.name, progress_data.get("descript", ""))
 	#recruiting
 	for task_id in ResourceScripts.game_res.active_tasks.recruiting:
 		var progress_data = ResourceScripts.game_res.tasks_progresses[task_id]
@@ -119,18 +176,14 @@ func show_resources_info():
 				progress_data.workers.erase(worker)
 		if progress_data.workers.empty():
 			continue
-		var newtask = input_handler.DuplicateContainerTemplate(TaskContainer)
-		var text = tr("TASKINFOWORKERS") + "\n"
-		for worker in progress_data.workers:
-			var ch = ResourceScripts.game_party.characters[worker]
-			text += ch.get_short_name() + '\n'
+		var newtask = _create_task_node(task_id)
 		newtask.get_node("Task/TaskIcon").texture = load(progress_data.icon)
 		newtask.get_node("ProgressBar").visible = true
-		newtask.get_node("progress").visible = false
 		newtask.get_node("ProgressBar").max_value = progress_data.progress_limit
 		newtask.get_node("ProgressBar").value = progress_data.progress
-		newtask.get_node("Task").text = tr(progress_data.name)
-		globals.connecttexttooltip(newtask, text)
+		_set_worker_display(newtask, progress_data.workers)
+		_set_output(newtask, "%d/%d" % [progress_data.progress, progress_data.progress_limit])
+		_connect_task_tooltip(newtask, progress_data.name, progress_data.get("descript", ""))
 	#gathering
 	for task_id in ResourceScripts.game_res.active_tasks.gathering:
 		var progress_data = ResourceScripts.game_res.tasks_progresses[task_id]
@@ -139,7 +192,7 @@ func show_resources_info():
 				progress_data.workers.erase(worker)
 		if progress_data.workers.empty():
 			continue
-		var newtask = input_handler.DuplicateContainerTemplate(TaskContainer)
+		var newtask = _create_task_node(task_id)
 		var text = tr("TASKINFOWORKERS") + "\n"
 		var progress = 0
 		for worker in progress_data.workers:
@@ -153,42 +206,71 @@ func show_resources_info():
 			progress += val
 		text += tr("TASKINFOINVENTORY") + " " + ResourceScripts.custom_text.transform_number(ResourceScripts.game_res.materials[progress_data.job])
 		var value = (progress_data.progress + progress) / progress_data.progress_limit
-		newtask.get_node("progress").text = "+ ~"+str(stepify(value,0.1))
-		newtask.get_node("ProgressBar").visible = false
-		newtask.get_node("progress").visible = true
 		newtask.get_node("Task/TaskIcon").texture = Items.materiallist[progress_data.job].icon
-		globals.connectmaterialtooltip(newtask.get_node("Task/TaskIcon"), Items.materiallist[progress_data.job])
-		newtask.get_node("Task").text = tr(progress_data.name)
-		newtask.get_node("Task").show()
-		globals.connecttexttooltip(newtask, text)
-	#crafting
-	for category in ['cooking_material', 'smith_material', 'alchemy_material', 'tailor_material', 'smith_item', 'alchemy_item', 'tailor_item', 'cooking_item',]:
+		_set_inventory_amount(newtask, ResourceScripts.game_res.materials[progress_data.job])
+		_set_worker_display(newtask, progress_data.workers, text)
+		_set_output(newtask, _format_production(value))
+	#Farming is spread across the farms on the grounds, and each worker chooses their own
+	#products. Keep one stable destination cell for the lot; the flying icon itself shows
+	#the product.
+	if true:
+		var farm_workers = []
+		for progress_data in ResourceScripts.game_res.tasks_progresses.values():
+			if progress_data.get('job', '') != 'farming' and progress_data.get('id', '') != 'farming':
+				continue
+			for worker in progress_data.get('workers', []):
+				if !farm_workers.has(worker):
+					farm_workers.append(worker)
+		var farm_task = {workers = farm_workers}
+		if !farm_task.workers.empty():
+			var newtask = _create_task_node("farming")
+			var farm_output = 0.0
+			var product_names = []
+			for worker in farm_task.workers:
+				if !ResourceScripts.game_party.characters.has(worker):
+					continue
+				var ch = ResourceScripts.game_party.characters[worker]
+				for product in ch.get_farming_rules():
+					if Items.materiallist.has(product) and !product_names.has(product):
+						product_names.append(product)
+					farm_output += ch.get_progress_farm(product)
+			newtask.get_node("Task/TaskIcon").texture = load("res://assets/images/iconsclasses/farmer.png")
+			_set_worker_display(newtask, farm_task.workers)
+			_set_output(newtask, _format_production(farm_output))
+			var product_text = "[center]" + tr("TASKPRODUCE") + "[/center]"
+			for product in product_names:
+				product_text += "\n" + tr(Items.materiallist[product].name)
+			_add_card_tooltip(newtask, product_text, true)
+	#crafting - one queue per craft type, items and materials together
+	for category in ['cooking', 'smith', 'alchemy', 'tailor']:
 		for task_id in ResourceScripts.game_res.crafting_lists[category]:
 			var progress_data = ResourceScripts.game_res.tasks_progresses[task_id]
 			if progress_data.status in ['completed', 'stopped', 'init']:
 				continue
-			var newtask = input_handler.DuplicateContainerTemplate(TaskContainer)
+			var recipe_data = Items.recipes[progress_data.id]
+			var newtask = _create_task_node(task_id)
 			if progress_data.status == 'no_resources':
 				newtask.get_node("NoResources").visible = true
-			if category == 'cooking_material':
+			if category == 'cooking' and recipe_data.resultitemtype == 'material':
 				newtask.get_node("ProgressBar").visible = true
-				newtask.get_node("progress").visible = false
 				newtask.get_node("ProgressBar").max_value = progress_data.progress_limit
 				newtask.get_node("ProgressBar").value = progress_data.progress
-			else:
-				newtask.get_node("ProgressBar").visible = false
-				newtask.get_node("progress").visible = true
-				newtask.get_node("progress").text = "%d / %d" % [progress_data.progress, progress_data.progress_limit]
-			var recipe_data = Items.recipes[progress_data.id]
+			_set_output(newtask, "%d/%d" % [progress_data.progress, progress_data.progress_limit])
+			var craft_workers = []
+			if ResourceScripts.game_res.tasks_progresses.has("crafting"):
+				for worker in ResourceScripts.game_res.tasks_progresses.crafting.workers:
+					if ResourceScripts.game_party.characters.has(worker):
+						var worker_ch = ResourceScripts.game_party.characters[worker]
+						if str(worker_ch.predict_active_task()) == str(task_id):
+							craft_workers.append(worker)
+			_set_worker_display(newtask, craft_workers)
 			var item_data
-			if category.ends_with('_material'):
+			if recipe_data.resultitemtype == 'material':
 				item_data = Items.materiallist[recipe_data.resultitem]
-				newtask.get_node("Task/TaskIcon/Label").show()
-				newtask.get_node("Task/TaskIcon/Label").text =  ResourceScripts.custom_text.transform_number(ResourceScripts.game_res.materials[recipe_data.resultitem])
-				globals.connectmaterialtooltip(newtask.get_node("Task/TaskIcon"), item_data)
+				_set_inventory_amount(newtask, ResourceScripts.game_res.materials[recipe_data.resultitem])
 			else:
 				item_data = Items.itemlist[recipe_data.resultitem]
-			
+				_set_inventory_amount(newtask, ResourceScripts.game_res.get_item_amount(recipe_data.resultitem))
 			newtask.get_node("Task/TaskIcon").texture = item_data.icon
 			if recipe_data.crafttype == 'modular':
 				newtask.get_node("Task/TaskIcon").material = load("res://assets/ItemShader.tres").duplicate()
@@ -198,20 +280,13 @@ func show_resources_info():
 			var work_time = ch.get_quest_time_remains()
 			if work_time > 0:
 				var work_time_init = ch.get_quest_time_init()
-				var newtask = input_handler.DuplicateContainerTemplate(TaskContainer)
+				var newtask = _create_task_node("quest_" + str(ch.id))
 				newtask.show()
 				newtask.get_node("Task/TaskIcon").texture = ch.get_icon_small()
 				newtask.get_node("NoResources").hide()
-#				newtask.get_node("progress").text = "%d / %d" % [work_time_init - work_time, work_time_init]
 				newtask.get_node("ProgressBar").visible = true
-				newtask.get_node("progress").visible = false
 				newtask.get_node("ProgressBar").max_value = work_time_init
 				newtask.get_node("ProgressBar").value = work_time_init - work_time
-				newtask.get_node("Task").text = ch.get_short_name() + " : " + tr(ch.get_work())
-#			else:
-#				var newtask = input_handler.DuplicateContainerTemplate(TaskContainer)
-#				newtask.show()
-#				newtask.get_node("Task/TaskIcon").hide()
-#				newtask.get_node("NoResources").hide()
-#				newtask.get_node("ProgressBar").hide()
-#				newtask.get_node("Task").text = tr("CHAR_UNAVALIABLE")
+				_set_worker_display(newtask, [ch.id])
+				_set_output(newtask, "%d/%d" % [work_time_init - work_time, work_time_init])
+				_add_card_tooltip(newtask, ch.get_short_name() + "\n" + tr(ch.get_work()), true)

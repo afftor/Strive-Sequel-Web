@@ -148,7 +148,7 @@ var skills = {
 	played_like_a_fiddle = {
 		code = 'played_like_a_fiddle',
 		descript = '',
-		icon = "res://assets/images/iconsclasses/icon_earth.png",
+		icon = "res://assets/images/iconsskills/icon_earth.png",
 		type = 'combat', 
 		ability_type = 'skill',
 		tags = ['damage','ads', 'damage_spot',],
@@ -224,7 +224,7 @@ var skills = {
 		sfx = [{code = '', code_repeat = {
 				1 : "devastation_1", 2 : "devastation_2", 3 : "devastation_3", 4 : "devastation_4",
 			}, target = 'target', period = 'predamage', duration = 0.2, no_repeat_delays = true},
-			{code = 'at_sword', target = 'caster', period = 'windup', no_delays = true, is_cast = true}],
+			{code = 'at_sword', target = 'caster', period = 'windup', is_cast = true}],
 		sounddata = {initiate = null, strike = 'spell_dark', hit = null},
 		value = 0.75,
 		variations = [
@@ -436,7 +436,7 @@ var skills = {
 	greg_last_bark_1 = {
 		code = 'greg_last_bark',
 		descript = '',
-		icon = "res://assets/images/iconsclasses/comboattack.png",
+		icon = "res://assets/images/iconsskills/comboattack.png",
 		type = 'combat', 
 		ability_type = 'skill',
 		tags = ['damage','ads', 'damage_spot', 'ultimate'],
@@ -463,7 +463,7 @@ var skills = {
 	greg_last_bark_2 = {
 		code = 'greg_last_bark',
 		descript = '',
-		icon = "res://assets/images/iconsclasses/comboattack.png",
+		icon = "res://assets/images/iconsskills/comboattack.png",
 		type = 'combat', 
 		ability_type = 'skill',
 		tags = ['damage','ads', 'damage_spot', 'ultimate'],
@@ -490,7 +490,7 @@ var skills = {
 	greg_last_bark_3 = {
 		code = 'greg_last_bark',
 		descript = '',
-		icon = "res://assets/images/iconsclasses/comboattack.png",
+		icon = "res://assets/images/iconsskills/comboattack.png",
 		type = 'combat', 
 		ability_type = 'skill',
 		tags = ['damage','ads', 'damage_spot', 'ultimate'],
@@ -517,7 +517,7 @@ var skills = {
 	greg_last_bark_4 = {
 		code = 'greg_last_bark',
 		descript = '',
-		icon = "res://assets/images/iconsclasses/comboattack.png",
+		icon = "res://assets/images/iconsskills/comboattack.png",
 		type = 'combat', 
 		ability_type = 'skill',
 		tags = ['damage','ads', 'damage_spot', 'ultimate'],

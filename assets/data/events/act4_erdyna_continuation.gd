@@ -1851,17 +1851,6 @@ var data = {
 				type = "next_dialogue",
 				bonus_effects = [
 					{code = "progress_quest", value = "erdyna_quest", stage = "archive_search"},
-					{
-						code = "add_special_task_for_location",
-						location = "empire_capital",
-						amount = 4,
-						descript = "ACT4_ERDYNA_ARCHIVE_SEARCH_TASK_DESC",
-						name = "ACT4_ERDYNA_ARCHIVE_SEARCH_TASK_NAME",
-						max_workers = 2,
-						workstat = "wits",
-						icon = "res://assets/Textures_v2/MANSION/quest_task.png",
-						args = [{code = "start_event", data = "act4_erdyna_archive_search_complete_1", args = {}}]
-					},
 					{code = "update_city"}
 				]
 			},
@@ -1925,11 +1914,6 @@ var data = {
 				reqs = [],
 				type = "next_dialogue",
 				bonus_effects = [
-					{
-						code = "remove_special_task_for_location",
-						location = "empire_capital",
-						event = "act4_erdyna_archive_search_complete_1"
-					},
 					{code = "progress_quest", value = "erdyna_quest", stage = "act4_erdyna_records"},
 					{code = "update_city"}
 				]
@@ -2094,6 +2078,7 @@ var data = {
 				type = "next_dialogue",
 				bonus_effects = [
 					{code = "make_story_character", value = "Erdyna", recruit_from_location = true},
+						{code = "plan_mansion_event", value = "erdyna_rouge_after_campfire_1"},
 					{code = "unique_character_changes", value = "erdyna", args = [
 						{code = "take_virginity", type = "vaginal", partner = "master"},
 						{code = "remove_combat_skill", skill = "fly_evasion"},
@@ -2114,6 +2099,7 @@ var data = {
 				type = "next_dialogue",
 				bonus_effects = [
 					{code = "make_story_character", value = "Erdyna", recruit_from_location = true},
+						{code = "plan_mansion_event", value = "erdyna_rouge_after_campfire_1"},
 					{code = "unique_character_changes", value = "erdyna", args = [
 						{code = "remove_combat_skill", skill = "fly_evasion"},
 						{code = "add_trait", trait = "training_s_combat"}
@@ -2151,7 +2137,8 @@ var data = {
 				type = "next_dialogue",
 				bonus_effects = [
 					{code = "decision", value = "ErdynaLeftForRedRooksAlone"},
-					{code = "complete_quest", value = "erdyna_quest"},
+					{code = "progress_quest", value = "erdyna_quest", stage = "catacombs_opened"},
+					{code = "make_quest_location", value = "quest_empire_catacomb_entry"},
 					{code = "update_city"}
 				]
 			}
@@ -2321,13 +2308,15 @@ var data = {
 				type = "next_dialogue",
 				bonus_effects = [
 					{code = "make_story_character", value = "Erdyna", recruit_from_location = true},
+						{code = "plan_mansion_event", value = "erdyna_rouge_after_campfire_1"},
 					{code = "affect_unique_character", name = "erdyna", type = "slavetype", value = "slave"},
 					{code = "unique_character_changes", value = "erdyna", args = [
 						{code = "remove_combat_skill", skill = "fly_evasion"}
 					]},
 					{code = "decision", value = "ErdynaBetrayedRedRooks"},
-					{code = "complete_quest", value = "erdyna_quest"},
+					{code = "progress_quest", value = "erdyna_quest", stage = "catacombs_opened"},
 					{code = "set_completed_active_location"},
+					{code = "make_quest_location", value = "quest_empire_catacomb_entry"},
 					{code = "update_city"}
 				]
 			}
@@ -2364,6 +2353,7 @@ var data = {
 				type = "next_dialogue",
 				bonus_effects = [
 					{code = "make_story_character", value = "Erdyna", recruit_from_location = true},
+						{code = "plan_mansion_event", value = "erdyna_rouge_after_campfire_1"},
 					{code = "screen_black_transition", value = 1}
 				]
 			}
@@ -2524,10 +2514,17 @@ var data = {
 				type = "next_dialogue"
 			},
 			{
+				code = "act4_3_artifact_found_alone",
+				text = "DIALOGUECONTINUE",
+				reqs = [{type = "decision", value = "ErdynaLeftForRedRooksAlone", check = true}],
+				type = "next_dialogue"
+			},
+			{
 				code = "act4_3_artifact_found_erdyna",
 				text = "DIALOGUECONTINUE",
 				reqs = [
 					{type = "decision", value = "ErdynaBetrayedRedRooks", check = false},
+					{type = "decision", value = "ErdynaLeftForRedRooksAlone", check = false},
 					{type = "decision", value = "ThalendirErdynaAbandoned", check = false}
 				],
 				type = "next_dialogue"

@@ -199,13 +199,20 @@ func ShadeAnimation(node, time = 0.3, delay = 0):
 	tweennode.start()
 
 
-func ShakeAnimation(node, time = 0.5, magnitude = 5):
+#`origin` is the position the node is snapped back to when the shake ends. Left out,
+#it is read off the live node - which is wrong for anything that may still be moving:
+#a fighter card caught mid-recoil would hand the shake a travelling position and get
+#hard-set there for good. Callers that know the node's rest position pass it in.
+func ShakeAnimation(node, time = 0.5, magnitude = 5, origin = null):
 	if !node.is_inside_tree(): return
-	var newdict = {node = node, time = time, magnitude = magnitude, originpos = node.rect_position}
+	var newdict = {node = node, time = time, magnitude = magnitude,
+		originpos = node.rect_position if origin == null else origin}
 	for i in range(ShakingNodes.size()-1, -1, -1):
 		var shaker = ShakingNodes[i]
 		if shaker.node == node:
-			newdict.originpos = shaker.originpos
+			#a re-triggered shake must not capture an already shaken position, but a
+			#caller that named the rest position outright still knows better
+			if origin == null: newdict.originpos = shaker.originpos
 			ShakingNodes.remove(i)
 	ShakingNodes.append(newdict)
 
@@ -259,11 +266,14 @@ func gfx_sprite(node, effect, fadeduration = 0.5, delayuntilfade = 0.3, flip = f
 
 	if wr.get_ref(): x.queue_free()
 
-func gfx_particles(node, effect, fadeduration = 0.5, delayuntilfade = 0.3, flip = false):
+func gfx_particles(node, effect, fadeduration = 0.5, delayuntilfade = 0.3, flip = false, speed = 1.0):
 	if !node.is_inside_tree(): return
 	var x = load(images.GFX_particles[effect]).instance()
 	node.add_child(x)
 	x.position = node.rect_size/2
+	#combat fast-forward plays the emitter faster instead of cutting it short
+	if speed != 1.0 and x.get("speed_scale") != null:
+		x.speed_scale = x.speed_scale * speed
 	if flip:
 		x.scale.x *= -1
 		x.rotation_degrees *= -1
@@ -329,7 +339,7 @@ func ItemFlightGold(start, params = {}):
 
 #null while the player has the effect switched off, so callers never build the overlay
 func get_flight_overlay():
-	if input_handler.globalsettings.get("no_item_flight", false):
+	if !input_handler.globalsettings.get("item_flight_animation", false):
 		return null
 	return input_handler.get_spec_node(input_handler.ANIM_ITEM_FLIGHT)
 

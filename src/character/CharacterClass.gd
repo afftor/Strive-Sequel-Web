@@ -21,6 +21,10 @@ var is_active = true
 var is_players_character = false
 var is_known_to_player = false #for purpose of private parts
 var npc_reference = null
+# Optional metadata copied from an enemy template for dynamic combat impact sounds.
+# Supported values: body, body_wet, cloth, leather, armor, wood, and stone.
+# Null uses the body profile.
+var hit_sound_profile = null
 var tags = []
 #base combat stats
 var hp = 100 setget hp_set#, hp_get
@@ -96,6 +100,12 @@ func base_exp_set(value):
 
 func swap_alternate_exterior():
 	statlist.swap_alternate_exterior()
+
+func remember_name_for_sex(sex = null):
+	statlist.remember_name_for_sex(sex)
+
+func name_for_sex(sex):
+	return statlist.name_for_sex(sex)
 
 
 func update_capped_stats():
@@ -193,6 +203,52 @@ func get_stat(statname, nobonus = false, desc_ready = false):
 			return 0
 		else:
 			return input_handler.combat_node.get_downed_opponent_amount(combatgroup)
+	if statname.begins_with('armor_'):
+		match statname:
+			'armor_base':
+#				return ('servant') #temporal, until correct recolor of armor
+				var res =  equipment.get_gear_type('chest')
+				if res == 'hector_armor':
+					res = 'chest_base_metal'
+				elif res == 'garb_of_forest':
+					res = 'chest_base_leather'
+				if res == null and !has_work_rule('nudity'):
+					res = 'underwear'
+				if !GeneratorData.transforms[statname].has(res):
+					res = 'servant'
+				return res
+			'armor_lower':
+#				return ('servant') #temporal, until correct recolor of armor
+				var res = equipment.get_gear_type('legs')
+				if res == 'garb_of_forest':
+					res = 'legs_base_leather'
+				if res == null and !has_work_rule('nudity'):
+					res = 'underwear'
+				if !GeneratorData.transforms[statname].has(res):
+					res = 'servant'
+				return res
+			'armor_base_underwear', 'armor_lower_underwear':
+				var res = equipment.get_gear_type('underwear')
+				if res == null and !has_work_rule('nudity'):
+					res = 'underwear'
+				if res != null and has_work_rule('nudity'):
+					res = null
+				return res
+			'armor_collar':
+				var res = equipment.get_gear_type('neck')
+				if !GeneratorData.transforms[statname].has(res):
+					res = null
+				return res
+			'armor_weapon':
+				var res = equipment.get_gear_type('rhand')
+				if !GeneratorData.transforms[statname].has(res):
+					res = null
+				return res
+			'armor_head':
+				var res = equipment.get_gear_type('head')
+				if !GeneratorData.transforms[statname].has(res):
+					res = null
+				return res
 	var st_data = statdata.statdata[statname]
 	if st_data.direct:
 		return statlist.get_stat(statname)
@@ -213,11 +269,12 @@ func get_stat_composition_dict():
 	#or get_stat() currently can't find them
 	return stat_compo_dict
 
-#metrics_* are bookkeeping counters - nothing derives a bonus from them, so writing one
-#must not throw away the dyn-stat cache. Doing so used to force a full rebuild on the next
-#get_stat, which is what made brothel/work ticks scale so badly with party size.
+#metrics_*, the experience progress and the fame timer are bookkeeping values - nothing
+#derives a dynamic bonus from them, so writing one must not throw away the dyn-stat cache.
+#Doing so used to force a full rebuild on the next get_stat, which is what made brothel/work
+#ticks scale so badly with party size.
 func stat_affects_dyn_stats(statname):
-	return !statname.begins_with('metrics_')
+	return !statname.begins_with('metrics_') and !statname in ['base_exp', 'fame_degrade_timer']
 
 
 func set_stat(stat, value):
@@ -465,7 +522,7 @@ func generate_ea_character(gendata, desired_class):
 	return res
 
 
-func generate_random_character_from_data(races_l, desired_class = null, adjust_difficulty = 0, trait_blacklist = [], guaranteed_classes = []):
+func generate_random_character_from_data(races_l, desired_class = null, adjust_difficulty = 0, trait_blacklist = [], guaranteed_classes = [], factor_cap = variables.maximum_factor_value):
 	adjust_difficulty = min(adjust_difficulty, 15)
 	var gendata = {race = '', sex = 'random', age = 'random'}
 
@@ -478,7 +535,7 @@ func generate_random_character_from_data(races_l, desired_class = null, adjust_d
 	create(gendata.race, gendata.sex, gendata.age)
 	dyn_stats.generate_data()
 	statlist.generate_random_character_from_data(adjust_difficulty)
-	dyn_stats.generate_random_character_from_data(desired_class, adjust_difficulty, guaranteed_classes)
+	dyn_stats.generate_random_character_from_data(desired_class, adjust_difficulty, guaranteed_classes, factor_cap)
 	dyn_stats.get_random_traits(trait_blacklist)
 	xp_module.set_service_boost()
 
@@ -493,6 +550,7 @@ func get_class_list(category, person):
 
 func generate_simple_fighter(tempname, setup_ai = true):
 	var data = Enemydata.enemies[tempname]
+	hit_sound_profile = data.get('hit_sound_profile', null)
 	for i in variables.fighter_stats_list:
 		if data.has(i):
 #			set_stat(i, 0)
@@ -525,10 +583,10 @@ func generate_simple_fighter(tempname, setup_ai = true):
 
 
 func add_mastery_as_bonuses(category, lv, mul = 2.5):
-	dyn_stats._add_mastery_as_bonuses(category, lv)
+	dyn_stats._add_mastery_as_bonuses(category, lv, mul)
 
 
-func roll_static_masteries(list, lv):
+func roll_static_masteries(list, lv, mul = 2.5):
 	var mas_1
 	var mas_2
 	var mas_3
@@ -584,11 +642,11 @@ func roll_static_masteries(list, lv):
 			lv_2 = globals.rng.randi_range(13, 18)
 			lv_3 = 45 - lv_1 - lv_2
 	
-	add_mastery_as_bonuses(mas_1, lv_1)
+	add_mastery_as_bonuses(mas_1, lv_1, mul)
 	if mas_2 != null:
-		add_mastery_as_bonuses(mas_2, lv_2)
+		add_mastery_as_bonuses(mas_2, lv_2, mul)
 	if mas_3 != null:
-		add_mastery_as_bonuses(mas_3, lv_3)
+		add_mastery_as_bonuses(mas_3, lv_3, mul)
 
 
 
@@ -750,6 +808,7 @@ func setup_baby(mother, father):
 			set_stat(i, father.get_stat(i))
 	
 	if mother.check_trait('master_progenecy') or father.check_trait('master_progenecy'):
+		var master_parent = mother.is_master() or father.is_master()
 		for factor in [
 			'physics_factor',
 			'magic_factor',
@@ -760,6 +819,8 @@ func setup_baby(mother, father):
 			'wits_factor',
 			'sexuals_factor',
 		]:
+			if master_parent and factor in ['tame_factor', 'authority_factor']:
+				continue
 			if randf() <= 0.5:
 				add_stat(factor, 1)
 	
@@ -839,6 +900,18 @@ func can_add_trait(tr_code):
 
 func remove_trait(tr_code):
 	dyn_stats.remove_trait(tr_code)
+
+func first_negative_trait():
+	return training.first_negative_trait()
+
+func get_trait_correction(code):
+	return training.get_trait_correction(code)
+
+func add_trait_correction(code, value):
+	return training.add_trait_correction(code, value)
+
+func clear_trait_correction(code):
+	training.clear_trait_correction(code)
 
 func get_traits_by_tag(tag):
 	return dyn_stats.get_traits_by_tag(tag)
@@ -941,6 +1014,9 @@ func get_estimated_service_value():
 
 func get_estimated_non_sex_service_value():
 	return xp_module.get_estimated_non_sex_service_value()
+
+func get_estimated_current_service_value():
+	return xp_module.get_estimated_current_service_value()
 
 func get_farming_rules():
 	return xp_module.get_farming_rules()
@@ -1179,13 +1255,16 @@ func can_evade():
 	return res
 
 func can_use_skill(skill):
-	if (is_players_character or need_req) and skill.has('reqs') and !checkreqs(skill.reqs): 
+	if skill.type == 'auto':
 		return false
-	if skill.type == 'auto': 
+	#in the sandbox reqs, cost and cooldown never block - anything is castable
+	if variables.anim_sandbox:
+		return true
+	if (is_players_character or need_req) and skill.has('reqs') and !checkreqs(skill.reqs):
 		return false
-	if is_players_character and !check_cost(skill.cost): 
+	if is_players_character and !check_cost(skill.cost):
 		return false
-	if skills.combat_cooldowns.has(skill.code): 
+	if skills.combat_cooldowns.has(skill.code):
 		return false
 	if has_status('disarm') and skill.ability_type == 'skill' and !skill.tags.has('disable_immunity'):
 		 return false
@@ -1220,6 +1299,14 @@ func is_worker():
 		return has_status('worker')
 	else:
 		return training.get_trainer() != null or enthrall.get_thrall_master() != null
+
+#Which of the four undress steps the player last left this character on. The nudity
+#work rule is the same choice with less in it, and set_undress_level writes both.
+func get_undress_level():
+	return xp_module.get_undress_level()
+
+func set_undress_level(level):
+	xp_module.set_undress_level(level)
 
 func has_work_rule(rule):
 	if !variables.work_rules.has(rule): return false
@@ -1349,8 +1436,8 @@ func get_professions():
 	return dyn_stats.get_professions()
 
 
-func use_mansion_item(item):
-	skills.use_mansion_item(item)
+func use_mansion_item(item, amount = 1):
+	skills.use_mansion_item(item, amount)
 
 func get_icon(path = false):
 	if path: 
@@ -1451,9 +1538,24 @@ func add_tattoo(slot, code):
 func remove_tattoo(slot):
 	statlist.remove_tattoo(slot)
 
-func play_sfx(code):
+#the same animal with the fur on or off - see ch_stats.set_furry_form
+func is_furry_form():
+	return statlist.is_furry_form()
+
+func has_furry_counterpart():
+	return statlist.furry_counterpart_race() != ''
+
+func set_furry_form(furry, first_coat = false):
+	return statlist.set_furry_form(furry, first_coat)
+
+func play_sfx(code, params = {}):
 	if displaynode != null:
-		displaynode.process_sfx(code)
+		displaynode.process_sfx(code, params)
+
+func play_sound(sound):
+	#an id audio.sounds does not know would die in PlaySound once the queue reaches it
+	if displaynode != null and audio.sounds.has(sound):
+		displaynode.process_sound(sound)
 
 func get_progress_task(temptask, tempsubtask, count_crit = false):
 	return xp_module.get_progress_task(temptask, tempsubtask, count_crit)
@@ -1742,11 +1844,19 @@ func killed(direct_call = true):
 		process_event(variables.TR_DEATH)
 	enthrall.cleanup()
 	ResourceScripts.game_party.check_breakdown_on_char_loss(self)
+	#The dead hold no job either. Nothing prunes a task's worker list on its own, so an id
+	#left behind went on filling a workplace that the party could no longer name - a slot
+	#showing nobody, refusing everybody, and impossible to free from any screen.
+	if !is_unavaliable():
+		remove_from_travel()
+		remove_from_task(true)
 	equipment.clear_equip()
 	training.clear_training()
-	ResourceScripts.game_party.add_fate(id, tr("SIBLINGMODULEFATEDEAD"))
+	ResourceScripts.game_party.add_fate(id, tr("SIBLINGMODULEFATERDEAD"))
 	is_active = false
 	ResourceScripts.game_party.character_order.erase(id)
+	#the dead do not keep their room
+	ResourceScripts.game_res.unhouse_character(id)
 	characters_pool.call_deferred('cleanup')
 	input_handler.update_slave_list()
 	if is_master():
@@ -1759,10 +1869,11 @@ func teleport(data):
 		return
 	xp_module.remove_from_task()
 	travel.location = locdata.location
-	travel.area = locdata.area # I think it's wrong @Sphinx 
-	#error was in getting locdata 
+	travel.area = locdata.area # I think it's wrong @Sphinx
+	#error was in getting locdata
 #	travel.area = locdata.area.code
 	travel.travel_time = 0
+	travel.travel_origin = ''
 	globals.emit_signal("slave_arrived", self)
 	input_handler.update_slave_list()
 	#add logging if reqired
@@ -1807,6 +1918,9 @@ func valuecheck(ch, ignore_npc_stats_gear = false): #additional flag is never us
 				check = input_handler.operate(i.operant, get_stat(i.stat, true), i.value) 
 			else:
 				check = input_handler.operate(i.operant, get_stat(i.stat), i.value)
+		#a stat without its bonuses, whoever asks (the slave market quests rely on it)
+		'base_stat':
+			check = input_handler.operate(i.operant, get_stat(i.stat, true), i.value)
 		'stat_in_set':
 			check = i.value.has(get_stat(i.stat))
 		'stat_index':
@@ -1915,6 +2029,17 @@ func valuecheck(ch, ignore_npc_stats_gear = false): #additional flag is never us
 			return (input_handler.combat_node.playergroupcounter == 1) == i.check
 		'workrule':
 			return check_work_rule(i.value) == i.check
+		#sleeps in a mansion room tagged like this - see mansion_room_types.gd
+		'lives_in_room':
+			return ResourceScripts.game_res.character_room_has_tag(id, i.value) == i.check
+		#the estate has such a room standing at all, wherever this character sleeps
+		'has_room':
+			return ResourceScripts.game_res.has_room_with_tag(i.value) == i.check
+		#sleeps somewhere good enough for what they have come to expect
+		'sleep_demand':
+			return ResourceScripts.game_res.sleep_demand_met(id) == i.check
+		'slept_rough':
+			return ResourceScripts.game_res.slept_rough(id) == i.check
 		'check_stored':
 			return training.check_stored_reqs(i.value)
 		'is_immune':
@@ -1928,6 +2053,11 @@ func valuecheck(ch, ignore_npc_stats_gear = false): #additional flag is never us
 					tres = true
 					break
 			return tres == i.check
+		#a mother or a father on record - every child born to the household has both
+		'has_known_parent':
+			var reldata = ResourceScripts.game_party.get_relatives_data(id)
+			var known = reldata != null and (reldata.mother != null or reldata.father != null)
+			return known == i.check
 		'work':
 			if i.has("check"):
 				return (get_work() == i.value) == i.check
@@ -1970,6 +2100,11 @@ func valuecheck(ch, ignore_npc_stats_gear = false): #additional flag is never us
 			else:
 				amount = input_handler.combat_node.get_group_amount(combatgroup)
 			check = input_handler.operate(i.operant, amount, i.value)
+		#number of distinct statuses tagged i.status (e.g. 'affliction') on this character
+		'status_count':
+			if dyn_stats.rebuild < variables.DYN_STATS_FULL:
+				dyn_stats.generate_data()
+			check = input_handler.operate(i.operant, dyn_stats.count_status(i.status), i.value)
 	return check
 
 
@@ -2079,7 +2214,9 @@ func decipher_single(ch):
 		'sex':
 			match i.operant:
 				'neq':
-					text2 += tr("REQSEX")+": " + i.value.capitalize() + "."
+					text2 += tr("REQSEX")+": " + tr("SLAVESEX" + i.value.to_upper()) + "."
+				'eq':
+					text2 += tr("STATSEX")+": " + tr("SLAVESEX" + i.value.to_upper()) + "."
 		'virgin':
 			match i.check:
 				false:
@@ -2112,13 +2249,11 @@ func show_race_description():
 	return text
 
 
+#down the road every other departure takes (game_res.run_away_unhoused)
 func escape_actions():
-	remove_from_work_quest()
-	remove_from_task()
-	remove_from_travel()
-	ResourceScripts.game_party.add_fate(id, tr("SIBLINGMODULEFATEESCAPE"))
-	is_active = false #for now, to replace with corresponding mechanic
-	characters_pool.cleanup()
+	ResourceScripts.game_party.add_fate(id, tr("SIBLINGMODULEFATERESCAPE"))
+	ResourceScripts.game_party.remove_slave(self, true)
+	is_active = false
 
 func predict_food():
 	return food.predict_food()
@@ -2142,7 +2277,7 @@ func tick(): #work ticks are not here - as they are called in tasks order, not i
 	#food runs before the regen, so a character that starves this turn loses this turn's
 	#health and half of this turn's mana rather than the next one's
 	food.tick()
-	self.hp += get_stat('hp_reg')
+	self.hp += hp_regen_allowed(get_stat('hp_reg'))
 	self.mp += get_stat('mp_reg')
 	#yet again workaround for effects, that should already be in action, but they don't
 	call_deferred('deferred_brk_check_food')
@@ -2159,8 +2294,21 @@ func tick(): #work ticks are not here - as they are called in tasks order, not i
 	minor_training_tick()
 
 
+#What a night on the floor leaves of the body's own mending: it stops at half. Somebody worse
+#off than that still mends up to half - the floor is miserable, not a wound - and somebody
+#already above it gains nothing at all. Said here rather than in the effect because hp_reg adds
+#flat bonuses after multiplying, so no multiplier can hold it down.
+func hp_regen_allowed(amount):
+	if amount <= 0 or !ResourceScripts.game_res.slept_rough(id):
+		return amount
+	var ceiling = floor(get_stat('hpmax') * 0.5)
+	if hp >= ceiling:
+		return 0
+	return min(amount, ceiling - hp)
+
+
 func rest_tick():
-	self.hp += get_stat('hp_reg') * 2
+	self.hp += hp_regen_allowed(get_stat('hp_reg') * 2)
 	self.mp += get_stat('mp_reg') * 2
 	for e in find_temp_effect_tag('addition_rest_tick'):
 		var eff = effects_pool.get_effect_by_id(e)
@@ -2298,6 +2446,12 @@ func log_me(text):
 	globals.text_log_add("char", "%s: %s" % [get_short_name(), text])
 
 func affect_char(template, manifest = false):
+	#The sandbox lets any fighter cast any skill, so a value computed from state
+	#this caster does not have comes back null. Treat it as zero there so the
+	#animation still plays; in a normal game a null here is a real bug and must
+	#keep failing loudly.
+	if variables.anim_sandbox and template.type == 'damage' and template.value == null:
+		template.value = 0
 	match template.type:
 		'damage':
 			var tval = deal_damage(template.value, template.source)
@@ -2405,7 +2559,10 @@ func affect_char(template, manifest = false):
 				return
 			input_handler.combat_node.transform_unit(position, template.unit)
 		'sfx':
-			play_sfx(template.value)
+			#optional params reach the animation function the way an sfx entry's keys do, and an
+			#optional sound plays with the animation
+			play_sfx(template.value, template.params if template.has('params') else {})
+			if template.get('sound', null) != null: play_sound(template.sound)
 		'effect':
 			var args = {}
 			if template.has('override'):
@@ -2446,6 +2603,13 @@ func affect_char(template, manifest = false):
 		'set_tutelage':
 			xp_module.assign_to_learning(template.value)
 			input_handler.rebuild_slave_list()
+			#This is chosen in the scene that follows a birth, with the mansion behind it, and
+			#it takes the newborn straight back out of the household's day. Only the list heard
+			#about it: the floorplan went on showing the child in its idle strip, and dropping
+			#that portrait on work overwrote the tutelage they had just been sent to.
+			if gui_controller.mansion != null and is_instance_valid(gui_controller.mansion) \
+					and gui_controller.mansion.has_method('try_refresh_rooms'):
+				gui_controller.mansion.try_refresh_rooms()
 		'add_counter':
 			if dyn_stats.counters.size() <= template.index + 1:
 				dyn_stats.counters.resize(template.index + 1)
@@ -2496,7 +2660,7 @@ func affect_char(template, manifest = false):
 					var data = ResourceScripts.world_gen.get_location_from_code(get_location())
 					data.stamina -= template.cost
 					if manifest:
-						globals.manifest_and_log("dungeon", "%s stamina spent in %s" % [template.cost, tr(data.name)])
+						globals.text_log_add("dungeon", "%s stamina spent in %s" % [template.cost, tr(data.name)])
 		'add_combat_log': #until we got proper midfight dialogue system, this will have to do.
 			if input_handler.combat_node == null: 
 				return
@@ -2747,18 +2911,49 @@ func get_explore_skills():
 func fix_skillpanels(list_soc_add, list_combat_add, list_soc_remove, list_combat_remove):
 	skills.fix_skillpanels(list_soc_add, list_combat_add, list_soc_remove, list_combat_remove)
 
-
-func update_portrait(ragdoll): # for ragdolls, obsolete for now
-#rewrite it later in case of different ragdoll implementation
-	if !get_stat('dynamic_portrait'):
+func update_portrait(ragdoll): # for ragdolls
+	if input_handler.globalsettings.disable_paperdoll: #no doll is drawn, so none is photographed
+		return
+	if !get_stat('dynamic_portrait') and !uses_paperdoll():
 		return
 	if !get_stat('portrait_update'):
 		return
-	
-	var path = 'portrait_' + id
+
+	#the shot needs two frames to land. icon_image only moves once it did - pointing it at a
+	#file that does not exist yet is what made the portrait blink to the race icon meanwhile
 	set_stat('portrait_update', false)
-	set_stat('icon_image', variables.portraits_folder + path + '.png')
-	ragdoll.save_portrait(path)
+	#handed back so a caller that has to wait for the picture can yield on it
+	return ragdoll.save_portrait('portrait_' + id, self)
+
+
+func needs_portrait(): #never had one taken, or the file behind it is gone
+	if uses_paperdoll():
+		#the drawn portrait stays in icon_image, so the doll's shot is asked for by its
+		#own path instead - switching the toggle back off must find the artwork intact
+		var doll_path = doll_portrait_path()
+		if input_handler.portrait_cache.has(doll_path):
+			return false
+		return !File.new().file_exists(doll_path)
+	if !get_stat('dynamic_portrait'):
+		return false
+	var path = get_stat('icon_image')
+	if !(path is String) or path == '':
+		return true
+	if !path.begins_with(variables.portraits_folder): #hand picked or story artwork
+		return false
+	if input_handler.portrait_cache.has(path): #asked once per card build, keep it off the disk
+		return false
+	return !File.new().file_exists(path)
+
+
+func portrait_ready(path): #called back by the ragdoll, the image is in the cache by then
+	if uses_paperdoll(): #get_icon reads the shot off doll_portrait_path, icon_image is left alone
+		return
+	set_stat('icon_image', path)
+
+
+func portrait_failed(): #nothing was written, ask again on the next rebuild
+	set_stat('portrait_update', true)
 
 
 func check_portrait():
@@ -2767,9 +2962,41 @@ func check_portrait():
 		return false
 	if !(path.is_abs_path() or path.is_rel_path()): #portrait is not path - so it must exist
 		return true
-	if File.new().file_exists(path): 
+	if File.new().file_exists(path):
 		return true
 	return false
+
+
+#Where the booth writes this character's shot. The drawn portrait and sprite of a unique
+#character stay in icon_image and body_image untouched, so the toggle below is reversible.
+func doll_portrait_path():
+	return variables.portraits_folder + 'portrait_' + id + '.png'
+
+
+#The doll instead of the character's own artwork. Only the unique cast has artwork to
+#replace, and with paperdolls switched off in the options there is no doll to switch to,
+#so the drawing stays in both of those cases.
+func uses_paperdoll():
+	if !get_stat('use_paperdoll'):
+		return false
+	if input_handler.globalsettings.disable_paperdoll:
+		return false
+	return true
+
+
+func set_use_paperdoll(value):
+	value = bool(value)
+	if bool(get_stat('use_paperdoll')) == value:
+		return
+	set_stat('use_paperdoll', value)
+	if value:
+		#nothing has ever been shot for a unique character - dynamic_portrait is off for
+		#anyone whose data names a portrait - so the booth is asked for one now
+		set_stat('portrait_update', true)
+		input_handler.reshoot_portrait(self)
+	else:
+		update_prt() #back to the drawn face for whatever they are wearing now
+	input_handler.emit_signal('update_ragdoll')
 
 
 func update_prt():
@@ -2854,20 +3081,6 @@ func try_breakdown_on_release():
 	try_breakdown('brk_enthrall_release')
 
 #Fame. Maybe should be withdrawn to separate module
-func get_stat_upgrade_price(stat_level):
-	var base_price = variables.base_stat_upg_price
-	var upg_price = base_price
-	for rarity in variables.race_stat_upg_bonus_priority:
-		if races.racelist[get_stat('race')].race_tags.has(rarity):
-			upg_price += base_price * variables.race_stat_upg_bonuses[rarity]
-			break
-	if variables.level_stat_upg_bonuses.has(stat_level):
-		upg_price += base_price * variables.level_stat_upg_bonuses[stat_level]
-	if is_unique():
-		upg_price += upg_price * variables.stat_upg_unique_bonus
-	
-	return upg_price
-
 func get_upkeep():
 	return int(get_fame_bonus('upkeep') * get_upkeep_multiplier())
 
@@ -2983,9 +3196,11 @@ func finish_minor_training():
 	}
 	input_handler.play_animation("trait_aquired", args)
 	var trait_data = Traitdata.traits[cur_minor_training]
-	globals.text_log_add('char', "%s: %s" % [
+	#The banner above says it once and is gone; the estate's log is where the player looks
+	#afterwards to find out which of them finished what while the turn was running.
+	globals.mansion_activity_log_add('training', tr("MANSION_ACTIVITY_TRAINING_COMPLETE") % [
 		get_short_name(),
-		tr("MINORTRAIN_TRAIT_AQUIRED") % tr(trait_data.name)
+		"[color=%s]%s[/color]" % [variables.hexcolordict.k_yellow, tr(trait_data.name)],
 	])
 	
 	cur_minor_training = null

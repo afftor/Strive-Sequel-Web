@@ -13,7 +13,7 @@ uniform float dist =0.7;
 
 vec3 rgb2hsl( in vec3 c )
 {
-    float epsilon = 0.00000001;
+    float epsilon = 0.0001;
     float cmin = min( c.r, min( c.g, c.b ) );
     float cmax = max( c.r, max( c.g, c.b ) );
     float cd   = cmax - cmin;

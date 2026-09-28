@@ -48,8 +48,11 @@ func tut_get_craftbutton():
 	return craftbutton
 func tut_get_daisy_work():
 	for line in $CharacterList/GridContainer.get_children():
+		if !line.has_meta('slave'):
+			continue
 		if line.get_meta('slave').get_stat('unique') == 'daisy':
 			return line
+	return null
 func tut_get_CloseButton():
 	return $CloseButton
 func tut_get_mat_order_highlight():
@@ -177,7 +180,7 @@ func update_characters():
 				newbutton.disabled = true
 			globals.connecttexttooltip(newbutton, ch.translate("[name]" + " " + tr("LACKS_BASIC_SERV_LABEL"))) #change translation
 		if selected_job != null:
-			if selected_job == "service":
+			if ResourceScripts.game_res.is_service_task(selected_job):
 				if !ch.is_worker():
 					newbutton.disabled = true
 					globals.connecttexttooltip(newbutton, ch.get_short_name() + ": Refused to work")
@@ -228,7 +231,11 @@ func update_status(newbutton, ch):
 			newbutton.disabled = true
 	else:
 		var prdata = ResourceScripts.game_res.tasks_progresses[ch.get_work()]
-		if prdata.id != 'farming':
+		#Not every task carries a picture. A room task takes its icon from the job's entry in
+		#tasks.tasklist, and the jobs that only name a room - farming, the practice room -
+		#have no entry there; the old estate-wide farming record had none either, which is
+		#what the name this replaces was guarding against.
+		if prdata.get('icon', null) != null:
 			newbutton.get_node("Status").texture = load(prdata.icon)
 
 
@@ -355,14 +362,20 @@ func update_resources():
 	var person_location = selected_location
 	var location = ResourceScripts.world_gen.get_location_from_code(person_location)
 	
-	if location.type == 'capital':
-		ResourceScripts.game_res._add_service_job()
+	#the service this settlement's own clients buy, which is a task of its own
+	var service_id = ResourceScripts.game_res._add_service_job(person_location)
+	if service_id != '':
 		servicebutton = input_handler.DuplicateContainerTemplate($Resourses/GridContainer)
-		if selected_job != null and selected_job == 'service':
+		if selected_job != null and selected_job == service_id:
 			servicebutton.pressed = true
 		servicebutton.get_node("TextureRect").texture = load("res://assets/images/gui/service.png")
-		servicebutton.connect("pressed", self, "select_resource", ["service", servicebutton])
-		globals.connecttexttooltip(servicebutton, tr('TASKRESTSERVICE'))
+		servicebutton.connect("pressed", self, "select_resource", [service_id, servicebutton])
+		var service_hint = tr('TASKRESTSERVICE')
+		#a settlement that buys service only from certain races does not take this one at all
+		if person != null and !ResourceScripts.game_world.service_takes_race(person_location, person):
+			servicebutton.disabled = true
+			service_hint = person.translate(tr("MANSIONVIEW_ERR_SERVICERACE"))
+		globals.connecttexttooltip(servicebutton, service_hint)
 	
 	for r_task in ['recruit_easy', 'recruit_hard']:
 		if location.has('tags') and location.tags.has(r_task):
@@ -512,7 +525,7 @@ func select_resource(job_id, newbutton):
 	$WorkunitLabel.text = ""
 	if job_id == "rest":
 		$DescriptionLabel.bbcode_text = tr("TASKRESTINFO")
-	elif job_id == "service":
+	elif ResourceScripts.game_res.is_service_task(job_id):
 		$DescriptionLabel.bbcode_text = tr("TASKRESTDESCRIPT")
 	elif job_id == "crafting":
 		$DescriptionLabel.bbcode_text = tr("TASKCRAFTDESCRIPT")
@@ -603,12 +616,12 @@ func focus_on_person_task(ch):
 		if restbutton != null:
 			select_resource("rest", restbutton)
 		return
-	if work_code == 'farming':
+	if ResourceScripts.game_res.is_farming_work(work_code):
 		build_farm()
 		return
-	if work_code == 'service':
+	if ResourceScripts.game_res.is_service_task(work_code):
 		if servicebutton != null:
-			select_resource("service", servicebutton)
+			select_resource(work_code, servicebutton)
 			show_brothel_options()
 			return
 	if work_code == 'crafting':
@@ -646,8 +659,8 @@ func select_job(button, newperson):
 		set_rest(button, person)
 #		show_brothel_options()
 		return
-	if selected_job == "service":
-		person.assign_to_task('service')
+	if ResourceScripts.game_res.is_service_task(selected_job):
+		person.assign_to_task(selected_job)
 		show_brothel_options()
 		update_status(button, person)
 		update_resources()
@@ -696,6 +709,9 @@ func show_brothel_options():
 	var location = ResourceScripts.world_gen.get_location_from_code(person.get_location())
 	
 	for i in brothel_rules.non_sex:
+		#acts this settlement's clients do not buy are not offered here at all
+		if !ResourceScripts.game_world.service_allows_rule(person.xp_module.service_location(), i):
+			continue
 		var newbutton = input_handler.DuplicateContainerTemplate($BrothelRules/GridContainer)
 		if person.get_stat('sex') == "male" && tasks.gold_tasks_data[i].tags.has('has_alt_name'):
 			newbutton.text = tr("BROTHEL"+i.to_upper() + "ALT")
@@ -709,6 +725,10 @@ func show_brothel_options():
 #		if person.get_work() == '':
 #			newbutton.disabled = true
 	for i in brothel_rules.sexual:
+		if !ResourceScripts.game_world.service_allows_rule(person.xp_module.service_location(), i):
+			continue
+		if i == 'sextoy' and !person.has_profession('sextoy'):
+			continue
 		if (i == 'pussy' && person.get_stat('has_womb') == false) || i == 'penetration' && person.get_stat('penis_size') == '':
 			continue
 		var newbutton = input_handler.DuplicateContainerTemplate($BrothelRules/GridContainer)
@@ -733,7 +753,11 @@ func show_brothel_options():
 		newbutton.add_to_group('sex_option')
 		#if person.get_work() == '':
 		#	newbutton.disabled = true
-		if person.has_status('no_sex'):
+		if !person.xp_module.service_rule_offered(i):
+			newbutton.disabled = true
+			newbutton.pressed = false
+			text += "\n" + tr("BROTHELBLOCKEDBYGEAR")
+		elif person.has_status('no_sex'):
 			newbutton.disabled = true
 			globals.connecttexttooltip(newbutton, person.translate("[name] " + " " + tr("REFUSE_TO_WHORE_LABEL")))
 		elif person.has_status('no_whoring'):
@@ -742,9 +766,6 @@ func show_brothel_options():
 		elif !person.has_status('sexservice'):
 			newbutton.disabled = true
 			text += tr("LACKSEXTRAINING")
-		elif i == 'sextoy' and !person.has_profession('sextoy'):
-			newbutton.hide()
-			continue
 		if person.get_stat('consent') < tasks.gold_tasks_data[i].min_consent:
 			newbutton.set("custom_colors/font_color", variables.hexcolordict['red'])
 			newbutton.set("custom_colors/font_color_pressed", variables.hexcolordict['red'])
@@ -900,9 +921,15 @@ func build_char_farm(char_id):
 	$Frame_farm/char_panel.visible = true
 	var ch = characters_pool.get_char_by_id(char_id)
 	farming_char = ch
-	if ch.get_work() == 'farming':
+	if ResourceScripts.game_res.is_farming_work(ch.get_work()):
 		ResourceScripts.game_party.remove_char_from_farm(char_id)
-	ch.assign_to_task('farming')
+	#a farm is a building now, and this screen does not know one from another - the estate
+	#puts them in the first with a place going
+	var farm_task = ResourceScripts.game_res.first_free_farm_task()
+	if farm_task == null:
+		input_handler.SystemMessage(tr("MANSIONVIEW_ERR_FULL"))
+		return
+	ch.assign_to_task(farm_task)
 	ResourceScripts.game_party.farming_slots[selected_slot] = char_id
 	build_farm_slots()
 	$Frame_farm/char_panel/Choose.visible = false
@@ -946,7 +973,11 @@ func build_char_farm(char_id):
 
 
 func set_to_farm():
-	farming_char.assign_to_task('farming')
+	var farm_task = ResourceScripts.game_res.first_free_farm_task()
+	if farm_task == null:
+		input_handler.SystemMessage(tr("MANSIONVIEW_ERR_FULL"))
+		return
+	farming_char.assign_to_task(farm_task)
 	build_farm()
 
 
@@ -966,6 +997,8 @@ func build_boosters():
 	$DescriptionLabel.visible = false
 	input_handler.ClearContainer($BrothelRules/boosters/VBoxContainer, ['Button'])
 	var boosters = person.xp_module.service_boosters
+	#first tier that gets paid for no more - it and every switched-on tier above it are idle
+	var stop = person.xp_module.get_booster_stop_tier()
 #	var f = true
 	for id in range(1, 4):
 		var newbutton = input_handler.DuplicateContainerTemplate($BrothelRules/boosters/VBoxContainer, 'Button')
@@ -984,7 +1017,15 @@ func build_boosters():
 		#free to add any more data
 		newbutton.pressed = boost_data.value
 		if boost_data.value:
-			text += " - " + tr("FARMACTIVATED")
+			if id < stop:
+				text += " - " + tr("FARMACTIVATED")
+			elif id == stop:
+				text += " - " + tr("SERVICEBOOSTNOSTOCK")
+				newbutton.get_node('Label').set("custom_colors/font_color", variables.hexcolordict['red'])
+			else:
+				var blocker = Items.materiallist[boosters['boost%d' % stop].res]
+				text += " - " + globals._report_text("SERVICEBOOSTNEEDS", [tr(blocker.name)])
+				newbutton.get_node('Label').set("custom_colors/font_color", variables.hexcolordict['red'])
 		
 		newbutton.get_node('Label').text = text
 		newbutton.connect('pressed', self, 'set_booster', [id, !boost_data.value])
@@ -1019,12 +1060,14 @@ func build_predicted(root):
 	else:
 		var task = ResourceScripts.game_res.tasks_progresses[task_id]
 		if task.job == 'building':
-			var udata = upgradedata.upgradelist[task_id]
-			root.get_node('icon').texture = images.upgrade_icons[udata.icon]
+			#a save from before the tree was retired can still name one here
+			if upgradedata.upgradelist.has(task_id):
+				var udata = upgradedata.upgradelist[task_id]
+				root.get_node('icon').texture = images.upgrade_icons[udata.icon]
 		else:
 			var recipe_data = Items.recipes[task.id]
 			var item_data
-			if task.job.ends_with('_material'):
+			if recipe_data.resultitemtype == 'material':
 				item_data = Items.materiallist[recipe_data.resultitem]
 			else:
 				item_data = Items.itemlist[recipe_data.resultitem]

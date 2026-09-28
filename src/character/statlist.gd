@@ -11,6 +11,9 @@ var sex_binded_exterior = {
 	chin = 'default',
 	eye_tex = 'eyes1',
 	eyebrows = 'style1',
+	eyeshape = 'face1',
+	nose = 'default',
+	lips = 'style1',
 	hair_base_length = '', 
 	hair_fringe_length = '', 
 	hair_back_length = '', 
@@ -53,6 +56,7 @@ var template_direct = {
 	body_image = 'default',
 	player_selected_icon = false,
 	player_selected_body = false,
+	use_paperdoll = false, #a unique character drawn with the doll instead of their own sprites
 	unique_variation = null,
 	
 	#personality
@@ -88,6 +92,7 @@ var template_direct = {
 	
 	#appearance
 	height = 'average',
+	head_size = 'average', #doll-only proportion, see doll_modifiers.gd
 	ears = 'normal',
 	eye_color = 'brown',
 	eye_shape = 'normal',
@@ -100,18 +105,28 @@ var template_direct = {
 	body_shape = 'humanoid',
 	skin_coverage = '',
 	facial_hair = '',
-	#new ones
-	eyeshape = 'face1',
-	nose = 'default',
-	lips = 'style1',
+	#new ones - eyeshape, nose and lips are in sex_binded_exterior
 	
 	#new skin, empty values SHOULD be set in remade char generating function or kept empty to indicate derivative nature
 	body_color_skin = '', 
 	body_color_wings = '', 
 	body_color_tail = '', 
-	body_color_horns = 'yellow3', 
-	body_color_animal = '', 
+	body_color_horns = '', 
+	body_color_ears = '', #empty means the ears take the hair, see get_body_color_ears()
+	body_color_animal = '',
+	#The fur or scales the body is painted in, when the player picked the colours
+	#themselves: one "#rrggbb" per colour the pattern has, comma separated, in the order
+	#doll_coverage lists them - the base first where there is one - and '' where the
+	#artist's own colour still stands. Empty means the whole coat is the artist's. The
+	#colours belong to the pattern they were picked for, so a new skin_coverage clears them.
+	body_color_coat = '',
 	body_color_lips = '',
+	body_color_nipples = '', #empty means the shade worked out from the skin, see doll2_view._apply_colours
+	#The doll's picture of a crotch tattoo: which drawing, as its catalogue part ('' is the first
+	#womb tattoo), and the ink, as "#rrggbb" ('' leaves the artist's black).
+	tattoo_crotch_style = '',
+	tattoo_crotch_color = '',
+	body_color_eyebrows = '',
 	#new hair, empty values SHOULD be set in remade char generating function or kept empty to indicate derivative nature
 	hair_base = '', 
 	hair_assist = '', 
@@ -213,6 +228,9 @@ var piercing = {
 	piercing_tongue = null, 
 	piercing_navel = null, 
 	piercing_nipples = null, 
+	#the metal the doll paints them in, as "#rrggbb"; null leaves the art's own gold
+	piercing_navel_color = null,
+	piercing_nipples_color = null,
 	piercing_clit = null, 
 	piercing_labia = null, 
 	piercing_penis = null,
@@ -223,6 +241,8 @@ var armor_color = {
 	armor_color_collar = 'default',
 	armor_color_weapon = 'default',
 	armor_color_underwear = 'default',
+	armor_color_underwear_lower = 'default',
+	armor_color_head = 'default',
 }
 var pregnancy = {
 	pregnancy_fertility = 0, 
@@ -389,6 +409,8 @@ var resists = {
 	resist_shock = 0.0,
 	resist_fear = 0.0,
 	resist_cursed = 0.0,
+	resist_taunt = 0.0,
+	resist_provoke = 0.0,
 	resist_sleep = 0.0,
 	resist_blind = 0.0,
 	resist_shred = 0.0,

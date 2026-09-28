@@ -353,7 +353,9 @@ func make_location(code, area):
 #	code = 'dungeon_bandit_fort'
 	var location = DungeonData.dungeons[code].duplicate(true)
 	location.stamina = 100
-	location.active = true
+	location.cleared = false
+	location.abandoned = false
+	location.removal_hours = 0
 	var text = tr(location.name)
 	if worlddata.locationnames.has(location.name+'_adjs'):
 		text = tr("LOCATIONTHE") + tr(worlddata.locationnames[location.name+"_adjs"][randi() % worlddata.locationnames[location.name + "_adjs"].size()]) + " " + tr(worlddata.locationnames[location.name+"_nouns"][randi() % worlddata.locationnames[location.name + "_nouns"].size()])
@@ -713,10 +715,26 @@ func _apply_requirement_items_to_name(quest_data, base_name):
 
 
 func make_quest_location(code):
-	if globals.valuecheck({type = 'location_exists', location = code}): 
-		return
+	var captives = []
+	var old = get_location_from_code(code)
+	if old != null:
+		#a place the story is not done with stays as it is, as it always has
+		if !old.get('cleared', false):
+			return
+		#one waiting to be removed is rebuilt instead, which is what the story used to get back
+		#when removal was instant - unless the player is looking at it, and its data cannot be
+		#swapped under an open screen
+		if globals.is_location_on_screen(code):
+			ResourceScripts.game_world.revive_location(old)
+			globals.refresh_location_status_ui(old)
+			return
+		captives = old.get('captured_characters', []).duplicate()
+		old.captured_characters = []
+		globals.remove_location(code, true)
 	var data = DungeonData.dungeons[code]
 	var locationdata = make_location(code, data.area)
+	if !captives.empty():
+		locationdata.captured_characters = captives
 	locationdata.id = code
 	locationdata.tags.push_back('quest')
 	locationdata.travel_time = max(1, globals.rng.randi_range(data.travel_time[0], data.travel_time[1]))#round(rand_range(data.travel_time[0], data.travel_time[1]))
@@ -880,7 +898,6 @@ var dungeon_template = { #sample dungeon data
 		
 		bgm = "dungeon",
 		purchase_price = 100,
-		affiliation = 'local', #defines character races and events
 		events = [],
 		tags = [],
 	}
@@ -1153,6 +1170,7 @@ func finalize_subrooms(locdata, subrooms, level):
 						tmp.event = e_data.events
 					tmp.possible_challenges = e_data.possible_challenges.duplicate() #or roll 
 					tmp.icon = e_data.icon
+					roll_tower_chest_ore(locdata, tmp)
 					e_data.limit -= 1
 					if e_data.limit == 0:
 						locdata.event_data.erase(roll)
@@ -1203,6 +1221,32 @@ func finalize_subrooms(locdata, subrooms, level):
 #		input_handler.array_shuffle(r_data.subrooms, globals.rng_controllable)
 
 
+#Meteorite ore in the tower's chests, from the tenth floor down. Rolled while the
+#floor is being built rather than when the chest is opened, so what a chest holds
+#is settled the moment the floor exists and reopening the scene cannot reroll it.
+const TOWER_ORE_MATERIAL = 'meteorite_iron'
+const TOWER_ORE_FIRST_FLOOR = 10
+const TOWER_ORE_CHANCE = 0.25
+const TOWER_ORE_AMOUNT = [1, 3]
+
+
+func roll_tower_chest_ore(locdata, subroom):
+	if !locdata.tags.has('infinite'):
+		return
+	#current_level counts from zero, the floor the player is shown counts from one
+	if locdata.current_level + 1 < TOWER_ORE_FIRST_FLOOR:
+		return
+	if !scenedata.scenedict.has(subroom.event):
+		return
+	if !scenedata.scenedict[subroom.event].tags.has('locked_chest'):
+		return
+	if globals.rng.randf() >= TOWER_ORE_CHANCE:
+		return
+	subroom.bonus_materials = {
+		TOWER_ORE_MATERIAL: globals.rng.randi_range(TOWER_ORE_AMOUNT[0], TOWER_ORE_AMOUNT[1])
+	}
+
+
 func set_level_infinite(location, level):
 	#cleanup
 	if !location.dungeon.empty():
@@ -1212,11 +1256,20 @@ func set_level_infinite(location, level):
 	location.current_level = level
 	location.max_level = max(level, location.max_level)
 	#set biome
-	if location.biomes.size() <= level:
+	while location.biomes.size() <= level:
 		var pool = location.avaliable_biomes.duplicate()
 		pool.shuffle()
+		var added = 0
 		for i in pool:
+			var b_data = DungeonData.infinite_dungeon_biomes[i]
+			#low tier biomes are dropped from the rotation once the floor gets high enough
+			if b_data.has('max_floor') and location.biomes.size() > b_data.max_floor:
+				continue
 			location.biomes.push_back(i)
+			added += 1
+		if added == 0: #safety net - every biome is capped, ignore the caps rather than loop forever
+			for i in pool:
+				location.biomes.push_back(i)
 	location.biome = location.biomes[level]
 	#setup biome attributes
 	var biome_data = DungeonData.infinite_dungeon_biomes[location.biome]

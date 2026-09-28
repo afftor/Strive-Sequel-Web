@@ -20,6 +20,11 @@ var acquired_turn = -1 #absolute turn the character joined the party, -1 for old
 
 var stored_reqs = {}
 
+#How far each bad habit has been talked out of this character, 0..100. Kept here rather than on
+#the practice room because the room mends whoever happens to be standing in it: somebody moved
+#out and back in again picks up where they left off, and two pupils do not share one bar.
+var trait_correction = {}
+
 var enable = true
 var cooldown = {
 #	main = 0,
@@ -60,6 +65,28 @@ func get_loyalty_decay_grace():
 
 func get_loyalty_decay_amount():
 	return 10 + 2 * parent.get_ref().get_stat('authority_factor')
+
+#The habit this character would be worked on next: the first they have. One at a time, so the
+#room needs no list and the player no second choice.
+func first_negative_trait():
+	var found = parent.get_ref().get_traits_by_tag('negative')
+	return found[0] if !found.empty() else null
+
+
+func get_trait_correction(code):
+	return float(trait_correction.get(code, 0.0))
+
+
+#Returns true on the turn it reaches a hundred, which is when the habit is finally gone.
+func add_trait_correction(code, value):
+	var now = min(100.0, get_trait_correction(code) + value)
+	trait_correction[code] = now
+	return now >= 100.0
+
+
+func clear_trait_correction(code):
+	trait_correction.erase(code)
+
 
 func get_training_points_cap():
 	return 50 + 10 * parent.get_ref().get_stat('tame_factor')
@@ -158,11 +185,12 @@ func add_trainee(id): #unsafe - no limit check
 func is_in_training():
 	return enable and trainer != null
 
+#Every action but mindread spends the day, and it is `positive` that records it - despite the
+#name, apply_training() sets it whatever category was used. The other two keys are no answer to
+#this question: mindread has its own flag, and negotiation belongs to servants, so both sit at
+#zero for a slave whose day is already gone.
 func has_category_not_in_cd():
-	for cat in cooldown:
-		if cooldown[cat] < 1:
-			return true
-	return false
+	return cooldown.positive < 1
 
 
 func can_be_trained():
@@ -288,6 +316,13 @@ func finish_training(internal = false):
 			var tchar = characters_pool.get_char_by_id(trainer)
 			tchar.get_trainees().erase(parent.get_ref().id)
 			trainer = null
+		#Reaching full loyalty unlocks the same set a training course grants (ch_leveling's
+		#slave_training* branches). They used to be bought one at a time from the training panel,
+		#and that purchase honoured blocked_training_traits - a unique character can have one of
+		#these held back behind a questline, and finishing training must not hand it over early.
+		for tr in variables.slave_unlock_traits:
+			if check_stored_reqs(tr):
+				parent.get_ref().add_trait(tr)
 		parent.get_ref().set_slave_category('slave_trained')
 
 
@@ -454,7 +489,7 @@ func apply_training(code):
 				if input_handler.operate(eff.operant, parent.get_ref().get_stat(eff.stat), eff.check):
 					effects.push_back(eff.effect)
 	#modify result
-	if ResourceScripts.game_res.upgrades.has('resting') and ResourceScripts.game_res.upgrades.resting > 0:
+	if ResourceScripts.game_res.has_bath():
 		result_data.training_points += 1
 	for eff_dict in effects:
 		for eff in eff_dict:
@@ -475,9 +510,8 @@ func apply_training(code):
 					result_data[ch] += tmp
 	if result_data.loyalty != 0:
 		result_data.loyalty += parent.get_ref().get_stat('training_loyalty')
-		#trainer_loyalty_bonus and fame's loyalty_bonus works the same way
-		#For now fame works separately, but maybe it should influence trainer_loyalty_bonus
-		var trainers_bonus = ch_trainer.get_stat('trainer_loyalty_bonus') + ch_trainer.get_fame_bonus('loyalty_bonus')
+		#fame's loyalty_bonus is part of trainer_loyalty_bonus (ch_dyn_stats.fix_stat_data)
+		var trainers_bonus = ch_trainer.get_stat('trainer_loyalty_bonus')
 		result_data.loyalty += result_data.loyalty * trainers_bonus
 		if result_data.loyalty < 0:
 			result_data.loyalty = 0

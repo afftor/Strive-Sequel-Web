@@ -67,10 +67,13 @@ onready var node_data = {
 #	input_handler.NODE_DIALOGUE_T2 : {name = 'dialogue_t2', mode = 'scene', scene = preload("res://gui_modules/Universal/Modules/QuestDialogue.tscn")},
 	# input_handler.NODE_INVENTORY : {name = 'inventory', mode = 'scene', scene = preload("res://src/main/Inventory.tscn"), calls = 'open'},
 	input_handler.NODE_POPUP : {name = 'PopupPanel', mode = 'scene', scene = preload("res://src/scenes/PopupPanel.tscn"), calls = 'open'},
-	input_handler.NODE_ALERT_PANEL : {name = 'AlertPanel', mode = 'scene', scene = preload("res://src/scenes/AlertPanel.tscn"), calls = 'Show'},
-	input_handler.NODE_CONFIRMPANEL : {name = 'AlertPanel', mode = 'scene', scene = preload("res://src/scenes/AlertPanel.tscn"), calls = 'ShowConfirmCancel'},
-	input_handler.NODE_YESNOPANEL : {name = 'AlertPanel', mode = 'scene', scene = preload("res://src/scenes/AlertPanel.tscn"), calls = 'ShowYesNo'},
-	input_handler.NODE_YESORNOPANEL : {name = 'AlertPanel', mode = 'scene', scene = preload("res://src/scenes/AlertPanel.tscn"), calls = 'ShowYesOrNo'},
+	#'layer' puts the window on a canvas layer of its own (input_handler.get_spec_node_parent).
+	#The questions and the game menu need it to clear the mansion's room card, which draws on
+	#layer 3; the questions sit above the menu because the menu asks one of them on the way out.
+	input_handler.NODE_ALERT_PANEL : {name = 'AlertPanel', mode = 'scene', scene = preload("res://src/scenes/AlertPanel.tscn"), calls = 'Show', layer = 15},
+	input_handler.NODE_CONFIRMPANEL : {name = 'AlertPanel', mode = 'scene', scene = preload("res://src/scenes/AlertPanel.tscn"), calls = 'ShowConfirmCancel', layer = 15},
+	input_handler.NODE_YESNOPANEL : {name = 'AlertPanel', mode = 'scene', scene = preload("res://src/scenes/AlertPanel.tscn"), calls = 'ShowYesNo', layer = 15},
+	input_handler.NODE_YESORNOPANEL : {name = 'AlertPanel', mode = 'scene', scene = preload("res://src/scenes/AlertPanel.tscn"), calls = 'ShowYesOrNo', layer = 15},
 	input_handler.NODE_SLAVESELECT : {name = 'SlaveSelectMenu', mode = 'scene', scene = preload("res://src/scenes/SlaveSelectMenu.tscn")},
 	input_handler.NODE_SKILLSELECT : {name = 'SelectSkillMenu', mode = 'scene', scene = preload("res://src/scenes/SkillSelectMenu.tscn")},
 	input_handler.NODE_MUSIC : {name = 'music', mode = 'node', node = AudioStreamPlayer, args = {'bus':"Music"}},
@@ -81,6 +84,7 @@ onready var node_data = {
 	input_handler.NODE_SKILLTOOLTIP : {name = 'skilltooltip', mode = 'scene', scene = preload("res://gui_modules/Universal/Modules/SkillToolTip.tscn")},
 	input_handler.NODE_ITEMTOOLTIP : {name = 'itemtooltip', mode = 'scene', scene = preload("res://gui_modules/Universal/Modules/ItemTooltipV3.tscn")},
 	input_handler.NODE_TEXTTOOLTIP : {name = 'texttooltip', mode = 'scene', scene = preload("res://gui_modules/Universal/Modules/TextTooltipPanel.tscn")},
+	input_handler.NODE_RACETOOLTIP : {name = 'racetooltip', mode = 'scene', scene = preload("res://gui_modules/Universal/Modules/RaceTooltipPanel.tscn")},
 	input_handler.NODE_GALLERYTOOLTIP : {name = 'gallerytooltip', mode = 'scene', scene = preload("res://gui_modules/Universal/Modules/GalleryTooltip.tscn")},
 	input_handler.NODE_CLASSTOOLTIP : {name = 'classtooltip', mode = 'scene', scene = preload("res://gui_modules/classtooltip.tscn")},
 	input_handler.NODE_CHARCREATE : {name = 'charcreationpanel', mode = 'scene', scene = preload("res://gui_modules/CharacterCreation/CharacterCreationMainModule.tscn"), calls = 'open'},
@@ -97,7 +101,7 @@ onready var node_data = {
 	input_handler.NODE_EXPLORATION_CITY : {name = 'exploration_city', mode = 'scene', scene = preload("res://gui_modules/Exploration/Modules/ExplorationCityModule.tscn") },
 	input_handler.NODE_EXPLORATION_DUNGEON : {name = 'exploration_dungeon', mode = 'scene', scene = preload("res://gui_modules/Exploration/Modules/ExplorationDungeon.tscn") },
 	input_handler.NODE_EXPLORE_SLAVEINFO : {name = 'explore_slaveinfo', mode = 'scene', scene = preload("res://gui_modules/Exploration/Modules/ExploreFullSlaveInfo.tscn") },
-	input_handler.NODE_GAMEMENU : {name = 'gamemenu', mode = 'scene', scene = preload("res://gui_modules/Universal/Modules/GameMenuPanel.tscn") },
+	input_handler.NODE_GAMEMENU : {name = 'gamemenu', mode = 'scene', scene = preload("res://gui_modules/Universal/Modules/GameMenuPanel.tscn"), layer = 10 },
 	input_handler.NODE_SEX : {name = 'sex_panel', mode = 'scene', scene = preload("res://gui_modules/Interaction/Modules/InteractionMainModule.tscn") },
 	input_handler.NODE_DATE : {name = 'date_panel', mode = 'scene', scene = preload("res://gui_modules/Interaction/Modules/date.tscn") },
 	input_handler.NODE_TUTORIAL_PANEL : {name = 'tutorial_panel', mode = 'scene', scene = preload("res://gui_modules/Mansion/Modules/Tutorial.tscn") },
@@ -106,19 +110,22 @@ onready var node_data = {
 	input_handler.NODE_HARD_TUTORIAL_PANEL : {name = 'hard_tutorial_panel', mode = 'scene', scene = preload("res://gui_modules/Universal/Modules/hard_tutorial_panel.tscn")},
 	input_handler.NODE_HARD_TUTORIAL_LIST : {name = 'hard_tutorial_list', mode = 'scene', scene = preload("res://gui_modules/Universal/Modules/hard_tutorial_list.tscn")},
 	input_handler.NODE_ACHI_UNLOCK : {name = 'achi_unlock', mode = 'scene', scene = preload("res://gui_modules/achievements/unlock.tscn")},#calls = 'open'
+	input_handler.NODE_NUMBERSELECT : {name = 'number_select', mode = 'scene', scene = preload("res://gui_modules/Universal/Modules/NumberSelectPanel.tscn"), calls = 'open'},
 	#Animations
 	input_handler.ANIM_TASK_AQUARED : {name = 'ANIMTaskAquared', mode = 'scene', scene = preload("res://gui_modules/Animations/Animation_task_aquired.tscn") },
 	input_handler.ANIM_BATTLE_START : {name = 'ANIMBattleStart', mode = 'scene', scene = preload("res://gui_modules/Animations/Animation_battle_start.tscn") },
 	input_handler.ANIM_BATTLE_DEFEAT : {name = 'ANIMBattleDefeat', mode = 'scene', scene = preload("res://gui_modules/Animations/Animation_defeated.tscn") },
 	input_handler.ANIM_BATTLE_RUNAWAY : {name = 'ANIMBattleRunaway', mode = 'scene', scene = preload("res://gui_modules/Animations/Animation_runaway.tscn") },
-	input_handler.ANIM_CLASS_ACHIEVED : {name = 'ANIMClassAchieved', mode = 'scene', scene = preload("res://gui_modules/Animations/Animation_class_achieved.tscn") },
+	#On its own CanvasLayer: the body rites panel plays it from the mansion view's Overlay (layer 3), which
+	#would otherwise cover it. Still under the game menu (10) and alerts (15).
+	input_handler.ANIM_CLASS_ACHIEVED : {name = 'ANIMClassAchieved', mode = 'scene', scene = preload("res://gui_modules/Animations/Animation_class_achieved.tscn"), layer = 5 },
 	input_handler.ANIM_CLASS_UNLOCKED : {name = 'ANIMTaskAquared', mode = 'scene', scene = preload("res://gui_modules/Animations/Animation_class_unlocked.tscn") },
 	input_handler.ANIM_TASK_COMPLETED : {name = 'ANIMTaskCompleted', mode = 'scene', scene = preload("res://gui_modules/Animations/Animation_task_completed.tscn") },
 	input_handler.ANIM_LOOT : {name = 'ANIMLoot', mode = 'scene', scene = preload("res://gui_modules/Animations/Animation_loot.tscn") },
 	input_handler.ANIM_SKILL_UNLOCKED : {name = 'ANIMSkillUnlocked', mode = 'scene', scene = preload("res://gui_modules/Animations/Animation_ability_unlocked.tscn") },
-	input_handler.ANIM_GROWTHF : {name = 'ANIMGrowthFactor', mode = 'scene', scene = preload("res://gui_modules/Animations/Animation_growth_factor.tscn") },
 	input_handler.ANIM_MASTER_POINT: {name = 'ANIMMasterPoint', mode = 'scene', scene = preload("res://gui_modules/Animations/Animation_master_point.tscn") },
 	input_handler.ANIM_ITEM_FLIGHT: {name = 'ANIMItemFlight', mode = 'node', node = preload("res://src/core/item_flight.gd") },
+	input_handler.ANIM_FACTOR_UPGRADE: {name = 'ANIMFactorUpgrade', mode = 'scene', scene = preload("res://gui_modules/Animations/Animation_factor_upgrade.tscn") },
 }
 
 

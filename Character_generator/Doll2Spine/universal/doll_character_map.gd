@@ -1,0 +1,524 @@
+extends Reference
+
+# Character stat -> catalogue selection.
+#
+# The old paperdoll kept this correspondence inside `GeneratorData.transforms`,
+# mixed in with the node paths and the textures it applied.  Here it is only the
+# correspondence: which value of which stat means which part.
+# `legacy/old_doll_behaviour.md` lists every stat the old doll read and what it
+# accepted; this file answers it value by value.
+#
+# Where the two dolls happen to agree on a name, RULES resolves it and no entry
+# is needed.  VALUES holds the rest, which is most of the older art: those names
+# were written before these folders were.
+#
+# Nothing here touches a singleton - the caller passes the values in.
+
+const GEAR = preload("res://Character_generator/Doll2Spine/universal/doll_gear_map.gd")
+
+# stat -> the group it picks a part in.
+const FEEDS = {
+	"chin": "head",
+	"eyeshape": "face",
+	"eye_tex": "eyes",
+	"eyebrows": "eyebrows",
+	"lips": "lips",
+	"nose": "nose",
+	"ears": "ears",
+	"hair_base": "hair",
+	"hair_back": "hair_back",
+	"hair_assist": "hair_assist",
+	# The male export grew beard art; the female rig has none and ignores it.
+	"beard": "beard",
+	"horns": "horns",
+	"wings": "wings",
+	"tail": "tails",
+	"penis_type": "genitals",
+}
+
+# Prefix tried when a value has no entry below: `straight` finds
+# `hair_base_straight`, `cat` finds `ears_cat`.
+const RULES = {
+	"head": "head_chin_",
+	"face": "",
+	"eyes": "",
+	"eyebrows": "",
+	"lips": "lips_",
+	"nose": "nose_",
+	"ears": "ears_",
+	"hair": "hair_base_",
+	"hair_back": "hair_back_",
+	"hair_assist": "hair_assist_",
+	"beard": "",
+	"horns": "horn_",
+	"wings": "wings_",
+	"tails": "tail_",
+	"genitals": "Dick_",
+}
+
+# What the rules cannot reach.  An empty string means the new art has nothing for
+# that value and the slot stays bare - a content gap, recorded rather than hidden.
+const VALUES = {
+	"eye_tex": {
+		"eyes1m": "eyes_m1", "eyes2m": "eyes_m2", "eyes3m": "eyes_m3",
+		"eyes4m": "eyes_m4", "eyes5m": "eyes_m5",
+	},
+	"eyebrows": {
+		"style1": "eyebrows1", "style2": "eyebrows2", "style3": "eyebrows3",
+		"style4": "eyebrows4", "style5": "eyebrows5",
+		"style6": "eyebrows_m1", "style7": "eyebrows_m2", "style8": "eyebrows_m3",
+	},
+	"lips": {
+		"none": "", "style1": "lips1", "style2": "lips2", "style3": "lips3",
+		"style4": "lips4", "style5": "lips5", "orcish": "lips_orc",
+		"style6": "lips_m1", "style7": "lips_m2", "style8": "lips_m3", "style9": "lips_m4",
+		# the new smiles, drawn for either sex.  There is no `style12`: the third
+		# of them, `lips_s3`, is in neither export, and a name pointing at art
+		# nobody drew is a choice that silently does nothing.
+		"style10": "lips_s1", "style11": "lips_s2",
+		"orcish_1": "lips_orc_1", "orcish_2": "lips_orc_2", "orcish_3": "lips_orc_3",
+		"beastkin_cry": "beastkin_lips_cry", "beastkin_open": "beastkin_lips_open",
+		"beastkin_smile": "beastkin_lips_smile",
+	},
+	"ears": {
+		"rat": "ears_mouse", "tanuki": "ears_tanuk", "cow": "ears_taurus",
+		"bunny": "ears_rabbit", "bunny_standing": "ears_rabbit2",
+		"bunny_drooping": "ears_rabbit3", "orcish": "ears_orc",
+		"normal": "ears_human", "fish": "ears_nereid",
+		"demon": "", "feathered": "",
+		"elven2": "ears_elven2",
+		# The August re-export dropped `ears_fox` and `ears_fox2` for four new
+		# cuts, so the two names the game has carried since the old doll have no
+		# art of their own any more.  They are pointed at the nearest of the new
+		# ones rather than left dangling: a character generated before the
+		# re-export still spells their ears `fox`, and a dangling name is a fox
+		# with no ears at all.
+		"fox": "ears_fox_n1", "fox2": "ears_fox_n2",
+	},
+	"horns": {
+		# the names are the old doll's and so is the art each one picked: its
+		# `straight` was the diagonal pair and its `short` the stubby one.  The
+		# export carries a single spiral, so both spiral names land on it.
+		"curved": "horn_curve_up", "curved_top": "horn_curve_top",
+		"curved_down": "horn_curve_down",
+		"straight": "Horn_straight_diagonal", "short": "Horn_straight_top",
+		"dragon": "horn_dragon2", "seraph": "horn_seraph_fibule",
+		"spiral": "horn_spiral_2", "spiral_2": "horn_spiral_2",
+	},
+	# a beastkin muzzle has its nose drawn in, so there is no separate one
+	"nose": {"beastkin": ""},
+	"tail": {
+		"rat": "tail_mouse", "tanuki": "tail_tanuk", "fish": "tail_nereid",
+		"dragon2": "tail_dragon2",
+		# Tails with no art of their own.  A centaur, a lamia and a harpy wear a
+		# whole lower body instead, and nobody has drawn a rabbit's scut yet.
+		"cow": "", "horse": "", "snake": "", "avian": "", "bunny": "",
+	},
+	"penis_type": {
+		"human": "Dick_human_up", "furry": "Dick_furry_up", "feline": "Dick_furry_up",
+		"canine": "Dick_furry_up", "equine": "Dick_horse_up",
+	},
+	"chin": {
+		"kobold": "head_chin_curve_kobold", "kobold_2": "head_chin_kobold2",
+		# the August re-export replaced the small chin with a recut of it and
+		# withdrew the loli one altogether
+		"skinny": "head_chin_long_skinny", "small": "head_chin_small_c",
+		# the muzzles a wolf, a fox or a tanuki picks between - see BEAST_MUZZLES
+		"muzzle1": "beastkin_head_muzzle_1", "muzzle2": "beastkin_head_muzzle_2",
+		"muzzle3": "beastkin_head_muzzle_3",
+		# a beastkin muzzle depends on the animal; BEAST_CHINS answers it
+		"beastkin": "",
+	},
+	"hair_base": {
+		# `dopple` is the one the re-export kept under the older spelling; the
+		# lion, the lamb and the irokez went with that pass and have no art left.
+		"fringe2": "hair_base_fringe_2", "dopple": "hairs_base_dopple",
+		# renamed by the September export to match the art it always drew, so a
+		# character saved before it still finds their cut
+		"kare": "hair_base_bobcut",
+	},
+	"hair_back": {
+		"wave": "hair_back_wawe", "very_long": "hair_back_verylong1",
+		"care": "hair_back_bobcut", #renamed with the base cut above
+		"double_tail": "hair_back_double_tail_long",
+		"twin_braids": "hair_back_twin_braids", "no": "",
+	},
+	"hair_assist": {
+		"no": "", "twin_tails_2": "hair_assist_twin_tails_2",
+		"ponytail_2": "ponytail_2", "ponytail_3": "ponytail_3",
+		"twin_tails_3": "twin_tails_3",
+		# The re-export dropped the prefixed spellings of these three and kept the
+		# bare ones, and brought a spiral and a pair of braids that had no value yet.
+		"braid": "braid", "pigtails": "pigtails", "ponytail": "ponytail",
+		"spiral": "hair_spiral", "twin_braids": "twin_braids",
+		# two names the export drew the same way; the art is gone, the saved
+		# characters wearing them are not
+		"twin_tails_4": "hair_assist_twin_tails",
+		"twin_tails_5": "hair_assist_twin_tails_2",
+	},
+	# Seventeen pieces of beard art against the twelve styles the game had:
+	# the extra five are new values, so nothing the artist drew is unreachable.
+	"beard": {
+		"no": "", "": "",
+		# Twelve pieces since the re-export withdrew beards one to five, which is
+		# exactly the twelve styles the game has always carried.
+		"style1": "beard6", "style2": "beard7", "style3": "beard8",
+		"style4": "beard9",
+		"style5": "beard_moustache1", "style6": "beard_moustache2",
+		"style7": "beard_moustache3", "style8": "beard_moustache4",
+		"style9": "moustache1", "style10": "moustache2",
+		"style11": "moustache3", "style12": "moustache4",
+	},
+	"wings": {
+		"dragon": "Wings_dragon", "fairy": "Wings_fairy", "seraph": "Wings_seraph",
+		# the art spells the harpy's pair the Latin way
+		"harpy": "wings_harpia",
+	},
+}
+
+# What to wear when a rig has not been drawn the piece a character asks for.
+#
+# The two exports are not always in step: the artist cuts a variant for one rig
+# and the other follows later.  Rather than hide the option from half the cast
+# or leave a character with the group's default - a human ear on an elf - the
+# piece names what it stands in for, and the doll wears that until its own art
+# arrives.  Delete an entry when both rigs have the part.
+# Empty: the August re-export gave both rigs the second elven and fox ears, which
+# is what this last stood in for.
+const STAND_INS = {
+	# Two cuts only the female export has, for a man who is handed one anyway: the
+	# plain tangle under the fallen fringe, and a swept-back cut for the scraped-back
+	# one.  The men's roll reaches neither.
+	"hair": {
+		"hair_base_disheveled_eyehide": "hair_base_disheveled",
+		"hair_base_slave": "hair_base_back",
+	},
+}
+
+# Piercings live in the game's own `piercing` container and in the game's own
+# words - the old descriptions already read `stud`, `ring` and `chain` off these
+# two stats - and each word names the drawn piece that looks like it.  Female art
+# only for now: a rig without the group has no part to wear, and the menu hides
+# the row there.  The order is the order the menu lists them in.
+# A tattoo inked in the game's crotch slot is drawn as a womb tattoo: the first
+# one, unless the player picked another drawing.  Whatever the tattoo is in the
+# game - a brand, a lust mark - the doll has one kind of picture for the place.
+const CROTCH_TATTOO_DEFAULT = "tatoo_womb1"
+const CROTCH_TATTOO_PREFIX = "tatoo_womb"
+
+const PIERCINGS = {
+	"piercing_nipples": {
+		"group": "piercing_nipple",
+		"values": {"ring": "piercing_nipple_1", "stud": "piercing_nipple_2", "chain": "piercing_nipple_3"},
+	},
+	"piercing_navel": {
+		"group": "piercing_belly",
+		"values": {"stud": "piercing_belly_1", "ring": "piercing_belly_2", "charm": "piercing_belly_3"},
+	},
+}
+
+
+# The piece this rig should wear instead, or "" when there is nothing to fall
+# back to and the slot is better left as the catalogue has it.
+static func stand_in(group_id, part_id):
+	return str(STAND_INS.get(str(group_id), {}).get(str(part_id), ""))
+
+
+# A beastkin does not merely wear a muzzle: the face and the mouth are drawn for
+# a snout as well, and the human ones sit flat on it.  These are the groups with
+# a beastkin cut, and how a human value becomes its beastkin counterpart.
+#   face   face3 -> beastkin_face3, face_m2 -> beastkin_face_m2
+#   lips   any human mouth -> the beast mouth; the three `beastkin_lips_*` are
+#          expressions and stay reachable by naming them outright
+#   head   forced to a muzzle even when the character's chin says otherwise,
+#          because a human chin on a beastkin body is the wrong shape
+const BEASTKIN_GROUPS = ["head", "face", "lips", "nose"]
+const BEASTKIN_FACE_PREFIX = "beastkin_"
+const BEASTKIN_DEFAULT_FACE = "beastkin_face1"
+const BEASTKIN_LIPS = "lips_beast"
+# Animals whose muzzle is drawn with its mouth already in it.  A cat's chin art
+# carries the little mouth under the nose, so any lips part on top of it was a
+# second mouth - the beast mouth, or an expression, whichever was asked for.
+const BEASTS_WITHOUT_MOUTH = ["cat"]
+const BEASTKIN_EXPRESSIONS = ["beastkin_lips_cry", "beastkin_lips_open", "beastkin_lips_smile"]
+
+
+# The three muzzles a race can be given to choose between, rather than being
+# handed the one snout its animal comes with.  The wolves, the foxes and the
+# tanuki are on these; their old per-animal snouts are still in the art, and the
+# cats and the bunnies still wear theirs.
+const BEAST_MUZZLES = ["beastkin_head_muzzle_1", "beastkin_head_muzzle_2", "beastkin_head_muzzle_3"]
+
+# The muzzle to fall back on, by the animal the beastkin race is drawn from.
+# Only reached when the character's chin does not name one - a character rolled
+# before the choice existed, or a race that has no choice to make.
+const BEAST_CHINS = {
+	"cat": "beastkin_chin_cat", "rat": "beastkin_chin_cat",
+	"rabbit": "beastkin_chin_rabbit", "bunny": "beastkin_chin_rabbit",
+	# the three that choose: an old save saying only `beastkin` lands on the
+	# first of the new muzzles rather than the snout it used to wear
+	"fox": "beastkin_head_muzzle_1", "wolf": "beastkin_head_muzzle_1",
+	"tanuki": "beastkin_head_muzzle_1",
+}
+
+# The old doll had one rig and swapped textures on it; here the body is a part.
+const BODIES = {
+	"female": {"base": "body_female_base", "beastkin": "body_female_beastkin"},
+	"male": {"base": "body_male_base", "beastkin": "body_male_beastkin", "femboy": "body_male_femboy"},
+}
+
+# Races that put a whole overlay on the body rather than only ears and a tail.
+const RACE_OVERLAYS = {
+	"Dragonkin": "race_dragon", "Kobold": "race_kobold", "Dryad": "race_dryad",
+	"Nereid": "race_nereid", "Slime": "race_slime",
+}
+
+# A dragon's scales and a kobold's spots are drawn parts rather than fur
+# masks: they are variants of the race's own overlay, and `skin_coverage` is
+# what picks between them.  `doll_coverage.gd` answers the furs.
+const OVERLAY_COVERAGE = {
+	"race_dragon": {
+		"scale": "race_dragon", "scale2": "race_dragon_scales",
+		"scale3": "race_dragon_scales2",
+	},
+	"race_kobold": {"kobold": "race_kobold", "kobold_spots": "race_kobold_spots"},
+}
+
+# Races whose lower half is an animal.
+# The race ids are the game's; the part ids are the art's, and the two spell the
+# centaur differently.
+const ANIMAL_BODIES = {
+	"Centaur": "kentaur_body",
+	"Arachna": "arachna_body",
+	"Lamia": "lamia_body",
+	"Scylla": "scylla_body",
+}
+
+
+# `stats` is a plain dictionary of the values the old doll read, plus
+# `equipment` and `undress` for the gear.  An unknown value leaves its slot alone,
+# exactly as a missing `transforms` entry did.
+static func selections_for(stats, doll_id = "female"):
+	var result = {}
+	var race = str(stats.get("race", ""))
+	# Only beastkin are drawn as animals.  A halfkin is the same race with the fur
+	# taken off - the game renames `Beastkin` to `Halfkin` itself when the furry
+	# setting is off - so they keep the ears and the tail on a human body and a
+	# human face.  Ratkin are their own race and are not furry either.
+	var beastkin = draws_beastkin(race)
+	var bodies = BODIES.get(doll_id, BODIES.female)
+	var body = "beastkin" if beastkin else "base"
+	if str(stats.get("body_shape", "")) == "femboy" and bodies.has("femboy"):
+		body = "femboy"
+	result["body"] = bodies[body]
+
+	# The old doll showed or hid the whole genitals node from `sex`: a woman has
+	# none, a man and a futa do.  Reading `penis_type` alone put one on everybody,
+	# because every character carries a type whether or not they have the part.
+	var sex = str(stats.get("sex", "female"))
+	# Dressed characters keep them out of sight, as they did on the old doll.  The
+	# export only carries the erect variants (`Dick_*_up`), whose upper half is
+	# drawn on the belly above any waistband, so putting one under the trousers
+	# still leaves it sticking out over them.  When the art gains a resting
+	# variant this becomes a choice between the two rather than a hide.
+	var undress = GEAR.normalise(stats.get("undress", stats.get("nude", false)))
+	var bared = undress == GEAR.BARE or undress == GEAR.NAKED
+	var has_genitals = (sex == "male" or sex == "futa") and bared
+	for stat in FEEDS.keys():
+		var group_id = str(FEEDS[stat])
+		if group_id == "genitals" and !has_genitals:
+			result[group_id] = ""
+			continue
+		var part_id = resolve(stat, str(stats.get(stat, "")), stats)
+		if beastkin and group_id in BEASTKIN_GROUPS:
+			# these four are decided by the muzzle, whatever the character says -
+			# including when it says nothing.  Leaving them to the catalogue's
+			# default puts a human face and mouth on a snout, which is what the
+			# old doll's `chin = beastkin` was there to prevent.
+			result[group_id] = beastkin_variant(group_id, part_id, stats)
+			continue
+		if part_id != "":
+			result[group_id] = part_id
+		elif is_absent(stats.get(stat, "")):
+			# Taken off on purpose, which is not the same as a value this rig has
+			# no art for.  Left out of the result the group keeps the catalogue's
+			# own default, and `hair_back` has one: a character who asked for no
+			# back hair went on wearing `hair_back_straight`.
+			result[group_id] = ""
+
+	if RACE_OVERLAYS.has(race):
+		var overlay = str(RACE_OVERLAYS[race])
+		var variants = OVERLAY_COVERAGE.get(overlay, {})
+		overlay = str(variants.get(str(stats.get("skin_coverage", "")), overlay))
+		result["race_overlay"] = overlay
+	if ANIMAL_BODIES.has(race):
+		result["animal_body"] = ANIMAL_BODIES[race]
+	for stat in ["tattoo", "face_markings"]:
+		var value = str(stats.get(stat, ""))
+		if value != "":
+			result[stat] = value
+	var inked = stats.get("tattoo_crotch", "")
+	if inked != null and str(inked) != "" and !is_absent(inked):
+		var drawing = str(stats.get("tattoo_crotch_style", ""))
+		result["tattoo"] = drawing if drawing.begins_with(CROTCH_TATTOO_PREFIX) else CROTCH_TATTOO_DEFAULT
+	for stat in PIERCINGS.keys():
+		var pierced = str(PIERCINGS[stat].values.get(str(stats.get(stat, "")), ""))
+		if pierced != "":
+			result[PIERCINGS[stat].group] = pierced
+
+	var gear = GEAR.selections_for(stats.get("equipment", {}), undress, doll_id)
+	for group_id in gear.keys():
+		result[group_id] = gear[group_id]
+	return result
+
+
+# Whether a race is drawn as an animal: a beastkin body and a muzzled head.  The
+# one test for it, so the screens that offer parts ask what the doll will draw.
+static func draws_beastkin(race):
+	return str(race).find("Beastkin") >= 0
+
+
+# The animal a beastkin race is drawn from, which decides its muzzle and whether
+# it has a mouth of its own - the same reading the doll and the body editor make.
+static func beast_of(race):
+	var name = str(race).to_lower()
+	for animal in ["cat", "fox", "wolf", "rabbit", "bunny", "tanuki", "rat"]:
+		if name.find(animal) >= 0:
+			return animal
+	return "cat"
+
+
+# Whether a chin is one this body can actually wear.  A beastkin's head is always
+# a muzzle - `beastkin_variant` puts the animal's own over any human chin - so the
+# only real choices there are the values that name a muzzle; a human head has no
+# use for a muzzle at all.  A value that draws nothing is not this test's to judge.
+static func chin_fits_body(value, beastkin, beast = ""):
+	# `beastkin` names no muzzle of its own: it is whatever snout the animal wears.
+	# For the animals that pick between the shared muzzles that is their first one,
+	# which is offered under its own name - the generic value would be a second
+	# tile for the same face.
+	if bool(beastkin) and str(value) == "beastkin" and str(beast) != "":
+		return !(str(BEAST_CHINS.get(str(beast), "")) in BEAST_MUZZLES)
+	var part = resolve("chin", str(value))
+	if part == "":
+		return true
+	return part.begins_with("beastkin_") == bool(beastkin)
+
+
+# The beastkin cut of a part, or the part unchanged when there is none.
+static func beastkin_variant(group_id, part_id, stats = {}):
+	if group_id == "head":
+		# a chin that names one of the shared muzzles is a choice the player made
+		# and outranks the animal's own
+		if part_id in BEAST_MUZZLES:
+			return part_id
+		return str(BEAST_CHINS.get(str(stats.get("beast", "")), "beastkin_chin_cat"))
+	if group_id == "face":
+		if part_id == "":
+			return BEASTKIN_DEFAULT_FACE
+		return part_id if part_id.begins_with(BEASTKIN_FACE_PREFIX) else BEASTKIN_FACE_PREFIX + part_id
+	if group_id == "lips":
+		if str(stats.get("beast", "")) in BEASTS_WITHOUT_MOUTH:
+			return ""
+		return part_id if part_id in BEASTKIN_EXPRESSIONS else BEASTKIN_LIPS
+	# the muzzle is drawn with its own nose, so the human one would be a second
+	if group_id == "nose":
+		return ""
+	return part_id
+
+
+# Every way the game spells "this piece is not worn".  `resolve` answers "" for
+# all of them - and for a value it simply cannot place - so a caller that has to
+# tell those two apart asks `is_absent` rather than reading the answer.
+const ABSENT = ["", "no", "none", "Null"]
+
+
+static func is_absent(value):
+	return str(value) in ABSENT
+
+
+static func resolve(stat, value, stats = {}):
+	if is_absent(value):
+		return ""
+	if stat == "chin" and value == "beastkin":
+		return str(BEAST_CHINS.get(str(stats.get("beast", "")), "beastkin_chin_cat"))
+	var table = VALUES.get(stat, {})
+	if table.has(value):
+		return str(table[value])
+	var prefix = str(RULES.get(str(FEEDS.get(stat, "")), ""))
+	return prefix + value
+
+
+# The value a stat is given to wear a part - resolve() the other way round: the
+# part's name with its group's prefix taken off, when that name resolves back to
+# it, and otherwise the first name VALUES points at the part.  "" when no value of
+# the stat reaches the part.
+static func value_for_part(stat, part_id):
+	var part = str(part_id)
+	var prefix = str(RULES.get(str(FEEDS.get(stat, "")), ""))
+	if part.begins_with(prefix):
+		var bare = part.substr(prefix.length())
+		if bare != "" and resolve(stat, bare) == part:
+			return bare
+	var table = VALUES.get(stat, {})
+	for value in table.keys():
+		if str(table[value]) == part:
+			return str(value)
+	return ""
+
+
+# Parts the art carries that no screen puts on offer; one already worn is kept.
+const NOT_OFFERED = {
+	"hair": [
+		"hair_base_bobcut_monofringe",
+		"hair_base_disheveled_monofringe",
+		"hair_base_fringe_monofringe",
+	],
+}
+
+
+static func offered_parts(group_id, parts, keep = ""):
+	var hidden = NOT_OFFERED.get(str(group_id), [])
+	if hidden.empty():
+		return parts
+	var result = []
+	for part_id in parts:
+		if !(str(part_id) in hidden) or str(part_id) == str(keep):
+			result.append(part_id)
+	return result
+
+
+# Values for the parts in `parts` that none of `values` reaches yet, one per part,
+# in the catalogue's order.  The screens list their options from the old doll's
+# tables, and a cut the export gained after those were written - the monofringe
+# cuts, hime - was drawn but could not be picked.
+static func values_for_unlisted_parts(stat, values, parts):
+	var reached = {}
+	for value in values:
+		reached[resolve(stat, str(value))] = true
+	var result = []
+	for part_id in offered_parts(str(FEEDS.get(stat, "")), parts):
+		if reached.has(str(part_id)):
+			continue
+		var value = value_for_part(stat, part_id)
+		if value != "":
+			result.append(value)
+			reached[str(part_id)] = true
+	return result
+
+
+# Every value the old doll accepted that this map answers with a part the
+# catalogue does not have, so the gaps are reported rather than met on a
+# character.
+static func unmapped(old_values, parts_by_group):
+	var result = []
+	for stat in FEEDS.keys():
+		var group_id = str(FEEDS[stat])
+		var known = parts_by_group.get(group_id, [])
+		for value in old_values.get(stat, []):
+			var part_id = resolve(stat, str(value), {"beast": "cat"})
+			if part_id == "":
+				continue
+			if !(part_id in known):
+				result.append("%s = %s -> %s, which %s has not" % [stat, value, part_id, group_id])
+	return result

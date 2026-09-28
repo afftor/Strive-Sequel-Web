@@ -24,6 +24,7 @@ var popup_opened = null
 var debug = false
 
 var combat_data = {}
+var instant_mode = false #combat resolved without entering the battle
 var allowaction = false
 var highlightargets = false
 var allowedtargets = {}
@@ -40,6 +41,7 @@ var enemygroup = {}
 var currentactor
 
 var summons = [] #pos
+var dead_summons = [] #summons that died mid-fight - retired in FinishCombat, not here
 
 var activeaction
 var activeitem
@@ -122,6 +124,11 @@ func _ready():
 	$Rewards/CloseButton.connect("pressed",self,'FinishCombat')
 	$Menu/Items.connect("toggled", self, "open_items")
 	$Menu/Run.connect("pressed", self, "run")
+	#combat speed-up. The setting is the one the options panel writes, so the switch
+	#here and the checkbox there are the same toggle seen from two places.
+	$FastForward.pressed = input_handler.globalsettings.get("fast_combat", false)
+	$FastForward.connect("toggled", self, "toggle_fast_combat")
+	globals.connecttexttooltip($FastForward, tr("COMBATFASTFORWARDTOOLTIP"))
 	$ItemPanel.hide()
 	
 	$Button.connect("pressed", self, "on_skillbook_click")
@@ -142,6 +149,11 @@ func _ready():
 	input_handler.register_btn_source('combat_skill_2', self, 'tut_get_skill_shield')
 	input_handler.register_btn_source('combat_enemy', self, 'tut_get_enemy')
 	input_handler.register_btn_source('combat_ally', self, 'tut_get_master')
+
+	if variables.anim_sandbox:
+		var stand = load("res://src/combat/anim_sandbox.gd").new()
+		add_child(stand)
+		stand.setup(self)
 	
 #	queue_size_max = $Panel4/VBoxContainer.rect_size.x
 
@@ -177,27 +189,51 @@ func on_skillbook_click():
 	RebuildSkillPanel()
 
 
-func _input(event):
-	#simple version based on legacy code and without proper keybinding
-	if !allowaction: return
-	if str(event.as_text().replace("Kp ",'')) in str(range(1,9)):
-		var skill_index = int(event.as_text().replace("Kp ",''))
-		if activecharacter == null: 
-			return
-		var src = activecharacter.skills.combat_skill_panel
-		var offset = activecharacter.skills.get_combat_panel_row_offset()
-		var pos = offset + skill_index
-		if !src.has(pos): 
-			return
-		var skill = src[pos]
-		var skill_data = Skilldata.get_template_combat(skill, activecharacter)
-		if !activecharacter.can_use_skill(skill_data): return
-		#possible not reqired
-		if !activecharacter.has_status('ignore_catalysts_for_%s' % skill):
-			for i in skill_data.catalysts:
-				if ResourceScripts.game_res.materials[i] < skill_data.catalysts[i]: return
-		if skill_data.charges > 0 and activecharacter.skills.combat_skill_charges.has(skill) and activecharacter.skills.combat_skill_charges[skill] >= skill_data.charges: return
-		SelectSkill(skill)
+#called by the hotkeys singleton while the combat context is the active one
+func hotkey_action(code):
+	if !allowaction:
+		return false
+	if code.begins_with('combat_skill_'):
+		return use_skill_by_index(int(code.trim_prefix('combat_skill_')))
+	match code:
+		'combat_row_up':
+			change_skill_panel_row(-1)
+			return true
+		'combat_row_down':
+			change_skill_panel_row(1)
+			return true
+		'combat_skillbook':
+			on_skillbook_click()
+			return true
+		'combat_items':
+			if $Menu/Items.disabled: return false
+			$Menu/Items.pressed = !$Menu/Items.pressed
+			return true
+		'combat_run':
+			if $Menu/Run.disabled: return false
+			run()
+			return true
+	return false
+
+
+func use_skill_by_index(skill_index):
+	if activecharacter == null:
+		return false
+	var src = activecharacter.skills.combat_skill_panel
+	var offset = activecharacter.skills.get_combat_panel_row_offset()
+	var pos = offset + skill_index
+	if !src.has(pos):
+		return false
+	var skill = src[pos]
+	var skill_data = Skilldata.get_template_combat(skill, activecharacter)
+	if !activecharacter.can_use_skill(skill_data): return false
+	#possible not reqired
+	if !activecharacter.has_status('ignore_catalysts_for_%s' % skill):
+		for i in skill_data.catalysts:
+			if ResourceScripts.game_res.materials[i] < skill_data.catalysts[i]: return false
+	if skill_data.charges > 0 and activecharacter.skills.combat_skill_charges.has(skill) and activecharacter.skills.combat_skill_charges[skill] >= skill_data.charges: return false
+	SelectSkill(skill)
+	return true
 
 
 func run():
@@ -229,7 +265,14 @@ func reset_combat_data():
 	combat_data.enemy_stats_mod = 1.0
 
 
-func start_combat(newplayergroup, newenemygroup, background, music = 'battle1', t_combat_data = {}):
+func start_combat(newplayergroup, newenemygroup, background, music = 'combattheme', t_combat_data = {}):
+	reset_combat_data()
+	for arg in combat_data:
+		if t_combat_data.has(arg):
+			combat_data[arg] = t_combat_data[arg]
+	if combat_data.instawin or ResourceScripts.game_globals.skip_combat:
+		resolve_without_combat(newplayergroup, newenemygroup)
+		return
 	ClearSkillPanel()
 	ClearItemPanel()
 	input_handler.ClearContainer(turnorder_cont)
@@ -239,7 +282,7 @@ func start_combat(newplayergroup, newenemygroup, background, music = 'battle1', 
 	else:
 		$Background.texture = images.get_background('dungeon')
 	if music == "default":
-		music = 'battle1'
+		music = 'combattheme'
 	no_material_reward = false
 	only_show_mat_reward = false
 	external_reward = null
@@ -262,22 +305,19 @@ func start_combat(newplayergroup, newenemygroup, background, music = 'battle1', 
 	global_turn = 0
 	$Combatlog/RichTextLabel.clear()
 	summons.clear()
+	dead_summons.clear()
 	enemygroup.clear()
 	playergroup.clear()
 	turnorder.clear()
 	next_turnorder.clear()
 	if music == 'combattheme':
-		var temparray = ['battle1','battle2','battle3','battle4']
+		var temparray = ['battle1','battle2','battle3','battle4','arena_combat']
 		music = temparray[randi()%temparray.size()]
 	input_handler.SetMusic(music)
 	fightover = false
 	$Rewards.visible = false
 	allowaction = false
 	$Button.disabled = true
-	reset_combat_data()
-	for arg in combat_data:
-		if t_combat_data.has(arg):
-			combat_data[arg] = t_combat_data[arg]
 	enemygroup = newenemygroup
 	playergroup = newplayergroup
 	for i in range(1,13):
@@ -288,23 +328,83 @@ func start_combat(newplayergroup, newenemygroup, background, music = 'battle1', 
 	#victory()
 	#start combat triggers
 	CombatAnimations.force_end()
-	if combat_data.instawin or ResourceScripts.game_globals.skip_combat:
-		victory()
-	else:
-		ActionQueue = queue_script.new()
-		ActionQueue.combatnode = self
-		ActionQueue.animationnode = CombatAnimations
-		for i in playergroup.values() + enemygroup.values():
-			var tchar = characters_pool.get_char_by_id(i)
-			tchar.process_event(variables.TR_COMBAT_S)
-			ActionQueue.add_rebuildbuffs(tchar.displaynode)
-		set_process_input(true)
-		ActionQueue.add_start_combat()
-		ActionQueue.invoke_resume()
+	ActionQueue = queue_script.new()
+	ActionQueue.combatnode = self
+	ActionQueue.animationnode = CombatAnimations
+	for i in playergroup.values() + enemygroup.values():
+		var tchar = characters_pool.get_char_by_id(i)
+		tchar.process_event(variables.TR_COMBAT_S)
+		ActionQueue.add_rebuildbuffs(tchar.displaynode)
+	ActionQueue.add_start_combat()
+	ActionQueue.invoke_resume()
 
 
+#encounter won outside of combat (avoid/intimidate skills, events, skip_combat cheat)
+#no battle is entered - enemies are only built to roll rewards, and just the rewards panel is shown
+func resolve_without_combat(newplayergroup, newenemygroup):
+	instant_mode = true
+	no_material_reward = false
+	only_show_mat_reward = false
+	external_reward = null
+	external_rewardchars = null
+	turns = 0
+	global_turn = 0
+	fightover = true
+	summons.clear()
+	dead_summons.clear()
+	enemygroup.clear()
+	playergroup.clear()
+	turnorder.clear()
+	next_turnorder.clear()
+	input_handler.emit_signal("CombatStarted", encountercode)
+	input_handler.combat_node = self
+	gui_controller.combat = self
+	gui_controller.previous_screen = gui_controller.current_screen
+	gui_controller.current_screen = self
+	enemygroup = newenemygroup
+	playergroup = newplayergroup
+	buildenemygroup(enemygroup, true)
+	buildplayergroup_headless(playergroup)
+	#gives callers a frame to set external rewards, same as the yields inside victory() did
+	yield(get_tree(), 'idle_frame')
+	hide_combat_ui()
+	show()
+	input_handler.lock_input()
+	emit_signal("combat_finished")
+	give_rewards()
 
-func buildenemygroup(enemygroup):
+
+#hides everything but the rewards panel, so the screen behind (dungeon map) stays visible
+var hidden_combat_ui = []
+func hide_combat_ui():
+	hidden_combat_ui.clear()
+	for node in get_children():
+		if node == $Rewards or !(node is CanvasItem):
+			continue
+		if node.visible:
+			hidden_combat_ui.push_back(node)
+			node.hide()
+
+
+func restore_combat_ui():
+	for node in hidden_combat_ui:
+		if is_instance_valid(node):
+			node.show()
+	hidden_combat_ui.clear()
+
+
+func buildplayergroup_headless(group):
+	playergroup = {}
+	for i in group:
+		if int(i) > 6: break
+		if group[i] == null:
+			continue
+		var fighter = ResourceScripts.game_party.characters[group[i]]
+		fighter.combatgroup = 'ally'
+		playergroup[int(i)] = fighter.id
+
+
+func buildenemygroup(enemygroup, headless = false):
 	for i in range(1,7):
 		if enemygroup[i] != null:
 			enemygroup[i+6] = enemygroup[i]
@@ -331,11 +431,18 @@ func buildenemygroup(enemygroup):
 		tchar.position = i
 		
 		var mas_lv = 1
+		#Mastery levels a monster gets are normally worth 2.5 of a player's, which is
+		#fine while a rare rolls two or three of them. The tower hands out twenty to
+		#forty-five, and none of what they grant is bounded by the depth caps the way
+		#hp and armour are - so there a level is worth exactly what it is worth to a
+		#character, and the tier alone carries the difficulty.
+		var mas_mul = 2.5
 		if globals.char_roll_data.diff == 'medium':
 			mas_lv = globals.rng.randi_range(2, 3)
 		if globals.char_roll_data.diff == 'hard':
 			mas_lv = globals.rng.randi_range(4, 5)
 		if globals.char_roll_data.diff == 'infinite':
+			mas_mul = 1.0
 			if globals.char_roll_data.lvl > 30:
 				mas_lv = 8
 			elif globals.char_roll_data.lvl > 20:
@@ -350,7 +457,7 @@ func buildenemygroup(enemygroup):
 			mas_arr = Enemydata.enemies[tempname].allowed_mastery.duplicate()
 		if rare:
 #			tchar.add_rare_trait()
-			tchar.roll_static_masteries(mas_arr, mas_lv)
+			tchar.roll_static_masteries(mas_arr, mas_lv, mas_mul)
 		if mboss:
 			tchar.tags.push_back("miniboss")
 			tchar.add_trait('miniboss')
@@ -363,12 +470,14 @@ func buildenemygroup(enemygroup):
 		var tchar = characters_pool.get_char_by_id(enemygroup[i])
 		for stat in ['hpmax', 'xpreward']:
 			tchar.mul_stat(stat, combat_data.enemy_stats_mod)
-		for stat in ['atk', 'matk', 'armor']:
+		for stat in ['atk', 'matk', 'armor','mdef']:
 			tchar.mul_stat(stat, min(combat_data.enemy_stats_mod, variables.survival_cap_main))
 		for stat in ['hitrate', 'evasion']:
 			tchar.mul_stat(stat, min(combat_data.enemy_stats_mod, variables.survival_cap_secondary))
 		tchar.hp = tchar.get_stat("hpmax") * combat_data.hpmod
 		tchar.mp = tchar.get_stat("mpmax")
+		if headless:
+			continue
 		battlefield[int(i)] = enemygroup[i]
 		make_fighter_panel(tchar, i)
 
@@ -467,6 +576,23 @@ func make_fighter_panel(fighter, spot):
 	panel.material.set_shader_param('modulate', g_color);
 	panel.turn_overlay(false)
 	panel.noq_rebuildbuffs()
+	update_slot_frames()
+
+
+#The empty slot frame shows from under a card while it floats, so an occupied
+#slot hides it. Cards are destroyed from several places (a summon dying,
+#transform_unit, the end of combat), so instead of tracking each one we just
+#re-sync all twelve slots.
+func update_slot_frames():
+	for slot in battlefieldpositions.values():
+		if slot.has_node('Frame'):
+			slot.get_node('Frame').visible = !slot.has_node('Character')
+
+
+func stop_floating():
+	for slot in battlefieldpositions.values():
+		if slot.has_node('Character'):
+			slot.get_node('Character').set_floating(false)
 
 
 func checkdeaths():
@@ -489,6 +615,7 @@ func checkdeaths():
 			if summons.has(i):
 #				tchar.displaynode.queue_free()
 				tchar.displaynode.is_active = false
+				dead_summons.push_back(tchar.id)
 #				tchar.displaynode = null
 #				tchar.is_active = false
 				battlefield[i] = null
@@ -525,6 +652,10 @@ func enemy_escape(escaper):
 
 var playergroupcounter = 0
 func checkwinlose():
+	#the sandbox lets fighters die so their death animation plays, then revives
+	#them - combat itself must never end there
+	if variables.anim_sandbox:
+		return false
 	if fightover == true:
 		return true
 	playergroupcounter = 0
@@ -600,10 +731,12 @@ func select_actor():
 func current_turn(char_changed = true):
 	if checkwinlose() == true:
 		return
+	update_slot_frames()
 	emit_signal('turn_started')
 	if currentactor <= 0:
 		env_turn(char_changed)
-	elif currentactor < 7:
+	#in the sandbox an enemy is driven by hand just like an ally - no AI turn
+	elif currentactor < 7 or variables.anim_sandbox:
 		player_turn(char_changed)
 	else:
 		enemy_turn(char_changed)
@@ -639,7 +772,7 @@ func calculateorder():
 		order_conts = [next_turnorder]
 	for order_cont in order_conts:
 		if autoskill != null:
-			order_cont.append({pos = 0, speed = 100, id = make_order_id()})
+			order_cont.append({pos = 0, speed = 100, id = make_order_id(), autoskill = true})
 		for pos in playergroup.keys() + enemygroup.keys():
 			var tchar = get_char_by_pos(pos)
 			if tchar.defeated == true:
@@ -743,12 +876,36 @@ func speedsort(first, second):
 	return first.speed > second.speed
 
 
+#A fighter with nothing legal to do would otherwise sit on its turn forever: the player screen
+#waits for a click every button refuses, and an AI turn never gets around to select_actor.
+#Passing the turn is what the !can_act() branches already do.
+func pass_turn(fighter):
+	fighter.process_event(variables.TR_TURN_F)
+	effects_pool.process_event(variables.TR_TURN_F, fighter)
+	if fighter.displaynode != null and is_instance_valid(fighter.displaynode):
+		fighter.displaynode.rebuildbuffs()
+	call_deferred('select_actor')
+
+
+#Every character built through create() knows 'attack', which carries disable_immunity and so
+#survives disarm, and setup_skills() hands simple fighters the same fallback. An empty result
+#here therefore means a broken skill list, not an ordinary disable - pass the turn rather than
+#hang on it.
+func has_usable_skill(fighter):
+	for s in fighter.get_combat_skills():
+		if fighter.can_use_skill(Skilldata.get_template_combat(s, fighter)):
+			return true
+	return false
+
+
 func player_turn(char_changed = true):
 	var pos = currentactor
 	# battlefieldpositions[pos].get_node("Character/Active").show()
 	for position in battlefieldpositions.values():
 		if position.get_node_or_null("Character"):
 			position.get_node("Character/Active").visible = battlefieldpositions[pos] == position
+			#floating goes on further down, once the turn actually waits on the player
+			position.get_node("Character").set_floating(false)
 	turns += 1
 	var selected_character = get_char_by_pos(pos)
 	activecharacter = selected_character
@@ -774,6 +931,11 @@ func player_turn(char_changed = true):
 		selected_character.displaynode.rebuildbuffs()
 		call_deferred('select_actor')
 		return
+
+	if !has_usable_skill(selected_character):
+		print('warning - %s has no usable combat skill, passing the turn' % selected_character.get_short_name())
+		pass_turn(selected_character)
+		return
 	if selected_character.has_status('confuse'):
 		activeaction = selected_character.get_skill_by_tag('basic')
 		var activeaction_data = Skilldata.get_template_combat(activeaction, selected_character)
@@ -798,6 +960,11 @@ func player_turn(char_changed = true):
 	RebuildSkillPanel()
 	RebuildItemPanel()
 	SelectSkill(selected_character.selectedskill)
+	#Only now does the turn stand still and wait for a decision. Before this point
+	#the start-of-turn effects were running, and floating would have fought their
+	#animations over the same rect_position.
+	if selected_character.displaynode != null:
+		selected_character.displaynode.set_floating(true)
 
 
 
@@ -806,6 +973,8 @@ func enemy_turn(char_changed = true):
 	for position in battlefieldpositions.values():
 		if position.get_node_or_null("Character"):
 			position.get_node("Character/Active").visible = battlefieldpositions[pos] == position
+			#allies only - an enemy turn waits for nothing, so there is nothing to mark
+			position.get_node("Character").set_floating(false)
 	$Menu/Run.disabled = true
 	turns += 1
 	var fighter = get_char_by_pos(pos)
@@ -836,14 +1005,21 @@ func enemy_turn(char_changed = true):
 	Highlight(pos, 'enemy')
 	
 	turns += 1
+	#_get_action answers null when even the basic attack is blocked - feeding that to
+	#_get_target would index skill_targets with null, and returning outright would leave the
+	#fight standing on this fighter's turn with nothing left to move it on.
 	var castskill = fighter.ai._get_action()
-	var target = fighter.ai._get_target(castskill)
+	var target = null
+	if castskill != null:
+		target = fighter.ai._get_target(castskill)
 	if target == null:
 		castskill = fighter.ai._get_action(true)
-		target = fighter.ai._get_target(castskill)
+		if castskill != null:
+			target = fighter.ai._get_target(castskill)
 	if target == null:
 		if !checkwinlose():
 			print("AI ERROR")
+			pass_turn(fighter)
 		return
 	target = get_char_by_pos(target)
 
@@ -869,7 +1045,9 @@ func enemy_turn(char_changed = true):
 
 
 func env_turn(char_changed = true):
-	if autoskill == null: return
+	if autoskill == null: 
+		call_deferred('select_actor')
+		return
 	if autoskill_delay_rem <= 0:
 		autoskill_delay_rem = autoskill_delay
 		turns += 1
@@ -878,6 +1056,10 @@ func env_turn(char_changed = true):
 		use_skill(autoskill, autoskill_dummy, get_proper_target_for_autoskill(), variables.SKILL_AUTO)
 		if autoskill_times == 0: 
 			autoskill = null
+			for i in range (next_turnorder.size()):
+				if next_turnorder[i].has('autoskill'):
+					next_turnorder.remove(i)
+					break
 		CombatAnimations.check_start()
 		if CombatAnimations.is_busy: 
 			yield(CombatAnimations, 'alleffectsfinished')
@@ -1001,6 +1183,9 @@ func can_be_taunted(caster, target):
 
 
 func setup_autoskill(data, person):
+	var update = false
+	if autoskill != null:
+		update = true
 	autoskill = data.skill
 	if data.has('delay'):
 		autoskill_delay = data.delay
@@ -1014,7 +1199,8 @@ func setup_autoskill(data, person):
 	autoskill_dummy.combatgroup = "_" + person.combatgroup
 	autoskill_dummy.set_stat('atk', person.get_stat('atk'))
 	autoskill_dummy.set_stat('matk', person.get_stat('matk'))
-	next_turnorder.append({pos = 0, speed = 100, id = make_order_id()})
+	if !update:
+		next_turnorder.append({pos = 0, speed = 100, id = make_order_id(), autoskill = true})
 
 
 var fighterhighlighted = false
@@ -1053,11 +1239,16 @@ func FighterMouseOver(id, no_press = false):
 
 func FighterMouseOverFinish(id):
 	var fighter = characters_pool.get_char_by_id(id)
-	var panel = fighter.displaynode
 	fighterhighlighted = false
 	$StatsPanelRight.visible = false
 	$StatsPanelLeft.visible = false
-	if variables.CombatAllyHpAlwaysVisible == false || fighter.combatgroup == 'enemy':
+	#The card can be gone by the time the cursor leaves it - a fighter that died under the mouse
+	#has its displaynode cleared, and the pool no longer answers for a summon that was retired.
+	#Everything below still has to run: this is where the cursor and the target glow are put back.
+	var panel = null
+	if fighter != null:
+		panel = fighter.displaynode
+	if panel != null and (variables.CombatAllyHpAlwaysVisible == false || fighter.combatgroup == 'enemy'):
 		panel.get_node("bars/HP/hplabel").hide()
 		panel.get_node("bars/MP/mplabel").hide()
 	Input.set_custom_mouse_cursor(images.cursors.default)
@@ -1084,6 +1275,10 @@ func HideFighterStats():
 
 
 func FighterPress(pos):
+	#in the sandbox a click on a card only picks caster and target - the panel
+	#drives what gets cast, so a click must never fire a skill by itself
+	if variables.anim_sandbox:
+		return
 	if allowaction == false || (!allowedtargets.enemy.has(pos) && !allowedtargets.ally.has(pos)):
 		return
 	ClearSkillTargets()
@@ -1244,6 +1439,10 @@ func use_skill(skill_code, caster, target, mode = variables.SKILL_BASE):
 	$ItemPanel.hide()
 	hide_popup_skill()
 	$Menu/Items.pressed = false
+	#Floating means "waiting on this fighter to decide". The decision is made, so
+	#drop it now - otherwise the card keeps bobbing in the gaps between the
+	#animations of its own attack.
+	stop_floating()
 	if activeaction != skill_code:
 		activeaction = skill_code
 	allowaction = false
@@ -1383,7 +1582,25 @@ func CalculateTargets(skill, target, finale = false):
 	
 	match skill.target_number:
 		'single':
-			array = [target]
+			var tchar = get_char_by_pos(target.position)
+			#A defeated summon leaves the battlefield outright - checkdeaths() nulls its slot and
+			#drops it from its group, which a defeated hero never does - so a skill still holding
+			#it as its target finds an empty slot on a later iteration. That is reached by any
+			#repeating single-target skill: the gryphon's swipe_en (repeat 2) kills a summon on
+			#its first hit and resolves the second against the slot just cleared. Every other
+			#branch below already skips an empty slot; this one indexed it, and the throw turned
+			#this function's return into Nil for combat_skill_iteration_handler to call .empty() on.
+			if tchar == null:
+				array = []
+			elif tchar.defeated:
+				if skill.target_range == 'dead':
+					array = [target]
+				else:
+					array = []
+			elif !tchar.can_be_damaged(skill) and !finale:
+				array = []
+			else:
+				array = [target]
 		'row':
 			for i in variables.rows:
 				if variables.rows[i].has(target.position):
@@ -1444,6 +1661,7 @@ func CalculateTargets(skill, target, finale = false):
 			array.clear()
 			for pos in allowedtargets.enemy + allowedtargets.ally:
 				var tchar = get_char_by_pos(pos)
+				if tchar == null: continue #an allowed position a summon has just vacated
 				array.push_back(tchar)
 		'nontarget':
 			for j in range(1, 13):
@@ -1716,33 +1934,52 @@ func SelectContainer(button):
 
 
 
+#Every "this one will not do" branch below falls back on the basic attack. The basic attack can
+#be blocked too - disarm stops any ability_type 'skill' that is not tagged disable_immunity, and
+#ranged_attack carries no such tag - and then the fallback lands back in the branch it came from
+#and defers itself again. Deferred calls pushed during a message-queue flush are handled inside
+#that same flush and their bytes are not reclaimed until it ends, so the loop never reaches a
+#frame boundary: it grows the queue until the 4MB buffer is full and the engine dies outright
+#("Message queue out of memory", 87k queued calls). Fall back only to a skill we have not just
+#refused, and otherwise leave the turn waiting on the player.
+func fallback_to_basic(refused_code):
+	var basic = activecharacter.get_skill_by_tag('basic')
+	if basic == null or basic == refused_code:
+		return
+	call_deferred('SelectSkill', basic)
+
+
 func SelectSkill(skill, user_act = true):
 	hide_popup_skill()
-	if activecharacter == null: 
+	if activecharacter == null:
 		return
-	
+
+	var requested = skill
 	skill = Skilldata.get_template_combat(skill, activecharacter)
-	
+
 	Input.set_custom_mouse_cursor(images.cursors.default)
-	
+
 	$Panel3/TextureRect.texture = skill.icon
 	$Panel3/Label.text = skill.name
 	#need to add daily restriction check
 	if !activecharacter.can_use_skill(skill)  :
 		#SelectSkill('attack')
-		call_deferred('SelectSkill', activecharacter.get_skill_by_tag('basic'))
+		fallback_to_basic(requested)
 		return
 	if !activecharacter.has_status('ignore_catalysts_for_%s' % skill.code):
 		for i in skill.catalysts:
 			if ResourceScripts.game_res.materials[i] < skill.catalysts[i]:
 				input_handler.SystemMessage("Missing catalyst: " + Items.materiallist[i].name)
-				call_deferred('SelectSkill', activecharacter.get_skill_by_tag('basic'));
+				fallback_to_basic(requested)
 				break
 	if skill.charges > 0 && activecharacter.skills.combat_skill_charges.has(skill.code) && activecharacter.skills.combat_skill_charges[skill.code] >= skill.charges:
 		#input_handler.SystemMessage("No charges left: " + skill.name)
-		call_deferred('SelectSkill', activecharacter.get_skill_by_tag('basic'))
+		fallback_to_basic(requested)
 		return
-	activecharacter.selectedskill = skill.code
+	#remember what was asked for, not what it resolved to: a 'replace' variation (disarm turning
+	#ranged_attack into the unarmed attack) is true for this turn only, and storing the
+	#replacement would leave the fighter defaulting to it once the status is gone.
+	activecharacter.selectedskill = requested
 	activeaction = skill.code
 	UpdateSkillTargets(activecharacter, skill)
 	allowaction = true
@@ -1757,7 +1994,7 @@ func SelectSkill(skill, user_act = true):
 					return
 				else:
 					input_handler.SystemMessage(tr("NO_TARGETS"))
-					call_deferred('SelectSkill', activecharacter.get_skill_by_tag('basic'))
+					fallback_to_basic(requested)
 					return
 	if skill.has('cursor'): 
 		customcursor = skill.cursor
@@ -1765,7 +2002,7 @@ func SelectSkill(skill, user_act = true):
 		customcursor = null
 	if skill.target == 'self':
 		if !user_act:
-			call_deferred('SelectSkill', activecharacter.get_skill_by_tag('basic'))
+			fallback_to_basic(requested)
 			return
 		globals.closeskilltooltip()
 		activecharacter.selectedskill = activecharacter.get_skill_by_tag('basic')
@@ -1830,14 +2067,14 @@ func update_queue_asynch(new_turn = false):
 			var is_next_turn_icon = new_queue[i].has("next_turn")
 			if (!is_next_turn_icon
 					and (new_queue[i].pos < 0
-					or battlefield[new_queue[i].pos] == null)):
+					or new_queue[i].pos > 0 and battlefield[new_queue[i].pos] == null)):
 				continue
 			if new_queue[i].id == id and !(is_next_turn_icon and new_turn):
 				CombatAnimations.add_new_data({
 					node = queue_icon, time = turns,
 					type = 'order_move', slot = 'order',
 					params = {new_x = turn_order_step * i}})
-				if !new_queue[i].has("next_turn"):
+				if !new_queue[i].has("next_turn") and !new_queue[i].has("autoskill"):
 					var person = get_char_by_pos(new_queue[i].pos)
 					var hp_bar = queue_icon.get_node('hpbar')
 					if hp_bar.value != person.hp:
@@ -1856,7 +2093,7 @@ func update_queue_asynch(new_turn = false):
 		var is_next_turn_icon = new_queue[i].has("next_turn")
 		if (!is_next_turn_icon
 				and (new_queue[i].pos < 0
-				or battlefield[new_queue[i].pos] == null)):
+				or new_queue[i].pos > 0 and battlefield[new_queue[i].pos] == null)):
 			continue
 		var has_icon = false
 		for queue_icon in old_queue:
@@ -1885,21 +2122,28 @@ func make_new_queue_icon(order_entry, order_num):
 		tmp.get_node('icon').texture = load("res://assets/Textures_v2/craft/exchant.png")
 		tmp.get_node('hpbar').hide()
 		return tmp
-	var person = get_char_by_pos(order_entry.pos)
-	if order_entry.pos > 6:
+	var icon
+	if order_entry.pos == 0:
 		tmp.disabled = true
-	var icon = person.get_icon()
+		var skill = Skilldata.get_template_combat(autoskill, autoskill_dummy)
+		tmp.get_node('hpbar').visible = false
+		icon = skill.icon
+	else:
+		var person = get_char_by_pos(order_entry.pos)
+		if order_entry.pos > 6:
+			tmp.disabled = true
+		icon = person.get_icon()
+		if person.combatgroup == 'enemy':
+			tmp.self_modulate = Color(1.0,0.5,0.5,1.0)
+		else:
+			tmp.self_modulate = Color(0.5,1.0,0.5,1.0)
+		tmp.get_node('hpbar').max_value = person.get_stat('hpmax')
+		tmp.get_node('hpbar').value = person.hp
+		tmp.connect("mouse_entered", self, 'FighterMouseOver', [person.id, true])
+		tmp.connect("mouse_exited", self, 'FighterMouseOverFinish', [person.id])
+	tmp.rect_position.x = turn_order_step * order_num
 	if icon != null:
 		tmp.get_node('icon').texture = icon
-	if person.combatgroup == 'enemy':
-		tmp.self_modulate = Color(1.0,0.5,0.5,1.0)
-	else:
-		tmp.self_modulate = Color(0.5,1.0,0.5,1.0)
-	tmp.get_node('hpbar').max_value = person.get_stat('hpmax')
-	tmp.get_node('hpbar').value = person.hp
-	tmp.connect("mouse_entered", self, 'FighterMouseOver', [person.id, true])
-	tmp.connect("mouse_exited", self, 'FighterMouseOverFinish', [person.id])
-	tmp.rect_position.x = turn_order_step * order_num
 	return tmp
 
 func remove_queue_icon(node):
@@ -1943,6 +2187,12 @@ func remove_queue_icon(node):
 
 
 var active_position
+func toggle_fast_combat(value):
+	input_handler.globalsettings.fast_combat = value
+	#animations already in flight switch pace with it
+	CombatAnimations.refresh_rate()
+
+
 func change_skill_panel_row(delta):
 	if activecharacter == null:
 		return
@@ -1978,8 +2228,10 @@ func skill_selected(skill):
 
 func FinishCombat(victory = true):
 	victory_seq_run = false
+	if instant_mode:
+		finish_instant_combat()
+		return
 	HideFighterStats()
-	set_process_input(false)
 	if is_instance_valid(gui_controller.dialogue) && gui_controller.dialogue.is_visible():
 		gui_controller.dialogue.close() #for test
 	autoskill_dummy.is_active = false
@@ -2002,7 +2254,9 @@ func FinishCombat(victory = true):
 					ch.apply_effect_code('e_grave_injury', {duration = 8})
 				else:
 					ch.apply_effect_code('e_grave_injury', {duration = 12})
-				ResourceScripts.game_party.check_breakdown_on_char_loss(ch)
+				#no check_breakdown_on_char_loss() here - the char is only grave injured,
+				#not lost, so friends/lovers/relatives have nothing to grieve over.
+				#permadeath still rolls it from killed()
 				ch.try_breakdown('brk_grave_injury')
 			else:
 				ch.killed()
@@ -2027,6 +2281,18 @@ func FinishCombat(victory = true):
 		if tchar.displaynode != null:
 			tchar.displaynode.check_active()
 		tchar.is_active = false
+	#summons that died during the fight left their groups in checkdeaths(), so the loop
+	#above never reaches them. They are retired here, once check_active() has released the
+	#display node - deactivating them mid-combat would pull the character out from under
+	#effects still queued on it.
+	for id in dead_summons:
+		var summon_char = characters_pool.get_char_by_id(id)
+		if summon_char == null:
+			continue
+		if summon_char.displaynode != null and is_instance_valid(summon_char.displaynode):
+			summon_char.displaynode.check_active()
+		summon_char.is_active = false
+	dead_summons.clear()
 	if victory:
 		CombatAnimations.force_end()
 		ResourceScripts.core_animations.BlackScreenTransition(0.5)
@@ -2047,6 +2313,30 @@ func FinishCombat(victory = true):
 	emit_signal("combat_cleaned_up")
 
 
+#closes an encounter resolved by resolve_without_combat() - no battle state to unwind
+func finish_instant_combat():
+	instant_mode = false
+	$Rewards.hide()
+	if is_instance_valid(gui_controller.dialogue) && gui_controller.dialogue.is_visible():
+		gui_controller.dialogue.close()
+	for i in enemygroup.values():
+		if i == null:
+			continue
+		var tchar = characters_pool.get_char_by_id(i)
+		if tchar != null:
+			tchar.is_active = false
+	restore_combat_ui()
+	hide()
+	input_handler.finish_combat()
+	if input_handler.event_is_active:
+		yield(input_handler, "EventFinished")
+	input_handler.combat_node = null
+	gui_controller.current_screen = gui_controller.previous_screen
+	gui_controller.combat = null
+	characters_pool.cleanup()
+	emit_signal("combat_cleaned_up")
+
+
 #to check next functions
 var victory_seq_run = false
 func victory():
@@ -2054,7 +2344,7 @@ func victory():
 		return
 	emit_signal("combat_finished")
 	victory_seq_run = true
-	get_tree().get_root().set_disable_input(true)
+	input_handler.lock_input()
 	
 	autoskill_dummy.is_active = false
 	CombatAnimations.check_start()
@@ -2066,7 +2356,6 @@ func victory():
 	Input.set_custom_mouse_cursor(images.cursors.default)
 	yield(get_tree().create_timer(0.5), 'timeout')
 	fightover = true
-	$Rewards/CloseButton.disabled = true
 	input_handler.StopMusic()
 	#on combat ends triggers
 	for p in range(1, 7):
@@ -2081,9 +2370,15 @@ func victory():
 			t_p.process_event(variables.TR_VICTORY)
 	effects_pool.process_event(variables.TR_VICTORY)
 	#add permadeath check here
-	
+	give_rewards()
+
+
+#reward roll and rewards panel, shared by a normal victory and by resolve_without_combat()
+func give_rewards():
+	$Rewards/CloseButton.disabled = true
 	input_handler.PlaySound("battle_victory")
-	
+	update_defeated_enemy_icons()
+
 	var rewardsdict = {gold = 0, materials = {}, items = [], xp = 0}
 	for i in enemygroup.values():
 		if i == null: #not sure why was this check added
@@ -2149,6 +2444,13 @@ func victory():
 		newbutton.get_node('name').set("custom_colors/font_color", variables.hexcolordict['factor'+str(int(tchar.get_stat('growth_factor')))])
 		newbutton.get_node("amount").text = ""
 		globals.connectslavetooltip(newbutton, tchar)
+		var quest_star = newbutton.get_node_or_null('QuestStar')
+		if quest_star != null:
+			var fit = ResourceScripts.slave_quests.best_match_for(tchar)
+			quest_star.visible = fit.status != ''
+			if quest_star.visible:
+				quest_star.self_modulate = Color(variables.hexcolordict[fit.status])
+				globals.connecttexttooltip(quest_star, ResourceScripts.slave_quests.star_tooltip(fit))
 	if input_handler.exploration_node != null:
 		input_handler.exploration_node.add_rolled_chars(rewardchars)
 	for i in rewardsdict.materials:
@@ -2161,7 +2463,7 @@ func victory():
 		newbutton.get_node("name").text = item.name
 		newbutton.get_node("amount").text = str(rewardsdict.materials[i])
 		if !only_show_mat_reward:
-			ResourceScripts.game_res.materials[i] += rewardsdict.materials[i]
+			ResourceScripts.game_res.gain_material(i, rewardsdict.materials[i])
 		globals.connectmaterialtooltip(newbutton, item)
 	for i in rewardsdict.items:
 		var newnode = input_handler.DuplicateContainerTemplate($Rewards/ScrollContainer/HBoxContainer)
@@ -2205,9 +2507,29 @@ func victory():
 	$Rewards/ScrollContainer2/HBoxContainer.show()
 	globals.show_buttons($Rewards/ScrollContainer/HBoxContainer)
 	globals.show_buttons($Rewards/ScrollContainer2/HBoxContainer)
-	get_tree().get_root().set_disable_input(false)
+	input_handler.unlock_input()
 	$Rewards/CloseButton.grab_click_focus()
 	emit_signal('rewards_anim_finished')
+
+
+func update_defeated_enemy_icons():
+	var icons_container = $Rewards/DefeatedEnemies/HBoxContainer
+	input_handler.ClearContainer(icons_container)
+	$Rewards/DefeatedEnemies.visible = instant_mode
+	if !instant_mode:
+		return
+	for id in enemygroup.values():
+		if id == null:
+			continue
+		var enemy = characters_pool.get_char_by_id(id)
+		if enemy == null:
+			continue
+		var icon = enemy.get_icon()
+		if icon == null:
+			continue
+		var icon_panel = input_handler.DuplicateContainerTemplate(icons_container)
+		icon_panel.get_node("Icon").texture = icon
+		globals.connecttexttooltip(icon_panel, enemy.get_short_name())
 
 
 func defeat(runaway = false): #runaway is a temporary variable until run() method not fully implemented

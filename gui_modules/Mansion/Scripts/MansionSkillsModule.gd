@@ -7,7 +7,11 @@ var active_skill
 func _ready():
 	input_handler.skill_list_node = self
 	$skillpanelswitch.connect("pressed", self, "change_panel_type")
-	input_handler.register_btn_source('mentor_skill_btn', self, 'tut_get_mentor_skill_btn')
+	#this panel is hidden and never built in the reworked mansion - there the slave list
+	#registers the hook against the expanded card's social skill bar instead
+	var legacy_panel_enabled = get_parent() == null or get_parent().get("show_legacy_character_panels")
+	if legacy_panel_enabled:
+		input_handler.register_btn_source('mentor_skill_btn', self, 'tut_get_mentor_skill_btn')
 
 
 func build_skill_panel():
@@ -91,23 +95,18 @@ func select_skill_target(skillcode):
 		use_skill(person)
 		return
 	input_handler.SystemMessage("Select target for Ability", 3)
-	get_parent().chars_for_skill.clear()
-	var skill_source = get_parent().skill_source
 	for i in $SkillPanel.get_children():
 		if i.has_meta('skill'):
 			i.pressed = i.get_meta("skill") == skillcode
-	# input_handler.ShowSlaveSelectPanel(self, 'use_skill', [{code = 'is_free', check = true}, {code = 'is_id', operant = 'neq', value = person.id}] + Skilldata.Skilllist[skillcode].targetreqs)
 	var reqs = [{code = 'is_id', operant = 'neq', value = person.id}] + template.targetreqs
-	for i in ResourceScripts.game_party.characters.values():
-		if !i.checkreqs(reqs) || !i.same_location_with(skill_source):
-			continue
-		if i.is_on_quest():
-			continue
-		get_parent().chars_for_skill.append(i)
-	get_parent().skill_manager()
+	reqs.append({code = 'is_at_location', value = person.get_location(), check = true})
+	input_handler.ShowSlaveSelectPanel(self, 'use_skill', reqs)
 
 func use_skill(target):
-	get_tree().get_root().get_node("skilltooltip").hide()
+	#the tooltip node is created lazily by the first skill tooltip connection
+	var skilltooltip = get_tree().get_root().get_node_or_null("skilltooltip")
+	if skilltooltip != null:
+		skilltooltip.hide()
 	person.use_social_skill(active_skill, target)
 	# update()
 	get_parent().mansion_state = "default"

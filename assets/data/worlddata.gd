@@ -176,13 +176,17 @@ var guild_upgrades = {
 	# 	maxlevel = 4,
 	# 	effects = [{code = 'questsetting:total', operant = '+', value = 1}],
 	# },
+	#One lesson, bought once. The guild teaches the trick of taking gear apart and that is the
+	#whole of what it sells - how much actually comes back off the bench is the forge's business,
+	#and is bought there as salvage_bench levels (mansion_room_types.gd). Nothing here to buy
+	#twice, so the row disappears from the guild screen the moment it is paid for.
 	workers_disassamby_upgrade = {
 		code = 'workers_disassamby_upgrade',
 		descript = tr("WORKERS_DISASSAMBY_UPGRADE_DISC"),
 		name = tr("WORKERS_DISASSAMBY_UPGRADE_NAME"),
-		cost = [100,500,1000,2000],
+		cost = [100],
 		reqs = [{type = "current_guild", check = true, value = "workers"}],
-		maxlevel = 4,
+		maxlevel = 1,
 		effects = [],
 	},
 
@@ -270,19 +274,9 @@ var factiondata = {
 		name = tr("WORKERS"),# Guild',
 		description = '',
 		actions = ['hire','upgrade', 'guild_shop'],
-		bonus_actions = [
-			{
-				code = 'disassemble',
-				name = 'WORKERSDISASSEMBLE',
-				reqs = [
-					{
-						type = "has_faction_upgrade",
-						check = true,
-						value = "workers_disassamby_upgrade"
-					},
-				],
-			},
-		],
+		#Taking gear apart is done at the estate's own forge now: the guild still teaches it -
+		#the workers_disassamby_upgrade below - but the bench is built at home and opened there.
+		bonus_actions = [],
 		events = [
 			'workers_init', 'workers_limnrov', 'heleviel_christmas',
 			],
@@ -789,37 +783,12 @@ var fixed_location_options = { #override serialized data
 			], 
 			args = [{code = 'start_event', data = 'fred_bribe_take', args = []}]
 		},
-		{
-			text = tr("ALIRON5"), 
+		{ #single entrance - first visit and quest scenes are variations of aliron_church_enter
+			text = tr("ALIRON6"),
 			reqs = [
-				{type = 'decision', value = 'ginny_visit', check = true}, 
-				{type = 'dialogue_seen', check = false, value = 'ALIRONCHURCHFIRSTCOME'},
-				{type = 'active_quest_stage', value = 'jean_ruins_quest', stage = 'stage1', state = false},
-				{type = 'active_quest_stage', value = 'jean_sylas_quest', stage = 'stage13', state = false},
-			], 
-			args = [{code = 'start_event', data = 'aliron_church_firstcome', args = []}]
-		},
-		{ #cause document's wording is 'trigger: enter church', not 'church option'
-			text = tr("ALIRON6"), 
-			reqs = [
-				{type = 'active_quest_stage', value = 'jean_ruins_quest', stage = 'stage1', state = true}
-			], 
-			args = [{code = 'start_event', data = 'jean_q2_church', args = []}]
-		},
-		{ #i think of this as the same as above 
-			text = tr("ALIRON6"), 
-			reqs = [
-				{type = 'active_quest_stage', value = 'jean_sylas_quest', stage = 'stage13', state = true}
-			], 
-			args = [{code = 'start_event', data = 'jean_sylas_church_event_1', args = []}]
-		},
-		{
-			text = tr("ALIRON6"), 
-			reqs = [
-				{type = 'dialogue_seen', check = true, value = 'ALIRONCHURCHFIRSTCOME'},
-				{type = 'active_quest_stage', value = 'jean_ruins_quest', stage = 'stage1', state = false},
-				{type = 'active_quest_stage', value = 'jean_sylas_quest', stage = 'stage13', state = false},
-			], 
+				{type = 'decision', value = 'ginny_visit', check = true},
+				{type = 'dialogue_seen', check = true, value = 'ALIRONCHURCHFIRSTCOME', orflag = true},
+			],
 			args = [{code = 'start_event', data = 'aliron_church_enter', args = []}]
 		},
 		{
@@ -957,13 +926,6 @@ var fixed_location_options = { #override serialized data
 			args = [{code = 'start_event', data = 'amelia_slave3_1', args = []}]
 		},
 		{
-			text = tr("ALIRON_KURO_CHURCH"),
-			reqs = [
-				{type = 'active_quest_stage', value = 'kuro_errand_quest', stage = 'church'}
-			], 
-			args = [{code = 'start_event', data = 'kuro_church_note', args = []}]
-		},
-		{
 			text = tr("MEET_LIORA"),
 			reqs = [
 				{type = 'active_quest_stage', value = 'anastasia_quest', stage = 'stage2'}
@@ -1000,6 +962,11 @@ var fixed_location_options = { #override serialized data
 		},
 	],
 	elf_capital = [
+		{
+			text = tr("ACT4_ROAD_ELF_OPTION_ARROW"),
+			reqs = [{type = 'active_quest_stage', value = 'act4_road_project_quest', stage = 'imbue_arrow'}],
+			args = [{code = 'start_event', data = 'act4_road_priestess_arrow', args = []}]
+		},
 		{
 			text = tr("LIRA_QUEST3_ELF_TEMPLE_OPTION"),
 			reqs = [
@@ -1317,6 +1284,13 @@ var fixed_location_options = { #override serialized data
 			args = [{code = 'start_event', data = 'meteor_durim_start', args = []}]
 		}
 	],
+	quest_dwarf_railroad = [
+		{
+			text = tr("ACT4_ROAD_LOCATION_OPTION_ARRIVE"),
+			reqs = [{type = 'active_quest_stage', value = 'act4_road_project_quest', stage = 'visit_road_project'}],
+			args = [{code = 'start_event', data = 'act4_road_arrive_1', args = []}]
+		}
+	],
 	quest_kharzug_deep = [
 		{
 			text = tr("ACT4_SEBASTIAN_DWARF_CAPITAL_OPTION_KHARZUG"),
@@ -1429,32 +1403,57 @@ var fixed_location_options = { #override serialized data
 	],
 	
 	empire_capital = [
-#		{
-#			text = tr("ACT4_SEBASTIAN_EMPIRE_CAPITAL_OPTION_PROPOSAL"),
-#			reqs = [
-#				{type = 'decision', value = 'JoinCoalition', check = false},
-#				{type = 'has_active_quest', name = 'sebastian_railroad_quest', check = false},
-#				{type = 'quest_completed', name = 'sebastian_railroad_quest', check = false},
-#				{type = 'event_seen', value = 'act4_sebastian_proposal_dwarf_king_1', check = false},
-#				{type = 'event_seen', value = 'act4_sebastian_proposal_bolthar_1', check = false}
-#			],
-#			args = [{code = 'start_event', data = 'act4_sebastian_proposal_dwarf_king_1', args = []}]
-#		},
-#		{
-#			text = tr("ACT4_SEBASTIAN_EMPIRE_CAPITAL_OPTION_PROPOSAL"),
-#			reqs = [
-#				{type = 'decision', value = 'JoinCoalition', check = true},
-#				{type = 'has_active_quest', name = 'sebastian_railroad_quest', check = false},
-#				{type = 'quest_completed', name = 'sebastian_railroad_quest', check = false},
-#				{type = 'event_seen', value = 'act4_sebastian_proposal_dwarf_king_1', check = false},
-#				{type = 'event_seen', value = 'act4_sebastian_proposal_bolthar_1', check = false}
-#			],
-#			args = [{code = 'start_event', data = 'act4_sebastian_proposal_bolthar_1', args = []}]
-#		},
+		{
+			text = tr("ACT4_SEBASTIAN_EMPIRE_CAPITAL_OPTION_PROPOSAL"),
+			reqs = [
+				{type = 'decision', value = 'JoinCoalition', check = false},
+				{type = 'has_active_quest', name = 'sebastian_railroad_quest', check = false},
+				{type = 'quest_completed', name = 'sebastian_railroad_quest', check = false},
+				{type = 'event_seen', value = 'act4_sebastian_proposal_dwarf_king_1', check = false},
+				{type = 'event_seen', value = 'act4_sebastian_proposal_bolthar_1', check = false}
+			],
+			args = [{code = 'start_event', data = 'act4_sebastian_proposal_dwarf_king_1', args = []}]
+		},
+		{
+			text = tr("ACT4_SEBASTIAN_EMPIRE_CAPITAL_OPTION_PROPOSAL"),
+			reqs = [
+				{type = 'decision', value = 'JoinCoalition', check = true},
+				{type = 'has_active_quest', name = 'sebastian_railroad_quest', check = false},
+				{type = 'quest_completed', name = 'sebastian_railroad_quest', check = false},
+				{type = 'event_seen', value = 'act4_sebastian_proposal_dwarf_king_1', check = false},
+				{type = 'event_seen', value = 'act4_sebastian_proposal_bolthar_1', check = false}
+			],
+			args = [{code = 'start_event', data = 'act4_sebastian_proposal_bolthar_1', args = []}]
+		},
 		{
 			text = tr("ACT4_SEBASTIAN_EMPIRE_CAPITAL_OPTION_REPORT_TECHNICIAN"),
 			reqs = [{type = 'active_quest_stage', value = 'sebastian_railroad_quest', stage = 'report_technician'}],
 			args = [{code = 'start_event', data = 'act4_sebastian_report_technician_1', args = []}]
+		},
+		{
+			text = tr("ACT4_ROAD_CAPITAL_OPTION_GUILD"),
+			reqs = [{type = 'active_quest_stage', value = 'act4_road_project_quest', stage = 'guild_quarters'}],
+			args = [{code = 'start_event', data = 'act4_road_guild_quarters_1', args = []}]
+		},
+		{
+			text = tr("ACT4_ROAD_CAPITAL_OPTION_MELCHOR"),
+			reqs = [{type = 'active_quest_stage', value = 'act4_road_project_quest', stage = 'meet_melchor'}],
+			args = [{code = 'start_event', data = 'act4_road_melchor_hiding_1', args = []}]
+		},
+		{
+			text = tr("ACT4_ROAD_CAPITAL_OPTION_SENERUS"),
+			reqs = [{type = 'active_quest_stage', value = 'act4_road_project_quest', stage = 'ask_senerus'}],
+			args = [{code = 'start_event', data = 'act4_road_senerus_1', args = []}]
+		},
+		{
+			text = tr("ACT4_ROAD_CAPITAL_OPTION_MELCHOR_RETURN"),
+			reqs = [{type = 'active_quest_stage', value = 'act4_road_project_quest', stage = 'return_to_melchor'}],
+			args = [{code = 'start_event', data = 'act4_road_melchor_plan_1', args = []}]
+		},
+		{
+			text = tr("ACT4_ROAD_CAPITAL_OPTION_PALACE"),
+			reqs = [{type = 'active_quest_stage', value = 'act4_road_project_quest', stage = 'charge_palace'}],
+			args = [{code = 'start_event', data = 'act4_road_palace_1', args = []}]
 		},
 #		{
 #			text = tr("LIRA_QUEST3_EMPIRE_NOTICE_OPTION"),
@@ -1606,6 +1605,11 @@ var fixed_location_options = { #override serialized data
 				{type = 'event_seen', value = 'act4_erdyna_grotus_delivery', check = false}
 			],
 			args = [{code = 'start_event', data = 'act4_erdyna_grotus_find', args = []}]
+		},
+		{
+			text = "ACT4_ERDYNA_EMPIRE_CAPITAL_OPT_ARCHIVE_SEARCH",
+			reqs = [{type = 'active_quest_stage', value = 'erdyna_quest', stage = 'archive_search', state = true}],
+			args = [{code = 'start_event', data = 'act4_erdyna_archive_search_complete_1', args = []}]
 		},
 		{
 			text = "ACT4_3_EMPIRE_CAPITAL_OPT_ERDYNA_HIDEOUT",
