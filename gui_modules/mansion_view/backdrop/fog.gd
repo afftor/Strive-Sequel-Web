@@ -27,7 +27,8 @@ export(float, 50, 4000, 10) var patch_size = 900.0 setget set_patch_size
 #How far the mist travels in a second, in picture pixels. Only in the game.
 export(Vector2) var drift = Vector2(14, -3)
 
-#fog.shader's noise repeats every 64 patches, so the offsets wrap there without a seam
+#fog.shader's noise repeats every 64 patches, so the drift wraps there without a seam. The offsets go over in
+#patches rather than pixels, which keeps them inside what GLES2's fragment stage can hold.
 const REPEAT = 64.0
 #how fast the finer layer of the noise travels, as a share of drift, so the patches change shape as they go
 const FINE_PACE = 0.6
@@ -191,9 +192,9 @@ func _process(delta):
 	if !(material is ShaderMaterial):
 		return
 	clock += delta
-	var period = REPEAT * patch_size
-	material.set_shader_param("offset_a", wrapped(drift * clock, period))
-	material.set_shader_param("offset_b", wrapped(drift * clock * FINE_PACE, period))
+	var period = REPEAT
+	material.set_shader_param("offset_a", wrapped(drift * clock / patch_size, period))
+	material.set_shader_param("offset_b", wrapped(drift * clock * FINE_PACE / patch_size, period))
 
 
 func wrapped(offset, period):

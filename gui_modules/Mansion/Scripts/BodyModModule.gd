@@ -422,8 +422,8 @@ func _values_for(stat):
 	var sources = []
 	if ResourceScripts.descriptions.bodypartsdata.has(stat):
 		sources.append(ResourceScripts.descriptions.bodypartsdata[stat])
-	if GeneratorData.transforms.has(stat):
-		sources.append(GeneratorData.transforms[stat])
+#	if GeneratorData.transforms.has(stat):
+#		sources.append(GeneratorData.transforms[stat])
 	var worn = str(person.get_stat(stat))
 	for source in sources:
 		for value in source:

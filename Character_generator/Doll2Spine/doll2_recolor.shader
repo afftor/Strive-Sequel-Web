@@ -72,7 +72,7 @@ vec3 rgb_to_hsl(vec3 color) {
 	float low = min(min(color.r, color.g), color.b);
 	float lightness = (high + low) * 0.5;
 	float delta = high - low;
-	if (delta < 0.00001) {
+	if (delta < 0.0001) {
 		return vec3(0.0, 0.0, lightness);
 	}
 	float saturation = lightness > 0.5 ? delta / (2.0 - high - low) : delta / (high + low);
@@ -109,7 +109,7 @@ float hue_channel(float p, float q, float t) {
 
 
 vec3 hsl_to_rgb(vec3 hsl) {
-	if (hsl.y < 0.00001) {
+	if (hsl.y < 0.0001) {
 		return vec3(hsl.z);
 	}
 	float q = hsl.z < 0.5 ? hsl.z * (1.0 + hsl.y) : hsl.z + hsl.y - hsl.z * hsl.y;

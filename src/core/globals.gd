@@ -1594,12 +1594,21 @@ func _serialize_party_chunked(chunk):
 	return res
 
 
-func LoadGame(filename):
+func LoadGame(filename, direct = false):
 #	print(effects_pool.serialize())
-	if !file.file_exists(variables.userfolder+'saves/'+ filename + '.sav') :
-		print("no file %s" % (variables.userfolder+'saves/'+ filename + '.sav'))
-		return
-
+	var save_text
+	var savedict
+	if direct:
+		if JSON.parse(filename).error != OK:
+			print ("wrong file format")
+			return
+		else:
+			savedict = parse_json(filename)
+	else:
+		if !file.file_exists(variables.userfolder+'saves/'+ filename + '.sav') :
+			print("no file %s" % (variables.userfolder+'saves/'+ filename + '.sav'))
+			return
+	
 	# Fade the current UI to black, install the loading screen at the opaque midpoint,
 	# then reveal it before doing any save parsing or state repair.
 	var loadscreen = yield(input_handler.ShowLoadScreenWithTransition(0.3), "completed")
@@ -1611,14 +1620,16 @@ func LoadGame(filename):
 	input_handler.emit_signal("clear_cashed")
 	loadscreen.set_progress(3)
 	yield(get_tree(), 'idle_frame')
-
-	file.open(variables.userfolder+'saves/'+ filename + '.sav', File.READ)
-	var save_text = file.get_as_text()
-	file.close()
-	loadscreen.set_progress(8)
-	yield(get_tree(), 'idle_frame')
-
-	var savedict = parse_json(save_text)
+	
+	if !direct:
+		file.open(variables.userfolder+'saves/'+ filename + '.sav', File.READ)
+		save_text = file.get_as_text()
+		file.close()
+		loadscreen.set_progress(8)
+		yield(get_tree(), 'idle_frame')
+	
+	if !direct:
+		savedict = parse_json(save_text)
 	loadscreen.set_progress(14)
 	yield(get_tree(), 'idle_frame')
 

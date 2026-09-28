@@ -185,6 +185,7 @@ script = ExtResource( 25 )
 margin_right = 2160.0
 margin_bottom = 1080.0
 texture = ExtResource( 27 )
+expand = true
 stretch_mode = 1
 
 [node name="TextureRect2" type="TextureRect" parent="."]
@@ -192,6 +193,7 @@ margin_left = -3.0
 margin_top = 1.0
 margin_right = 2157.0
 margin_bottom = 1081.0
+expand = true
 stretch_mode = 1
 
 [node name="TextureRect3" type="TextureRect" parent="."]
@@ -199,6 +201,7 @@ margin_left = -3.0
 margin_top = 1.0
 margin_right = 2157.0
 margin_bottom = 1081.0
+expand = true
 stretch_mode = 1
 
 [node name="TextureRect4" type="TextureRect" parent="."]
@@ -206,6 +209,7 @@ margin_left = -3.0
 margin_top = 1.0
 margin_right = 2157.0
 margin_bottom = 1081.0
+expand = true
 stretch_mode = 1
 
 [node name="char_sprite" type="TextureRect" parent="."]
@@ -214,6 +218,7 @@ margin_left = 1008.17
 margin_top = -0.513306
 margin_right = 1921.17
 margin_bottom = 1079.49
+expand = true
 stretch_mode = 6
 
 [node name="VBoxContainer" type="VBoxContainer" parent="."]
@@ -224,8 +229,8 @@ margin_bottom = 1076.0
 custom_constants/separation = 8
 
 [node name="continuebutton" type="Button" parent="VBoxContainer"]
-margin_left = 6.0
-margin_right = 645.0
+margin_left = 140.0
+margin_right = 779.0
 margin_bottom = 90.0
 size_flags_horizontal = 4
 size_flags_vertical = 4
@@ -239,10 +244,44 @@ custom_styles/normal = SubResource( 4 )
 toggle_mode = true
 text = "MENUCONTINUE"
 
-[node name="newgamebutton" type="Button" parent="VBoxContainer"]
+[node name="exportprogress" type="Button" parent="VBoxContainer"]
+margin_left = 3.0
 margin_top = 98.0
-margin_right = 652.0
+margin_right = 917.0
 margin_bottom = 188.0
+size_flags_horizontal = 4
+size_flags_vertical = 4
+custom_colors/font_color = Color( 0.913725, 0.894118, 0.737255, 1 )
+custom_colors/font_color_pressed = Color( 0.733333, 0.74902, 0.545098, 1 )
+custom_fonts/font = SubResource( 5 )
+custom_styles/hover = SubResource( 1 )
+custom_styles/pressed = SubResource( 2 )
+custom_styles/focus = SubResource( 3 )
+custom_styles/normal = SubResource( 4 )
+toggle_mode = true
+text = "MENUEXPORTPROGRESS"
+
+[node name="importprogress" type="Button" parent="VBoxContainer"]
+margin_top = 196.0
+margin_right = 920.0
+margin_bottom = 286.0
+size_flags_horizontal = 4
+size_flags_vertical = 4
+custom_colors/font_color = Color( 0.913725, 0.894118, 0.737255, 1 )
+custom_colors/font_color_pressed = Color( 0.733333, 0.74902, 0.545098, 1 )
+custom_fonts/font = SubResource( 5 )
+custom_styles/hover = SubResource( 1 )
+custom_styles/pressed = SubResource( 2 )
+custom_styles/focus = SubResource( 3 )
+custom_styles/normal = SubResource( 4 )
+toggle_mode = true
+text = "MENUIMPORTPROGRESS"
+
+[node name="newgamebutton" type="Button" parent="VBoxContainer"]
+margin_left = 134.0
+margin_top = 294.0
+margin_right = 786.0
+margin_bottom = 384.0
 size_flags_horizontal = 4
 size_flags_vertical = 4
 custom_colors/font_color = Color( 0.913725, 0.894118, 0.737255, 1 )
@@ -259,10 +298,10 @@ __meta__ = {
 }
 
 [node name="loadbutton" type="Button" parent="VBoxContainer"]
-margin_left = 102.0
-margin_top = 196.0
-margin_right = 550.0
-margin_bottom = 286.0
+margin_left = 236.0
+margin_top = 392.0
+margin_right = 684.0
+margin_bottom = 482.0
 size_flags_horizontal = 4
 size_flags_vertical = 4
 custom_colors/font_color = Color( 0.913725, 0.894118, 0.737255, 1 )
@@ -278,11 +317,28 @@ __meta__ = {
 "_editor_description_": ""
 }
 
+[node name="importsave" type="Button" parent="VBoxContainer"]
+margin_left = 91.0
+margin_top = 490.0
+margin_right = 829.0
+margin_bottom = 580.0
+size_flags_horizontal = 4
+size_flags_vertical = 4
+custom_colors/font_color = Color( 0.913725, 0.894118, 0.737255, 1 )
+custom_colors/font_color_pressed = Color( 0.733333, 0.74902, 0.545098, 1 )
+custom_fonts/font = SubResource( 5 )
+custom_styles/hover = SubResource( 1 )
+custom_styles/pressed = SubResource( 2 )
+custom_styles/focus = SubResource( 3 )
+custom_styles/normal = SubResource( 4 )
+toggle_mode = true
+text = "MENUIMPORTSAVE"
+
 [node name="optionsbutton" type="Button" parent="VBoxContainer"]
-margin_left = 43.0
-margin_top = 294.0
-margin_right = 608.0
-margin_bottom = 384.0
+margin_left = 177.0
+margin_top = 588.0
+margin_right = 742.0
+margin_bottom = 678.0
 size_flags_horizontal = 4
 size_flags_vertical = 4
 custom_colors/font_color = Color( 0.913725, 0.894118, 0.737255, 1 )
@@ -299,10 +355,10 @@ __meta__ = {
 }
 
 [node name="creditsbutton" type="Button" parent="VBoxContainer"]
-margin_left = 48.0
-margin_top = 392.0
-margin_right = 603.0
-margin_bottom = 482.0
+margin_left = 182.0
+margin_top = 686.0
+margin_right = 737.0
+margin_bottom = 776.0
 size_flags_horizontal = 4
 size_flags_vertical = 4
 custom_colors/font_color = Color( 0.913725, 0.894118, 0.737255, 1 )
@@ -318,31 +374,11 @@ __meta__ = {
 "_editor_description_": ""
 }
 
-[node name="modsbutton" type="Button" parent="VBoxContainer"]
-margin_left = 98.0
-margin_top = 490.0
-margin_right = 554.0
-margin_bottom = 580.0
-size_flags_horizontal = 4
-size_flags_vertical = 4
-custom_colors/font_color = Color( 0.913725, 0.894118, 0.737255, 1 )
-custom_colors/font_color_pressed = Color( 0.733333, 0.74902, 0.545098, 1 )
-custom_fonts/font = SubResource( 5 )
-custom_styles/hover = SubResource( 1 )
-custom_styles/pressed = SubResource( 2 )
-custom_styles/focus = SubResource( 3 )
-custom_styles/normal = SubResource( 4 )
-toggle_mode = true
-text = "MENUMODS"
-__meta__ = {
-"_editor_description_": ""
-}
-
 [node name="gallery" type="Button" parent="VBoxContainer"]
-margin_left = 33.0
-margin_top = 588.0
-margin_right = 619.0
-margin_bottom = 678.0
+margin_left = 167.0
+margin_top = 784.0
+margin_right = 753.0
+margin_bottom = 874.0
 size_flags_horizontal = 4
 size_flags_vertical = 4
 custom_colors/font_color = Color( 0.913725, 0.894118, 0.737255, 1 )
@@ -354,26 +390,6 @@ custom_styles/focus = SubResource( 3 )
 custom_styles/normal = SubResource( 4 )
 toggle_mode = true
 text = "MENUGALLERY"
-__meta__ = {
-"_editor_description_": ""
-}
-
-[node name="quitbutton" type="Button" parent="VBoxContainer"]
-margin_left = 115.0
-margin_top = 686.0
-margin_right = 537.0
-margin_bottom = 776.0
-size_flags_horizontal = 4
-size_flags_vertical = 4
-custom_colors/font_color = Color( 0.913725, 0.894118, 0.737255, 1 )
-custom_colors/font_color_pressed = Color( 0.733333, 0.74902, 0.545098, 1 )
-custom_fonts/font = SubResource( 5 )
-custom_styles/hover = SubResource( 1 )
-custom_styles/pressed = SubResource( 2 )
-custom_styles/focus = SubResource( 3 )
-custom_styles/normal = SubResource( 4 )
-toggle_mode = true
-text = "MENUQUIT"
 __meta__ = {
 "_editor_description_": ""
 }
@@ -538,45 +554,6 @@ margin_left = 340.811
 margin_top = 140.276
 margin_right = 1601.81
 margin_bottom = 943.276
-
-[node name="ModListSafetyPopup" type="PanelContainer" parent="."]
-visible = false
-margin_left = 560.0
-margin_top = 250.0
-margin_right = 1360.0
-margin_bottom = 756.0
-
-[node name="VBoxContainer" type="VBoxContainer" parent="ModListSafetyPopup"]
-margin_left = 7.0
-margin_top = 7.0
-margin_right = 793.0
-margin_bottom = 499.0
-
-[node name="Title" type="Label" parent="ModListSafetyPopup/VBoxContainer"]
-margin_right = 786.0
-margin_bottom = 42.0
-size_flags_vertical = 0
-custom_colors/font_color = Color( 0.976471, 0.882353, 0.505882, 1 )
-custom_fonts/font = ExtResource( 15 )
-text = "MENUMODLISTSAFETY"
-align = 1
-
-[node name="RichTextLabel" type="RichTextLabel" parent="ModListSafetyPopup/VBoxContainer"]
-margin_top = 46.0
-margin_right = 786.0
-margin_bottom = 82.0
-theme = ExtResource( 3 )
-custom_fonts/normal_font = ExtResource( 33 )
-bbcode_enabled = true
-fit_content_height = true
-
-[node name="CloseButton" parent="ModListSafetyPopup" instance=ExtResource( 66 )]
-margin_left = 7.0
-margin_top = 7.0
-margin_right = 37.0
-margin_bottom = 37.0
-size_flags_horizontal = 0
-size_flags_vertical = 0
 
 [node name="NewGameCont" type="HBoxContainer" parent="."]
 visible = false

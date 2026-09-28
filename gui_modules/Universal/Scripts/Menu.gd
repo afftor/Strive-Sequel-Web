@@ -18,16 +18,14 @@ func _ready():
 	gui_controller.add_close_button($Options)
 	gui_controller.add_close_button($Credits)
 	gui_controller.add_close_button($NewOrTutorial)
-	$ModListSafetyPopup/CloseButton.connect("pressed", $ModListSafetyPopup, "hide")
-	var buttonlist = ['continueb','newgame', 'loadwindow','options', 'credits', 'mods']
+	var buttonlist = ['continueb', 'export_progress', 'import_progress', 'newgame', 'loadwindow', 'import_save', 'options', 'credits']
 	$version.text = "ver. " + globals.gameversion
 	input_handler.CurrentScene = self
 	#input_handler.StopMusic()
 	check_last_save()
-	for i in range(0,6):
-		$VBoxContainer.get_child(i).connect("toggled",self,buttonlist[i], [$VBoxContainer.get_child(i)])
+	for i in range(0, 8):
+		$VBoxContainer.get_child(i).connect("toggled", self, buttonlist[i], [$VBoxContainer.get_child(i)])
 		#input_handler.ConnectSound($VBoxContainer.get_child(i), 'button_click', 'button_up')
-	$VBoxContainer/quitbutton.connect("pressed", self, "quit")
 	$VBoxContainer/gallery.connect("pressed", self, "gallery")
 	newgame_node.get_node("BackButton").connect("pressed", self, "open_newgame")
 	#$char_sprite.texture = images.sprites[images.sprites.keys()[randi() %images.sprites.keys().size()]]
@@ -57,19 +55,8 @@ func _ready():
 	$NewOrTutorial/ButtonR.connect("pressed", self, 'close_new_or_tutorial', [2])
 	newgame_node.get_node("NGPButton").connect("pressed", self, 'switch_ng_bonuses')
 	$Credits/Background/RichTextLabel.bbcode_text = tr("MENUCREDITSDESC")
-	call_deferred("show_mod_list_safety_message")
-	$UpdateNotice.start_update_check()
-	$SupporterNotice.try_show(lastsave != null)
 	cycle_backgrounds()
-func show_mod_list_safety_message():
-	if modding_core.mod_list_safety_message == "":
-		return
-	var backup_path = ProjectSettings.globalize_path(modding_core.mod_list_backup_path)
-	var text = tr(modding_core.mod_list_safety_message) % [modding_core.mod_list_backup_version, globals.gameversion, backup_path]
-	modding_core.mod_list_safety_message = ""
-	$ModListSafetyPopup/VBoxContainer/RichTextLabel.bbcode_text = globals.TextEncoder(text)
-	$ModListSafetyPopup.show()
-	$ModListSafetyPopup.raise()
+
 
 func cycle_backgrounds():
 	var arr = [images.get_background("forest1_menu"),
@@ -150,19 +137,6 @@ func credits(pressed, pressed_button):
 
 
 
-func quit():
-#	input_handler.globalsettings.window_size = OS.window_size
-#	input_handler.globalsettings.window_pos = OS.window_position
-#	get_tree().quit()
-	input_handler.quit()
-
-
-func mods(pressed, pressed_button):
-	gui_controller.win_btn_connections_handler(pressed, $mod_panel, pressed_button)
-	self.current_pressed_btn = pressed_button
-	$mod_panel.visible = pressed
-
-
 var current_pressed_btn setget set_btn_pressed
 
 func set_btn_pressed(value):
@@ -176,7 +150,7 @@ func set_btn_pressed(value):
 
 #newgame
 var settingarray = ['futa','furry']#,'turn_based_time_flow']
-var settingarray2 = ['skip_prologue','diff_permadeath', 'diff_bonus_taskmod', 'diff_bonus_loot', 'diff_stop_loan', 'diff_small_loan', 'diff_solo', 'diff_free_upgrade', 'diff_free_gather','easytrain'] 
+var settingarray2 = ['skip_prologue','diff_gf_only_upg','diff_permadeath', 'diff_bonus_taskmod', 'diff_bonus_loot', 'diff_stop_loan', 'diff_small_loan', 'diff_solo', 'diff_free_upgrade', 'diff_free_gather','easytrain'] 
 var settingarray3 = ['diff_money','diff_materials'] #'diff_free_chars'
 
 func newgame(pressed, pressed_button):
@@ -234,9 +208,7 @@ func open_newgame():
 	newgame_bonuses.clear()
 	ResourceScripts.game_globals.all_starting_races = false
 	var NGPButton = newgame_node.get_node("NGPButton")
-	#the cheat opens the panel only - the points and the unlocked bonuses stay whatever the
-	#player actually earned, so with nothing earned yet the panel shows up with nothing to spend
-	var show_newgame_plus = OS.has_feature('editor') or input_handler.ngplus_cheat_active() or (
+	var show_newgame_plus = OS.has_feature('editor') or (
 		max_bonus_points > 0
 		and input_handler.achievements.has_achimnt("act1"))
 	NGPButton.hide()
@@ -437,3 +409,18 @@ func _load_changelog():
 	$Changelogpanel/changelogtext.bbcode_text = changelog_file.get_as_text()
 	changelog_file.close()
 
+func export_progress(pressed, pressed_button):
+	if pressed:
+		pressed_button.pressed = false
+		input_handler.Download_File(variables.userfolder + 'progress_data', 'progress_data')
+
+func import_progress(pressed, pressed_button):
+	if pressed:
+		pressed_button.pressed = false
+		input_handler.load_external_progress()
+
+
+func import_save(pressed, pressed_button):
+	if pressed:
+		pressed_button.pressed = false
+		input_handler.load_external_save()

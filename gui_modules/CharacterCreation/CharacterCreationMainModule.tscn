@@ -1,4 +1,4 @@
-[gd_scene load_steps=123 format=2]
+[gd_scene load_steps=114 format=2]
 
 [ext_resource path="res://assets/Textures_v2/CHAR_INFO/panel_factors.png" type="Texture" id=1]
 [ext_resource path="res://assets/Fonts_v2/FontThemes/MainMiddle.tres" type="DynamicFont" id=2]
@@ -9,7 +9,6 @@
 [ext_resource path="res://assets/Themes_v2/CHAR_CREATION/ChC_Theme.tres" type="Theme" id=7]
 [ext_resource path="res://assets/Themes_v2/CHAR_CREATION/ChC_Diet_Panel.tres" type="Theme" id=8]
 [ext_resource path="res://assets/Textures_v2/CHAR_CREATION/Panels/frame_charactercreation.png" type="Texture" id=9]
-[ext_resource path="res://assets/Textures_v2/icon_question_small_alt.png" type="Texture" id=10]
 [ext_resource path="res://assets/Textures_v2/CHAR_CREATION/new/panel_stats.png" type="Texture" id=11]
 [ext_resource path="res://assets/Textures_v2/CHAR_CREATION/Buttons/buttondeco_pressed.png" type="Texture" id=12]
 [ext_resource path="res://assets/Textures_v2/CHAR_CREATION/Buttons/arrowstats_hover.png" type="Texture" id=13]
@@ -36,7 +35,6 @@
 [ext_resource path="res://assets/Themes_v2/CHAR_CREATION/Button_Colored_Normal.tres" type="StyleBox" id=34]
 [ext_resource path="res://assets/Themes_v2/UNIVERSAL/PT_24_Label.tres" type="Theme" id=35]
 [ext_resource path="res://gui_modules/CharacterCreation/ClassSelectionModule.tscn" type="PackedScene" id=37]
-[ext_resource path="res://Character_generator/Doll2Spine/Doll2View.tscn" type="PackedScene" id=102]
 [ext_resource path="res://gui_modules/CharacterCreation/RaceSelectionModule.tscn" type="PackedScene" id=39]
 [ext_resource path="res://assets/Themes_v2/UNIVERSAL/TextEdit.tres" type="StyleBox" id=40]
 [ext_resource path="res://assets/Textures_v2/MANSION/Job/button_jobselection_disabled.png" type="Texture" id=41]
@@ -62,7 +60,6 @@
 [ext_resource path="res://assets/Textures_v2/CHAR_CREATION/new/button_stats_default.png" type="Texture" id=61]
 [ext_resource path="res://assets/Textures_v2/CHAR_CREATION/new/panel_choose_ap.png" type="Texture" id=62]
 [ext_resource path="res://assets/Textures_v2/CHAR_CREATION/new/button_choose_appearance.png" type="Texture" id=63]
-[ext_resource path="res://Character_generator/new_simple_recolor_shader.shader" type="Shader" id=64]
 [ext_resource path="res://assets/Textures_v2/CHAR_CREATION/new/triangles_selection_active1.png" type="Texture" id=65]
 [ext_resource path="res://assets/Textures_v2/CHAR_CREATION/new/triangles_selection_hover2.png" type="Texture" id=66]
 [ext_resource path="res://assets/Textures_v2/CHAR_CREATION/new/triangles_selection_hover1.png" type="Texture" id=67]
@@ -88,9 +85,6 @@
 [ext_resource path="res://assets/Themes_v2/UNIVERSAL/HintTooltip.tres" type="Theme" id=87]
 [ext_resource path="res://assets/Textures_v2/CHAR_CREATION/Buttons/arrowstats_pressed.png" type="Texture" id=88]
 [ext_resource path="res://assets/Textures_v2/CHAR_CREATION/Buttons/arrowstats.png" type="Texture" id=89]
-[ext_resource path="res://assets/Textures_v2/CHEATS/buttonbig_cheats_hover.png" type="Texture" id=90]
-[ext_resource path="res://assets/Textures_v2/CHEATS/buttonbig_cheats.png" type="Texture" id=91]
-[ext_resource path="res://assets/Textures_v2/CHEATS/buttonbig_cheats_pressed.png" type="Texture" id=92]
 [ext_resource path="res://assets/Fonts_v2/Noto_Sans_SC/NotoSansSC-Medium.otf" type="DynamicFontData" id=93]
 [ext_resource path="res://assets/Textures_v2/CHAR_CREATION/Buttons/buttonsquare.png" type="Texture" id=94]
 [ext_resource path="res://assets/Textures_v2/CHAR_CREATION/Buttons/buttonsquare_hover.png" type="Texture" id=95]
@@ -99,6 +93,7 @@
 [ext_resource path="res://assets/Fonts_v2/FontThemes/NOTO_SANS_Regular_14px.tres" type="DynamicFont" id=99]
 [ext_resource path="res://assets/images/gui/gui icons/icon_slaveinfo_star.png" type="Texture" id=100]
 [ext_resource path="res://assets/Textures_v2/craft/buttons/frame_category_pressed.png" type="Texture" id=101]
+[ext_resource path="res://Character_generator/Doll2Spine/Doll2View.tscn" type="PackedScene" id=102]
 [ext_resource path="res://Character_generator/Doll2Spine/doll2_option_previews.gd" type="Script" id=103]
 [ext_resource path="res://assets/Themes_v2/UNIVERSAL/HSliderBG.tres" type="StyleBox" id=104]
 [ext_resource path="res://assets/Textures_v2/Universal/Bars/scrollbar_horizontal_detail.png" type="Texture" id=105]
@@ -107,24 +102,65 @@
 
 [sub_resource type="StyleBoxTexture" id=3]
 
-[sub_resource type="ShaderMaterial" id=1]
-shader = ExtResource( 64 )
-shader_param/target1color = Color( 0.654902, 0.380392, 0.266667, 1 )
-shader_param/part1color = Color( 0.243137, 0.262745, 0.482353, 1 )
-shader_param/origin = Color( 1, 0.890196, 0.819608, 1 )
-shader_param/overlay = 0.7
-
-[sub_resource type="ShaderMaterial" id=2]
-shader = ExtResource( 64 )
-shader_param/target1color = Color( 1, 0, 0, 1 )
-shader_param/part1color = Color( 0.219608, 0.694118, 0.647059, 1 )
-shader_param/origin = Color( 0.505882, 0.25098, 0.709804, 1 )
-shader_param/overlay = 0.7
-
 [sub_resource type="DynamicFont" id=5]
 size = 18
 font_data = ExtResource( 74 )
 fallback/0 = ExtResource( 93 )
+
+[sub_resource type="StyleBoxFlat" id=24]
+content_margin_left = 12.0
+content_margin_right = 12.0
+content_margin_top = 12.0
+content_margin_bottom = 12.0
+bg_color = Color( 0.03, 0.02, 0.03, 0.6 )
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_right = 5
+corner_radius_bottom_left = 5
+
+[sub_resource type="StyleBoxFlat" id=22]
+bg_color = Color( 0.102, 0.055, 0.086, 0.824 )
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color( 1, 1, 1, 0.6 )
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+[sub_resource type="Gradient" id=20]
+colors = PoolColorArray( 1, 1, 1, 1, 1, 1, 1, 0 )
+
+[sub_resource type="GradientTexture" id=21]
+gradient = SubResource( 20 )
+width = 256
+
+[sub_resource type="ShaderMaterial" id=25]
+shader = ExtResource( 108 )
+
+[sub_resource type="StyleBoxFlat" id=23]
+bg_color = Color( 0.08, 0.04, 0.07, 0.85 )
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color( 1, 1, 1, 0.35 )
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 2
+
+[sub_resource type="StyleBoxFlat" id=10]
+bg_color = Color( 0, 0, 0, 0 )
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color( 0.976, 0.882, 0.506, 1 )
+
+[sub_resource type="StyleBoxEmpty" id=9]
 
 [sub_resource type="StyleBoxTexture" id=7]
 texture = ExtResource( 95 )
@@ -157,62 +193,6 @@ margin_left = 58.5797
 margin_right = 53.0007
 margin_top = 71.2295
 margin_bottom = 72.5273
-
-[sub_resource type="StyleBoxEmpty" id=9]
-
-[sub_resource type="StyleBoxFlat" id=10]
-bg_color = Color( 0, 0, 0, 0 )
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color( 0.976, 0.882, 0.506, 1 )
-
-[sub_resource type="Gradient" id=20]
-offsets = PoolRealArray( 0, 1 )
-colors = PoolColorArray( 1, 1, 1, 1, 1, 1, 1, 0 )
-
-[sub_resource type="GradientTexture" id=21]
-gradient = SubResource( 20 )
-width = 256
-
-[sub_resource type="StyleBoxFlat" id=22]
-bg_color = Color( 0.102, 0.055, 0.086, 0.824 )
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color( 1, 1, 1, 0.6 )
-corner_radius_top_left = 8
-corner_radius_top_right = 8
-corner_radius_bottom_right = 8
-corner_radius_bottom_left = 8
-
-[sub_resource type="StyleBoxFlat" id=23]
-bg_color = Color( 0.08, 0.04, 0.07, 0.85 )
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color( 1, 1, 1, 0.35 )
-corner_radius_top_left = 2
-corner_radius_top_right = 2
-corner_radius_bottom_right = 2
-corner_radius_bottom_left = 2
-
-[sub_resource type="StyleBoxFlat" id=24]
-content_margin_left = 12.0
-content_margin_right = 12.0
-content_margin_top = 12.0
-content_margin_bottom = 12.0
-bg_color = Color( 0.03, 0.02, 0.03, 0.6 )
-corner_radius_top_left = 5
-corner_radius_top_right = 5
-corner_radius_bottom_right = 5
-corner_radius_bottom_left = 5
-
-[sub_resource type="ShaderMaterial" id=25]
-shader = ExtResource( 108 )
 
 [node name="CharacterCreationMainModule" type="Panel" groups=["disable_rmb_esc", "ignore_rightclicks"]]
 self_modulate = Color( 0.0235294, 0.0196078, 0.909804, 1 )
@@ -709,6 +689,9 @@ __meta__ = {
 }
 
 [node name="master_relation" type="TextureButton" parent="VBoxContainer"]
+margin_top = 719.0
+margin_right = 433.0
+margin_bottom = 785.0
 rect_min_size = Vector2( 0, 50 )
 texture_normal = ExtResource( 49 )
 texture_pressed = ExtResource( 48 )
@@ -750,10 +733,13 @@ margin_bottom = 883.0
 texture = ExtResource( 52 )
 
 [node name="ragdoll" parent="RagdollPanel" instance=ExtResource( 102 )]
-rect_position = Vector2( 17.0, 12.0 )
-rect_size = Vector2( 516.0, 719.0 )
+margin_left = 17.0
+margin_top = 12.0
+margin_right = 533.0
+margin_bottom = 731.0
 offered_undress_levels = [ "underwear", "naked" ]
 show_hair_menu = false
+
 [node name="TextureRect" type="TextureRect" parent="RagdollPanel"]
 visible = false
 margin_right = 548.0
@@ -840,7 +826,6 @@ margin_left = 675.0
 margin_top = 87.0
 margin_right = 1198.0
 margin_bottom = 647.0
-mouse_filter = 2
 theme = ExtResource( 29 )
 texture = ExtResource( 11 )
 patch_margin_left = 24
@@ -862,8 +847,8 @@ alignment = 1
 visible = false
 rect_min_size = Vector2( 0, 54 )
 rect_clip_content = true
-size_flags_horizontal = 3
 mouse_filter = 2
+size_flags_horizontal = 3
 custom_styles/panel = SubResource( 22 )
 
 [node name="Grad" type="TextureRect" parent="StatsModule/StatsContainer/FactorRow"]
@@ -901,7 +886,6 @@ margin_left = 58.0
 margin_top = 3.0
 margin_right = 238.0
 margin_bottom = 26.0
-mouse_filter = 2
 custom_fonts/font = ExtResource( 2 )
 text = "PHY"
 clip_text = true
@@ -911,7 +895,6 @@ margin_left = 58.0
 margin_top = 27.0
 margin_right = 238.0
 margin_bottom = 47.0
-mouse_filter = 2
 custom_colors/font_color = Color( 0.6, 0.514, 0.435, 1 )
 custom_fonts/font = ExtResource( 99 )
 text = "hint"
@@ -935,7 +918,6 @@ margin_left = 331.0
 margin_top = 13.0
 margin_right = 427.0
 margin_bottom = 43.0
-mouse_filter = 2
 custom_fonts/font = ExtResource( 98 )
 text = "1"
 align = 1
@@ -1012,7 +994,7 @@ theme = ExtResource( 3 )
 scroll_horizontal_enabled = false
 
 [node name="VBoxContainer" type="VBoxContainer" parent="VisualsModule/ScrollContainer"]
-margin_bottom = 4.0
+margin_right = 480.0
 
 [node name="StatsContainer" type="VBoxContainer" parent="VisualsModule/ScrollContainer/VBoxContainer"]
 rect_min_size = Vector2( 480, 0 )
@@ -1141,12 +1123,11 @@ margin_right = 480.0
 margin_bottom = 69.0
 rect_min_size = Vector2( 0, 38 )
 size_flags_horizontal = 3
-custom_icons/grabber = ExtResource( 105 )
-custom_icons/grabber_highlight = ExtResource( 105 )
 custom_icons/grabber_disabled = ExtResource( 105 )
+custom_icons/grabber_highlight = ExtResource( 105 )
+custom_icons/grabber = ExtResource( 105 )
 custom_styles/slider = ExtResource( 104 )
 max_value = 5.0
-step = 1.0
 ticks_on_borders = true
 
 [node name="Checkbox" type="CheckBox" parent="VisualsModule/ScrollContainer/VBoxContainer/StatsContainer"]
@@ -1209,7 +1190,6 @@ rect_min_size = Vector2( 40, 30 )
 toggle_mode = true
 
 [node name="ColorRect" type="ColorRect" parent="VisualsModule/ScrollContainer/VBoxContainer/StatsContainer/Colour/GridContainer/Button"]
-material = SubResource( 1 )
 anchor_right = 1.0
 anchor_bottom = 1.0
 margin_left = 3.0
@@ -1234,7 +1214,6 @@ rect_min_size = Vector2( 40, 30 )
 toggle_mode = true
 
 [node name="ColorRect" type="ColorRect" parent="VisualsModule/ScrollContainer/VBoxContainer/StatsContainer/Colour/GridContainer/Button2"]
-material = SubResource( 2 )
 anchor_right = 1.0
 anchor_bottom = 1.0
 margin_left = 3.0
@@ -1379,7 +1358,6 @@ margin_left = 4.0
 margin_top = -28.0
 margin_right = -4.0
 margin_bottom = -4.0
-mouse_filter = 2
 custom_fonts/font = ExtResource( 99 )
 text = "option"
 align = 1

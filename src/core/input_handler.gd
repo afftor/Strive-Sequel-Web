@@ -1700,6 +1700,9 @@ func dir_contents(target):
 		var file_name = dir.get_next()
 		while file_name != "":
 			if !dir.current_is_dir():
+				if file_name.ends_with('.remap'):
+					file_name = dir.get_next()
+					continue
 				array.append(target + "/" + file_name)
 			elif !file_name in ['.','..', null] && dir.current_is_dir():
 				array += dir_contents(target + "/" + file_name)
@@ -2318,3 +2321,88 @@ func is_btn_exists(btn_name):
 	return (hard_tutorial_btns.has(btn_name)
 			and hard_tutorial_btns[btn_name].source.get_ref()
 			and is_instance_valid(hard_tutorial_btns[btn_name].source.get_ref()))
+
+
+#web os methods. mb put them into separate autoload
+signal read_completed
+
+var js_callback_progress = JavaScript.create_callback(self, 'load_handler_progress');
+var js_callback_save = JavaScript.create_callback(self, 'load_handler_save');
+var js_interface;
+
+func _define_js()->void:
+	#Define JS script
+	JavaScript.eval("""
+	var _HTML5FileExchange = {};
+	_HTML5FileExchange.upload = function(gd_callback) {
+		canceled = true;
+		var input = document.createElement('INPUT'); 
+		input.setAttribute("type", "file");
+		input.click();
+		input.addEventListener('change', async (event) => {
+			if (event.target.files.length > 0){
+				canceled = false;}
+			const file = event.target.files[0];
+			const reader = new FileReader();
+			reader.readAsText(file); 
+			reader.onloadend = (e) => {
+				if (e.target.readyState == FileReader.DONE){
+					this.result = e.target.result;
+					gd_callback(e.target.result);
+				}
+			}
+		});
+	}
+	""", true)
+
+
+func load_external_progress():
+	if OS.get_name() != "HTML5" or !OS.has_feature('JavaScript'):
+		return
+	
+	_define_js()
+	js_interface = JavaScript.get_interface("_HTML5FileExchange")
+	js_interface.upload(js_callback_progress);
+	
+	yield(self, "read_completed")
+	SystemMessage(tr("MENUIMPORTPROGRESSCOMPLETED"))
+
+
+func load_external_save():
+	if OS.get_name() != "HTML5" or !OS.has_feature('JavaScript'):
+		return
+	
+	_define_js()
+	js_interface = JavaScript.get_interface("_HTML5FileExchange")
+	js_interface.upload(js_callback_save);
+
+
+func load_handler_progress(_args):
+	var fileType = js_interface.fileType;
+	var fileData = JSON.parse(_args[0])
+	if fileData.error != OK:
+		print ("wrong file format")
+		return
+	var parse_result = fileData.result
+	for key in parse_result:
+		var value = parse_result[key]
+		if progress_data.has(key) and progress_data[key] is int:
+			value = int(value)
+		progress_data[key] = value
+	emit_signal('read_completed')
+
+
+func load_handler_save(_args):
+	var fileType = js_interface.fileType;
+	var fileData = _args[0]
+	globals.LoadGame(fileData, true)
+
+
+func Download_File(_path, _filename):
+	if OS.get_name() != "HTML5" or !OS.has_feature('JavaScript'):
+		return
+	var f = File.new()
+	f.open(_path, File.READ)
+	var buf = f.get_buffer(f.get_len())
+	JavaScript.download_buffer(buf, _filename)
+	f.close()

@@ -2,9 +2,10 @@ shader_type canvas_item;
 render_mode blend_mix, unshaded;
 // Mist drifting over the mansion's grounds - see fog.gd, the node under mansion_backdrop.tscn's Sky that carries it.
 // Soft patches of value noise in two layers, the second finer and slower, so the patches change shape as they
-// move. Positions are the rect's own pixels, which are the picture's, so the mist stays on the grounds while the
-// plan is moved or zoomed. The noise repeats every 64 patches: fog.gd wraps the drift offsets there,
-// which keeps the numbers small without a visible seam.
+// move. Positions are in patches rather than pixels, which are the picture's either way, so the mist stays on the
+// grounds while the plan is moved or zoomed. The noise repeats every 64 patches: fog.gd wraps the drift offsets
+// there, which keeps the numbers small without a visible seam. Small matters: GLES2 and WebGL1 run the fragment
+// stage at mediump, where the pixels the offsets used to arrive in ran past what it can hold.
 
 uniform vec4 fog_color : hint_color = vec4(0.85, 0.88, 0.92, 1.0);
 // How thick the mist is where it is thickest.
@@ -14,14 +15,14 @@ uniform float coverage : hint_range(0.0, 1.0) = 0.55;
 uniform float softness : hint_range(0.01, 1.0) = 0.48;
 // The size of a patch, in picture pixels.
 uniform float patch_size = 900.0;
-// Set every frame by fog.gd.
+// How far the two layers have drifted, in patches. Set every frame by fog.gd.
 uniform vec2 offset_a = vec2(0.0, 0.0);
 uniform vec2 offset_b = vec2(0.0, 0.0);
 
 varying vec2 picture;
 
 void vertex() {
-	picture = VERTEX;
+	picture = VERTEX / patch_size;
 }
 
 // A value for a noise cell, the same for cells 64 apart.
@@ -56,8 +57,8 @@ float fbm(vec2 p) {
 }
 
 void fragment() {
-	float slow = fbm((picture + offset_a) / patch_size);
-	float fine = fbm((picture + offset_b) * 2.0 / patch_size + vec2(5.0, 11.0));
+	float slow = fbm(picture + offset_a);
+	float fine = fbm((picture + offset_b) * 2.0 + vec2(5.0, 11.0));
 	float mist = slow * 0.7 + fine * 0.3;
 	float edge = 1.0 - coverage;
 	float thick = smoothstep(edge - softness * 0.5, edge + softness * 0.5, mist);
