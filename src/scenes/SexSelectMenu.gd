@@ -30,6 +30,7 @@ func _ready():
 	globals.connecttexttooltip(_limit_icon, tr("SEXTOOLTIP"))
 
 func open():
+	hide_person_info()
 	selected_characters.clear()
 	_reset_category_buttons()
 	rebuild_list()
@@ -40,6 +41,16 @@ func open():
 func hide():
 	gui_controller.windows_opened.erase(self)
 	.hide()
+
+
+#gui_controller.close_scene() ends by raising the mansion, showing it and putting it back to
+#its default state. That is right for a window opened over the mansion and wrong here:
+#start_scene() has already handed the screen to the sex panel by the time it calls this, so
+#the tail was pulling the mansion back over the scene that had just started. It used to be
+#skipped only because the window was registered against the rail's sex button, and that
+#button is gone - the master's bedroom opens this now.
+func _custom_gui_controller_close():
+	hide()
 
 
 func rebuild_list():
@@ -74,13 +85,62 @@ func rebuild_list():
 				newbutton.disabled = true
 				globals.connecttexttooltip(newbutton,lock_reason)
 
+		var warning = ""
+		if newbutton.disabled:
+			warning = _get_participant_lock_reason(person)
 		if _is_missing_sex_traits(person):
 			name_label.add_color_override("font_color", Color(1, 0.67, 0.67))
-			globals.connecttexttooltip(newbutton, person.translate(tr("SEXSELECT_MISSING_TRAITS")))
+			warning = person.translate(tr("SEXSELECT_MISSING_TRAITS")) + warning
+		#Looking at a face fills the panel standing beside the window rather than opening a
+		#tooltip at the cursor: the list is long, and a card that jumps about with the mouse is
+		#not something two people can be compared in.
+		newbutton.connect("mouse_entered", self, "show_person_info", [person])
+		if warning != "":
+			globals.connecttexttooltip(newbutton, warning)
 
+	#whoever was being looked at is still worth showing once the list is drawn again
+	if info_person != null:
+		show_person_info(info_person)
 	_update_participant_label()
 	_update_interaction_label()
 	update_sex_date_buttons()
+
+
+#### the panel beside the window ####
+
+#Consent and how far each practice has been trained, drawn the way the character screen draws
+#the same thing - a name, a bar and the level it stands at - rather than as a wall of text.
+#The rows themselves come from globals so the tooltip here carries the same mastery hint the
+#character screen shows: which acts the character still has to be taken through.
+
+var info_person = null
+
+
+func show_person_info(person):
+	info_person = person
+	var info = $Info
+	info.visible = true
+	info.get_node("Name").text = person.get_short_name()
+	var consent_label = info.get_node("Consent")
+	consent_label.visible = !person.is_master()
+	if consent_label.visible:
+		var consent = int(person.get_stat('consent'))
+		consent_label.text = tr('SIBLINGMODULECONSENT') + tr(variables.consent_dict[consent])
+		globals.connecttexttooltip(consent_label, tr('INFOCONSENT'))
+	var stamina = info.get_node("Stamina")
+	stamina.text = tr("STATSEX_STAMINA") + ": " + str(person.get_stat('sex_stamina'))
+	globals.connecttexttooltip(stamina, "[center]" + tr("STATSEX_STAMINA") + "[/center]\n"
+		+ tr("STATSEX_STAMINADESCRIPT"))
+	var trained = globals.build_sex_training_rows(person, info.get_node("Skills/VBoxContainer"))
+	info.get_node("SkillsHeader").visible = trained > 0
+	info.get_node("Skills").visible = trained > 0
+	info.get_node("Empty").visible = trained == 0
+
+
+func hide_person_info():
+	info_person = null
+	$Info.visible = false
+
 
 func _on_category_pressed(category):
 	if _active_category == category:
@@ -145,10 +205,7 @@ func update_sex_date_buttons():
 func calculate_sex_limits():
 	if get_parent() != null && get_parent().get("in_test_mode") == true:
 		return ResourceScripts.game_party.character_order.size()
-	var slavelimit = 2
-	if ResourceScripts.game_res.upgrades.has('master_bedroom'):
-		slavelimit += ResourceScripts.game_res.upgrades.master_bedroom
-	return slavelimit
+	return ResourceScripts.game_res.get_sex_limit()
 
 
 func _update_participant_label():

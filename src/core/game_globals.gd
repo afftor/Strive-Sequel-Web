@@ -8,7 +8,6 @@ var original_version = globals.gameversion
 var newgame = false
 var difficulty = 'medium'
 #diff
-var diff_gf_only_upg = false
 var diff_permadeath = false
 var diff_bonus_taskmod = false
 var diff_bonus_loot = false
@@ -30,6 +29,9 @@ var seed_salt = randi()
 #dynamic part
 var date = 1
 var hour = 1
+#The weather over the mansion, rolled at the end of every turn - see advance_weather().
+var rain_turns_left = 0
+var storm = false
 
 #var daily_sex_left = 1
 #var daily_dates_left = 1
@@ -37,7 +39,7 @@ var weekly_sex_left = 2
 var weekly_sex_max = 1
 var weekly_dates_left = 3
 var weekly_dates_max = 1
-var log_btns = ['travel']
+var mansion_activity_log = []
 
 #not used
 #var votelinksseen = false
@@ -52,7 +54,7 @@ var log_btns = ['travel']
 #var log_storage = []
 
 #Cheats
-var cheats_active = false
+#cheats_active and cheat_code moved to input_handler.progress_data - they are account-wide, not per-save
 var instant_travel = false
 var skip_combat = false
 var free_upgrades = false
@@ -64,12 +66,7 @@ var social_skill_unlimited_charges = false
 var allow_skip_fights = false
 var unlimited_date_sex = false
 var unlock_all_classes = false
-var unlimited_popcap = false
 #var unlock_all_scenes = false
-
-# Cheat codes
-var cheat_code = "fkfynroh"
-# var cheat_code = "111"
 
 
 func get_date():
@@ -92,6 +89,17 @@ func fix_serialization():
 	weekly_sex_max = int(weekly_sex_max)
 	weekly_dates_left = int(weekly_dates_left)
 	weekly_dates_max = int(weekly_dates_max)
+	if mansion_activity_log == null:
+		mansion_activity_log = []
+	while mansion_activity_log.size() > 50:
+		mansion_activity_log.pop_front()
+	#Older saves - and any save written before the breakdown stopped being stored - can still
+	#carry the lines behind a folded report, the service takings or the turn's crafting. They are
+	#turn-local by design, so a loaded log keeps the total and drops the fold. See
+	#globals.mansion_activity_service() and globals.mansion_activity_craft(). Arrivals are the
+	#exception - see _drop_turn_local_breakdown().
+	for entry in mansion_activity_log:
+		_drop_turn_local_breakdown(entry)
 	if original_version == null: #stub, technically not correct
 		original_version = globals.gameversion
 	if difficulty == 'normal':
@@ -108,7 +116,23 @@ func fix_import():
 
 
 func serialize():
-	return inst2dict(self).duplicate(true)
+	var data = inst2dict(self).duplicate(true)
+	#What each worker earned in a service turn is something the log can still unfold while the
+	#turn is on screen, not a record worth carrying: a line per worker per hour would grow the
+	#save for something nobody reads back. The total stays, the breakdown does not.
+	for entry in data.get("mansion_activity_log", []):
+		_drop_turn_local_breakdown(entry)
+	return data
+
+
+#The one breakdown worth carrying is the arrivals'. It is a line per travel group, written only on
+#the turns somebody reaches the end of a road, and it is the only record left of who got where:
+#once a second person arrives in the same turn, the row itself names only their groups. Dropping
+#it would lose the names the per-person rows it replaced used to keep. See
+#globals.mansion_activity_arrival().
+static func _drop_turn_local_breakdown(entry):
+	if entry is Dictionary and entry.get("type") != "arrival":
+		entry.erase("details")
 
 
 func autosave_due():
@@ -117,37 +141,62 @@ func autosave_due():
 
 #managed = the caller (clock module) drives the autosave and the mansion rebuild itself,
 #spreading the tick over frames instead of doing everything inside a single one.
-#in managed mode this is a coroutine - yield on 'completed'
-func advance_hour(managed = false):
+#in managed mode this is a coroutine - yield on 'completed'. The optional clock target
+#receives one cumulative fraction for the whole simulation without exposing its stages.
+func advance_hour(managed = false, progress_target = null):
 	if managed: #always a coroutine when managed, so the caller can yield on it
 		yield(globals.get_tree(), 'idle_frame')
+	_report_turn_progress(progress_target, 0.01)
 	if !managed and autosave_due():
 		globals.autosave()
 	#slices are cut by elapsed time rather than character count, so one frame costs the same
 	#whether a character is cheap or expensive and the transition animates at a steady rate
+	#Who slept without a bed is decided once, here, before a single character ticks and long
+	#before game_res.tick() works out what the day's work produced - the penalty has to be on
+	#them while their work is counted, not after it.
+	ResourceScripts.game_res.mark_slept_rough()
 	var slice = OS.get_ticks_msec()
-	for i in ResourceScripts.game_party.characters.values():
+	var turn_characters = ResourceScripts.game_party.characters.values()
+	var character_count = max(turn_characters.size(), 1)
+	var character_index = 0
+	for i in turn_characters:
 		i.pretick()
+		character_index += 1
+		_report_turn_progress(progress_target, 0.02 + 0.16 * float(character_index) / character_count)
 		if managed and OS.get_ticks_msec() - slice >= variables.turn_frame_budget_msec:
 			yield(globals.get_tree(), 'idle_frame')
 			slice = OS.get_ticks_msec()
-	for i in ResourceScripts.game_party.characters.values():
+	turn_characters = ResourceScripts.game_party.characters.values()
+	character_count = max(turn_characters.size(), 1)
+	character_index = 0
+	for i in turn_characters:
 		i.act_prepared()
+		character_index += 1
+		_report_turn_progress(progress_target, 0.18 + 0.10 * float(character_index) / character_count)
 	slice = OS.get_ticks_msec()
-	for i in ResourceScripts.game_party.characters.values():
+	turn_characters = ResourceScripts.game_party.characters.values()
+	character_count = max(turn_characters.size(), 1)
+	character_index = 0
+	for i in turn_characters:
 		i.tick()
+		character_index += 1
+		_report_turn_progress(progress_target, 0.28 + 0.50 * float(character_index) / character_count)
 		if managed and OS.get_ticks_msec() - slice >= variables.turn_frame_budget_msec:
 			yield(globals.get_tree(), 'idle_frame')
 			slice = OS.get_ticks_msec()
 	if managed:
 		yield(globals.get_tree(), 'idle_frame')
+	_report_turn_progress(progress_target, 0.80)
 	if managed:
 		yield(ResourceScripts.game_res.tick(true), 'completed')
 	else:
 		ResourceScripts.game_res.tick()
+	_report_turn_progress(progress_target, 0.88)
 	if managed:
 		yield(globals.get_tree(), 'idle_frame')
 	hour += 1
+	advance_weather()
+	ResourceScripts.game_res.clear_buyback() #shops resell what they bought once the turn ends
 
 	ResourceScripts.game_world.advance_hour()
 	ResourceScripts.char_events.advance_hour()
@@ -156,6 +205,47 @@ func advance_hour(managed = false):
 			yield(advance_day(true), 'completed')
 		else:
 			advance_day()
+	_report_turn_progress(progress_target, 1.0)
+
+
+func _report_turn_progress(progress_target, value):
+	if progress_target != null and progress_target.has_method("set_turn_simulation_progress"):
+		progress_target.set_turn_simulation_progress(value)
+
+
+#Rain starts on its own chance, runs the length it rolled, and each of its turns carries its own
+#chance of a storm. The lengths are weights against each other, not percentages.
+const RAIN_CHANCE = 0.05
+const RAIN_LENGTHS = [[2, 40], [3, 40], [4, 10]]
+const STORM_CHANCE = 0.10
+
+
+func raining():
+	return rain_turns_left > 0
+
+
+func storming():
+	return rain_turns_left > 0 and storm
+
+
+func advance_weather():
+	if rain_turns_left > 0:
+		rain_turns_left -= 1
+	if rain_turns_left <= 0 and randf() < RAIN_CHANCE:
+		rain_turns_left = roll_rain_length()
+	storm = rain_turns_left > 0 and randf() < STORM_CHANCE
+
+
+func roll_rain_length():
+	var total = 0
+	for entry in RAIN_LENGTHS:
+		total += entry[1]
+	var roll = randi() % int(max(1, total))
+	for entry in RAIN_LENGTHS:
+		roll -= entry[1]
+		if roll < 0:
+			return entry[0]
+	return RAIN_LENGTHS[0][0]
 
 
 func advance_day(managed = false):
@@ -170,22 +260,33 @@ func advance_day(managed = false):
 	else:
 		ResourceScripts.game_party.advance_day()
 
+	#a night in the master's bed, if the company was willing - and the satisfaction everyone
+	#wakes with when it was, which that call pays out itself
+	ResourceScripts.game_res.process_master_bed_night()
+
+	#and a night on the floor for whoever has no bed
+	ResourceScripts.game_res.process_unhoused_night()
+
+	#the clerk's morning trip to market, against the standing orders the player left
+	ResourceScripts.game_res.process_autobuy()
+
 	#guilds and shops check
 	ResourceScripts.game_world.advance_day()
 
 	#weeks check
 	if int(date) % variables.DaysPerWeek == 1 or variables.DaysPerWeek == 1:
 		reset_limits()
+		ResourceScripts.game_world.refill_service_gold()
+		ResourceScripts.game_world.roll_service_bonuses()
 
 		ResourceScripts.game_res.subtract_taxes()
-		ResourceScripts.slave_quests.regen_quests()
 
 	if !managed and gui_controller.current_screen == gui_controller.mansion:
 		gui_controller.mansion.rebuild_mansion()
 
 
 func reset_limits():
-	weekly_sex_max = 2 + ceil(ResourceScripts.game_party.get_master().get_stat('sexuals_factor') * 0.5) + ResourceScripts.game_res.upgrades.sex_times
+	weekly_sex_max = 2 + ceil(ResourceScripts.game_party.get_master().get_stat('sexuals_factor') * 0.5) + ResourceScripts.game_res.findupgradelevel('sex_times')
 	weekly_sex_left = weekly_sex_max
 	update_weekly_dates()
 	weekly_dates_left = weekly_dates_max

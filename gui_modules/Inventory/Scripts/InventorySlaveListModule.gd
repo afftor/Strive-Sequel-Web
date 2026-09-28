@@ -27,8 +27,9 @@ func update():
 		newnode.connect("pressed", get_parent(), "set_active_hero", [i])
 		var work = i.get_work()
 #		var gatherable = Items.materiallist.has(work)
-		if work in ['', 'Assignment', 'disabled', 'learning', 'farming', 'travel']:
-			if i.is_on_quest() or work in ['farming', 'travel']:
+		var farming = ResourceScripts.game_res.is_farming_work(work)
+		if farming or work in ['', 'Assignment', 'disabled', 'learning', 'travel']:
+			if i.is_on_quest() or farming or work == 'travel':
 				pass
 				#stub
 				newnode.get_node("ToolIcon").texture = null
@@ -39,8 +40,14 @@ func update():
 				globals.connecttexttooltip(newnode.get_node("TaskIcon"), tr('REST')) #2test, not sure if assignments are here or in upper block
 		else:
 			var task = i.find_worktask()
-			newnode.get_node("TaskIcon").texture = load(task.icon)
-			globals.connecttexttooltip(newnode.get_node("TaskIcon"), tr(task.name))
+			#find_worktask answers null for work whose record is gone, and a task's icon can be
+			#absent - load() takes neither, and this line is what brought the list down
+			var task_icon = task.get('icon', null) if task != null else null
+			newnode.get_node("TaskIcon").texture = load(task_icon) if task_icon is String else task_icon
+			if task == null:
+				newnode.get_node("ToolIcon").texture = null
+				continue
+			globals.connecttexttooltip(newnode.get_node("TaskIcon"), tr(task.get('name', '')))
 			if task.has('worktool'):
 				var worktool = "res://assets/images/gui/inventory/tool_%s.png" % task.worktool
 				newnode.get_node("ToolIcon").texture = load(worktool)

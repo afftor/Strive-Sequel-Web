@@ -39,6 +39,12 @@ var state_map = [
 	'invoke_cleanup'
 ]
 
+const AREA_SFX_TARGETS = [
+	'target_group', 'target_line', 'target_row',
+	'caster_group', 'caster_line', 'caster_row',
+	'full_screen',
+]
+
 
 func _callerror(value):
 	print('error - wrong tags set')
@@ -203,20 +209,74 @@ func invoke_init():
 
 
 func invoke_animations_2():
+	var registry = queuenode.animationnode.get_registry()
+	#Projectiles are queued before everything else in the slot: they publish when the shot
+	#lands, and the hit visuals of the same skill read that to hold themselves back. An
+	#entry queued before the projectile would have nothing to read yet.
+	var predamage = []
 	for i in animationdict.predamage:
-		if i.target in ['target_frame']:
-			queuenode.add_sfx(target.displaynode, get_true_code(i))
+		if registry.is_projectile(get_true_code(i)): predamage.push_back(i)
+	for i in animationdict.predamage:
+		if !registry.is_projectile(get_true_code(i)): predamage.push_back(i)
+	#What every predamage entry gets to know about the cast, whatever its code. Only
+	#functions that look for these keys read them; the rest never notice.
+	var context = {
+		caster_node = caster.displaynode,
+		weapon_sprite = caster.get_weapon_cast_animation(),
+		iteration = parent.iterations_played,
+	}
+	#The skill's hit effect - its own hitfx, or the engine default for a damaging skill -
+	#for the cards it aims at. The roll is not known yet - these entries play out before
+	#instancing runs - so a miss gets the burst with its recoil, the same way it already
+	#gets the recoil. hit_fx_key keeps it to one burst per card per blow.
+	var hit_fx = queuenode.animationnode.hit_fx_for(template, parent.tags)
+	if hit_fx != null:
+		context.hit_fx = hit_fx
+		context.hit_fx_key = get_instance_id()
+		context.hit_fx_nodes = []
+		for affected in affected_targets:
+			if affected.displaynode != null:
+				context.hit_fx_nodes.append(affected.displaynode)
+	for i in predamage:
+		if i.target == 'target_frame':
+			queuenode.add_sfx(target.displaynode, get_true_code(i), globals.make_sfx_params(i, last_iteration))
+		elif i.target in AREA_SFX_TARGETS:
+			var sfxtarget = globals.ProcessSfxTarget(i.target, caster, target)
+			if sfxtarget != null:
+				var params = globals.make_sfx_params(i, last_iteration)
+				var true_code = get_true_code(i)
+				for key in context: params[key] = context[key]
+				params.primary_node = target.displaynode
+				#an area effect that syncs to the blow reacts on every card it covers
+				if params.has('sync_to_hit') and params.sync_to_hit:
+					params.hit_nodes = []
+					for affected in affected_targets:
+						if affected.displaynode != null:
+							params.hit_nodes.append(affected.displaynode)
+				#a chained effect wants the primary target first, then the rest
+				if registry.wants_primary_first(true_code):
+					params.hit_nodes = [target.displaynode]
+					for affected in affected_targets:
+						if affected.displaynode != null and affected.displaynode != target.displaynode:
+							params.hit_nodes.append(affected.displaynode)
+				queuenode.add_sfx(sfxtarget, true_code, params)
+	if !affected_targets.empty():
+		queuenode.animationnode.play_skill_sound('strike', template, caster, target)
+		for j in predamage:
+			if j.target == 'caster':
+				var sfxtarget = globals.ProcessSfxTarget(j.target, caster, target)
+				if sfxtarget != null:
+					var params = globals.make_sfx_params(j, last_iteration)
+					for key in context: params[key] = context[key]
+					queuenode.add_sfx(sfxtarget, get_true_code(j), params)
 	for i in affected_targets:
-		if template.has('sounddata') and !template.sounddata.empty() and template.sounddata.strike != null:
-			if template.sounddata.strike == 'weapon':
-				caster.displaynode.process_sound(caster.get_weapon_sound())
-			else:
-				caster.displaynode.process_sound(template.sounddata.strike)
-		for j in animationdict.predamage:
-			if j.target in ['caster','target']:
+		for j in predamage:
+			if j.target == 'target':
 				var sfxtarget = globals.ProcessSfxTarget(j.target, caster, i)
 				if sfxtarget != null:
-					queuenode.add_sfx(sfxtarget, get_true_code(j), globals.make_sfx_params(j, last_iteration))
+					var params = globals.make_sfx_params(j, last_iteration)
+					for key in context: params[key] = context[key]
+					queuenode.add_sfx(sfxtarget, get_true_code(j), params)
 	
 	combatnode.turns += 1
 	step += 1
@@ -258,6 +318,7 @@ func invoke_instancing():
 			
 			s_skill2.hit_roll()
 			s_skill2.resolve_value(combatnode.CheckMeleeRange(caster.combatgroup))
+			queue_default_hit_sound(s_skill2)
 			instances.push_back(s_skill2)
 	
 	combatnode.turns += 1
@@ -291,6 +352,7 @@ func invoke_def_hit():
 
 
 func invoke_damage():
+	var use_default_hit_reaction = parent.tags.has('damage') and !parent.tags.has('passive') and !has_predamage_hit_reaction()
 	for s_skill2 in instances:
 		#check miss
 		if s_skill2.hit_res == variables.RES_MISS:
@@ -298,11 +360,20 @@ func invoke_damage():
 			queuenode.add_combatlog(tr("LOG_COMBAT_EVADE_DAMAGE") % target.get_short_name())
 		else:
 			#hit landed animation
-			if template.has('sounddata') and !template.sounddata.empty() and template.sounddata.hit != null:
-				if template.sounddata.hittype == 'absolute':
-					s_skill2.target.displaynode.process_sound(template.sounddata.hit)
-				elif template.sounddata.hittype == 'bodyarmor':
-					s_skill2.target.displaynode.process_sound(globals.calculate_hit_sound(template, caster, s_skill2.target))
+			if use_default_hit_reaction:
+				var reaction = {alt_slot = 'hit_reaction'}
+				var hit_fx = queuenode.animationnode.hit_fx_for(template, parent.tags)
+				if hit_fx != null:
+					reaction.hit_fx = hit_fx
+					reaction.hit_fx_key = get_instance_id()
+					reaction.hit_fx_nodes = [s_skill2.target.displaynode]
+				queuenode.add_sfx(s_skill2.target.displaynode, 'default_hit_reaction', reaction)
+			if template.code == 'devastation':
+				queuenode.animationnode.prepare_devastation_hp_update(
+					s_skill2.target.displaynode, parent.iterations_played)
+			if template.code in ['lightning', 'chain_lightning']:
+				queuenode.animationnode.prepare_lightning_hp_update(s_skill2.target.displaynode)
+			queuenode.animationnode.play_skill_sound('hit', template, caster, s_skill2.target)
 			for j in animationdict.postdamage:
 				var sfxtarget = globals.ProcessSfxTarget(j.target, caster, s_skill2.target)
 				if sfxtarget.has_method("process_sfx"):
@@ -315,6 +386,16 @@ func invoke_damage():
 	combatnode.turns += 1
 	step += 1
 	queuenode.call_deferred('invoke_resume')
+
+
+# The hit roll becomes known during instancing, several queue stages before damage
+# application. Queue the ordinary impact here so it follows the attack animation
+# more closely while still remaining silent on misses. Explicit dynamic and static
+# effects keep their existing timing in invoke_damage().
+func queue_default_hit_sound(s_skill2):
+	if s_skill2.hit_res == variables.RES_MISS:
+		return
+	queuenode.animationnode.play_skill_sound('hit_default', template, caster, s_skill2.target, parent.tags)
 
 
 func invoke_postdamage():
@@ -362,6 +443,20 @@ func get_true_code(anim_dict):
 	if anim_dict.has('code_repeat') and anim_dict.code_repeat.has(parent.iterations_played):
 		return anim_dict.code_repeat[parent.iterations_played]
 	return anim_dict.code
+
+
+func has_predamage_hit_reaction():
+	for anim_dict in animationdict.predamage:
+		if anim_dict.has('hit_motion'):
+			return true
+		if anim_dict.has('sync_to_hit') and anim_dict.sync_to_hit:
+			return true
+		if get_true_code(anim_dict) in ['targetattack', 'ranged_attack', 'assassinate']:
+			return true
+		#a projectile pushes the card itself when it lands
+		if queuenode.animationnode.get_registry().is_projectile(get_true_code(anim_dict)):
+			return true
+	return false
 
 
 

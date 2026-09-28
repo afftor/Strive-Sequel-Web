@@ -1,0 +1,417 @@
+extends PanelContainer
+
+signal inventory_requested(person)
+signal food_filter_requested(person)
+signal sex_panel_requested(person)
+
+var person
+
+const OVERVIEW_FACTORS = [
+	"growth_factor",
+	"physics_factor",
+	"magic_factor",
+	"wits_factor",
+	"charm_factor",
+	"sexuals_factor",
+	"tame_factor",
+	"authority_factor",
+]
+const OVERVIEW_STATS = ["physics", "wits", "charm", "productivity"]
+const COMBAT_STATS = [
+	"atk",
+	"matk",
+	"armor",
+	"mdef",
+	"hitrate",
+	"evasion",
+	"speed",
+	"armorpenetration",
+	"critchance",
+	"critmod",
+]
+const COMBAT_STAT_TOOLTIPS = {
+	"atk": "SIMATK_DESC",
+	"matk": "SIMMATK_DESC",
+	"armor": "SIMDEF_DESC",
+	"mdef": "SIMMDEF_DESC",
+	"hitrate": "SIMHITRATE_DESC",
+	"evasion": "SIMEVASION_DESC",
+	"speed": "SIMSPEED_DESC",
+	"armorpenetration": "SIMARMORPEN_DESC",
+	"critchance": "SIMCRITICAL_DESC",
+	"critmod": "SIMCRITICALMOD_DESC",
+}
+const PERSONALITY_ICONS = {
+	"bold": preload("res://assets/Textures_v2/MANSION/personality_bold.png"),
+	"kind": preload("res://assets/Textures_v2/MANSION/personality_kind.png"),
+	"shy": preload("res://assets/Textures_v2/MANSION/personality_shy.png"),
+	"serious": preload("res://assets/Textures_v2/MANSION/personality_serious.png"),
+	"neutral": preload("res://assets/Textures_v2/MANSION/personality_neutral.png"),
+}
+const OVERVIEW_ICONS = {
+	# Every factor shares its medallion with the character creation screen, so a
+	# stat is the same picture and the same colour wherever it is shown.  Growth is
+	# the only one nobody assigns points to, and its medallion says so: silver and
+	# an arrow rather than a colour of its own.
+	"growth_factor": preload("res://assets/images/iconsfactors/growth_factor.png"),
+	"physics_factor": preload("res://assets/images/iconsfactors/physics_factor.png"),
+	"magic_factor": preload("res://assets/images/iconsfactors/magic_factor.png"),
+	"wits_factor": preload("res://assets/images/iconsfactors/wits_factor.png"),
+	"charm_factor": preload("res://assets/images/iconsfactors/charm_factor.png"),
+	"sexuals_factor": preload("res://assets/images/iconsfactors/sexuals_factor.png"),
+	"tame_factor": preload("res://assets/images/iconsfactors/tame_factor.png"),
+	"authority_factor": preload("res://assets/images/iconsfactors/authority_factor.png"),
+	"physics": preload("res://assets/images/gui/gui icons/icon_physics.png"),
+	"wits": preload("res://assets/images/gui/gui icons/icon_wits.png"),
+	"charm": preload("res://assets/images/gui/gui icons/icon_charm.png"),
+	"productivity": preload("res://assets/images/gui/inventory/icon_craft1.png"),
+}
+
+onready var Classes = $Sections/Classes/Content/Scroll/Items
+onready var FactorRows = $Sections/Overview/Left/Factors/Content/Rows
+onready var Experience = $Sections/Overview/Left/Experience/Content/Value
+onready var StatRows = $Sections/Overview/Left/BaseStats/Content/Rows
+onready var CharacterRows = $Sections/Overview/Right/CharacterInfo/Content/Rows
+onready var Relationships = $Sections/Overview/Right/Relationships
+onready var Equipment = $Sections/Equipment/Content/Scroll/Items
+onready var Traits = $Sections/Traits/Content/Scroll/Items
+onready var Buffs = $Sections/Buffs/Content/Scroll/Items
+onready var CombatStatItems = $Sections/CombatStats/Content/Stats/Items
+onready var ResistItems = $Sections/CombatStats/Content/Resists/Items
+
+
+func _ready():
+	$Sections/Overview/Right/Food/Content/Filter.connect(
+		"pressed", self, "_request_food_filter"
+	)
+	globals.connecttexttooltip(
+		$Sections/Overview/Right/Food/Content/Filter,
+		tr("INFOFOODFILTER")
+	)
+	input_handler.register_btn_source("food_filter_btn", self, "tut_get_food_filter_btn")
+	$Sections/Overview/Right/Consent/Content/Expand.connect(
+		"pressed", self, "_request_sex_panel"
+	)
+	globals.connecttexttooltip(
+		$Sections/Overview/Right/Consent/Content/Expand, tr("LABELSEXSKILLS")
+	)
+
+
+func tut_get_food_filter_btn():
+	return $Sections/Overview/Right/Food/Content/Filter
+
+
+func _request_inventory():
+	if person != null:
+		emit_signal("inventory_requested", person)
+
+
+func _request_food_filter():
+	if person != null:
+		emit_signal("food_filter_requested", person)
+
+
+func _request_sex_panel():
+	if person != null:
+		emit_signal("sex_panel_requested", person)
+
+
+func prepare_expanded_person(value):
+	person = value
+
+
+func set_person(value):
+	prepare_expanded_person(value)
+	build_professions()
+	build_overview()
+	build_expanded_character_info()
+	build_relationships()
+	build_equipment()
+	build_traits()
+	build_buffs()
+	build_combat_stats()
+
+
+func build_professions():
+	input_handler.ClearContainer(Classes)
+	if person == null:
+		return
+	for profession_code in person.get_professions():
+		var newnode = input_handler.DuplicateContainerTemplate(Classes)
+		var profession = classesdata.professions[profession_code]
+		newnode.get_node("ProfIcon").texture = profession.icon
+		newnode.connect("signal_RMB_release", gui_controller, "show_class_info", [profession_code, person])
+		globals.connectclasstooltip(newnode, person, profession_code)
+
+
+func build_overview():
+	input_handler.ClearContainer(FactorRows)
+	input_handler.ClearContainer(StatRows)
+	if person == null:
+		return
+	var current_exp = int(floor(person.get_stat("base_exp")))
+	var next_level_exp = int(floor(person.get_next_class_exp()))
+	Experience.text = tr("STATBASE_EXP") + ": " + str(current_exp) + " / " + str(next_level_exp)
+	if current_exp >= next_level_exp:
+		Experience.set("custom_colors/font_color", Color(variables.hexcolordict.levelup_text_color))
+	else:
+		Experience.set("custom_colors/font_color", variables.hexcolordict["k_yellow"])
+	var exp_tooltip = "[center]{color=yellow|" + tr("STATBASE_EXP") + "}[/center]\n" + tr("STATBASE_EXPDESCRIPT")
+	exp_tooltip += "\n" + tr("EXPREQUIRED") + ": " + str(next_level_exp)
+	globals.connecttexttooltip($Sections/Overview/Left/Experience, exp_tooltip)
+	for code in OVERVIEW_FACTORS:
+		if person.is_master() and code in ["tame_factor", "authority_factor"]:
+			continue
+		var row = input_handler.DuplicateContainerTemplate(FactorRows)
+		_setup_overview_row(row, code, str(int(floor(person.get_stat(code)))), true)
+	for code in OVERVIEW_STATS:
+		var value
+		if code == "productivity":
+			value = str(int(floor(person.get_stat(code)))) + "%"
+		else:
+			value = globals.base_stat_text(person, code)
+		var row = input_handler.DuplicateContainerTemplate(StatRows)
+		_setup_overview_row(row, code, value, false)
+
+
+func _setup_overview_row(row, code, value, factor):
+	row.get_node("Icon").texture = OVERVIEW_ICONS[code]
+	if factor:
+		_setup_factor_value(row, value, code)
+	else:
+		row.get_node("Value").text = value
+		row.get_node("Value").set("custom_colors/font_color", variables.hexcolordict["k_yellow"])
+	var tooltip
+	if code == "productivity":
+		tooltip = _build_productivity_tooltip()
+	else:
+		tooltip = "[center]{color=yellow|" + tr("STAT" + code.to_upper()) + "}[/center]\n" + person.translate(statdata.statdata[code].descript)
+	globals.connecttexttooltip(row, tooltip)
+
+
+#A factor reads as a digit or as a word, and the two want very different room: "6"
+#sits large over the medallion, while "Excellent" needs the whole width of the cell
+#in a small face. One label cannot be both, so the row carries two and shows one.
+#
+#The cell is 66 px wide and the word label 64 of that. Measured in the row's own
+#font, the longest English word only just fits at the template size, and a
+#translation can be longer - so the label is fitted to whatever it actually holds.
+#The shared default padding would leave 24 px of a 64 px label and shrink the word
+#to nothing, which is why this passes its own.
+const FACTOR_WORD_PADDING = 4
+
+
+func _setup_factor_value(row, value, code):
+	var step = int(clamp(floor(person.get_stat(code)), 1, 6))
+	var colour = variables.hexcolordict["factor" + str(step)]
+	var number = row.get_node("Value")
+	var word = row.get_node("Word")
+	var as_words = input_handler.globalsettings.factors_as_words
+	number.visible = !as_words
+	word.visible = as_words
+	if as_words:
+		word.text = ResourceScripts.descriptions.factor_descripts[step]
+		word.set("custom_colors/font_color", colour)
+		input_handler.font_size_adjust(word, FACTOR_WORD_PADDING)
+	else:
+		number.text = value
+		number.set("custom_colors/font_color", colour)
+	setup_factor_glow(row.get_node("Glow"), code, step)
+
+
+const LAYOUT = preload("res://gui_modules/CharacterCreation/creation_layout.gd")
+const GROWTH_HALO_COLOUR = Color("b4c4dc")
+
+
+static func setup_factor_glow(glow, code, step):
+	glow.visible = step == 6
+	if glow.visible:
+		glow.color = factor_halo_colour(code)
+
+
+#the creation screen's plate colours are too dull to read as light
+static func factor_halo_colour(code):
+	var plate = LAYOUT.factor_row(code)
+	if plate == null:
+		return GROWTH_HALO_COLOUR
+	var halo = Color(plate.colour)
+	halo.s = min(halo.s * 1.25, 1.0)
+	halo.v = 1.0
+	return halo
+
+
+func _build_productivity_tooltip():
+	var text = "[center]" + statdata.statdata.productivity.name + "[/center]\n"
+	text += person.translate(statdata.statdata.productivity.descript)
+	text += "\n" + tr("TOTALPRODUCTIVITY") + ": " + str(floor(person.get_stat("productivity")))
+	for mod_code in variables.productivity_mods:
+		var mod_value = person.get_stat(mod_code)
+		var line = str(round(mod_value * 100)) + " - " + statdata.statdata[mod_code].name
+		if mod_value > 1:
+			text += "\n{color=green|" + line + "}"
+		elif mod_value < 1:
+			text += "\n{color=red|" + line + "}"
+		else:
+			text += "\n" + line
+	return text
+
+
+func build_expanded_character_info():
+	if person == null:
+		return
+	var fame_row = CharacterRows.get_node("Fame")
+	fame_row.get_node("Value").text = tr(person.get_fame_bonus("name"))
+	globals.connecttexttooltip(fame_row,
+		person.translate(tr("TOOLTIPFAME") + "\n\n{color=yellow|" + tr(person.get_fame_bonus("desc")) + "}")
+		+ "\n" + person.get_fame_bonus_desc())
+
+	var price_row = CharacterRows.get_node("Price")
+	price_row.visible = !person.has_profession("master")
+	if price_row.visible:
+		var price = person.calculate_price(false, false, true)
+		var character_tax = person.get_weekly_tax()
+		price_row.get_node("Value").text = str(price)
+		if character_tax > 0:
+			price_row.get_node("Value").text += " (%d)" % character_tax
+		var value_tooltip = tr("TOOLTIPVALUE") + "\n\n" + person.get_price_composition()
+		if character_tax > 0:
+			value_tooltip += "\n%s: {color=yellow|%d} (%d + %d)" % [
+				tr("FAMEDESC_UPKEEP"), character_tax, person.get_upkeep(), person.get_value_upkeep()
+			]
+		globals.connecttexttooltip(price_row, value_tooltip)
+
+	var standing_row = Relationships.get_node("Content/Standing")
+	standing_row.visible = !person.is_master()
+	if standing_row.visible:
+		standing_row.get_node("Value").text = person.get_character_standing()
+		globals.connecttexttooltip(standing_row, _build_standing_tooltip())
+
+	var personality_row = CharacterRows.get_node("Personality")
+	var personality = person.get_stat("personality")
+	personality_row.get_node("Icon").texture = PERSONALITY_ICONS.get(personality, PERSONALITY_ICONS.neutral)
+	personality_row.get_node("Value").text = tr("PERSONALITYNAME" + personality.to_upper())
+	globals.connecttexttooltip(personality_row, globals.get_character_personality_tooltip(personality))
+
+	var food_panel = $Sections/Overview/Right/Food
+	var food_row = food_panel.get_node("Content")
+	#the filter button wears the liked food itself - the picture is its label, and the word
+	#only comes back when the character has no liked type to show
+	var filter_button = food_row.get_node("Filter")
+	var liked_icon = filter_button.get_node("Icon")
+	var food_love = person.food.food_love
+	liked_icon.visible = food_love != null and food_love != ""
+	var filter_tooltip = tr("INFOFOODFILTER")
+	if liked_icon.visible:
+		liked_icon.texture = images.get_icon(food_love)
+		filter_button.text = ""
+		filter_tooltip += "\n\n[center]" + tr("FOODLIKEDTYPE") + "[/center]"
+		filter_tooltip += "\n{color=green|" + tr("FOODTYPE" + food_love.to_upper()) + "}"
+		filter_tooltip += "\n" + tr("FOODTOOLTIPLIKED")
+	else:
+		filter_button.text = tr("MSLMFOOD")
+	globals.connecttexttooltip(filter_button, filter_tooltip)
+	var demand = person.get_food_demand()
+	var demand_label = food_row.get_node("Demand")
+	demand_label.text = tr("DEMAND") + ": " + tr("FOODDEMAND" + demand.to_upper())
+	demand_label.set("custom_colors/font_color", Color(variables.hexcolordict[variables.food_demand_colors[demand]]))
+	#the whole panel is the demand tooltip's hover zone - only the filter button carves
+	#its own tooltip out of it, so there is no dead space between the two
+	globals.connecttexttooltip(food_panel, globals.get_character_demand_tooltip(person, demand))
+
+	var consent_label = $Sections/Overview/Right/Consent/Content/Value
+	if person.is_master():
+		consent_label.text = tr("SIBLINGMODULECONSENT") + tr("MASTER")
+		globals.connecttexttooltip(consent_label, person.translate(tr("INFOCONSENTMASTER")))
+	else:
+		consent_label.text = tr("SIBLINGMODULECONSENT") + tr(variables.consent_dict[int(person.get_stat("consent"))])
+		globals.connecttexttooltip(consent_label, tr("INFOCONSENT"))
+
+
+func build_relationships():
+	if person == null:
+		return
+	Relationships.visible = !person.is_master()
+	if !Relationships.visible:
+		return
+	for code in ["affection", "respect"]:
+		var row = Relationships.get_node("Content/Bars/" + code.capitalize())
+		row.get_node("Bar").value = person.get_stat(code)
+		var tooltip = "[center]{color=yellow|" + tr("STAT" + code.to_upper()) + "}[/center]\n" + person.translate(statdata.statdata[code].descript)
+		globals.connecttexttooltip(row, tooltip)
+
+
+func build_equipment():
+	input_handler.ClearContainer(Equipment)
+	if person == null:
+		return
+	for item in person.get_equiped_items():
+		var newnode = input_handler.DuplicateContainerTemplate(Equipment)
+		item.set_icon(newnode.get_node("Icon"))
+		if item.quality != "":
+			newnode.get_node("quality_color").texture = variables.quality_colors[item.quality]
+			newnode.get_node("quality_color").show()
+		else:
+			newnode.get_node("quality_color").hide()
+		globals.connectitemtooltip_v2(newnode, item)
+		newnode.connect("pressed", self, "_request_inventory")
+
+
+func build_traits():
+	if person != null:
+		globals.build_traitlist_for_char(person, Traits)
+
+
+func build_buffs():
+	if person != null:
+		globals.build_buffs_for_char(person, Buffs, "mansion")
+
+
+func build_combat_stats():
+	input_handler.ClearContainer(CombatStatItems)
+	input_handler.ClearContainer(ResistItems)
+	if person == null:
+		return
+	for code in COMBAT_STATS:
+		var entry = input_handler.DuplicateContainerTemplate(CombatStatItems)
+		entry.name = code
+		entry.get_node("Icon").texture = images.get_icon(variables.fighter_stat_icons[code])
+		entry.get_node("Value").text = _format_combat_stat(code)
+		globals.connecttexttooltip(entry, tr(COMBAT_STAT_TOOLTIPS[code]))
+	for code in variables.resists_list:
+		var entry = input_handler.DuplicateContainerTemplate(ResistItems)
+		entry.name = code
+		entry.get_node("Icon").texture = images.get_icon("resist_" + code)
+		var value = person.get_stat("resist_" + code)
+		var value_label = entry.get_node("Value")
+		value_label.text = str(value)
+		if value > 0:
+			value_label.set("custom_colors/font_color", variables.hexcolordict.yellow)
+		elif value < 0:
+			value_label.set("custom_colors/font_color", variables.hexcolordict.green)
+		else:
+			value_label.set("custom_colors/font_color", variables.hexcolordict.white)
+		globals.connecttexttooltip(entry, tr(code.to_upper() + "RESIST_DESC"))
+
+
+func _format_combat_stat(code):
+	if code == "critmod":
+		return str(floor(person.get_stat(code) * 100)) + "%"
+	if code == "speed":
+		return str(floor(person.get_stat(code)[0]))
+	return str(floor(person.get_stat(code)))
+
+
+func _build_standing_tooltip():
+	var text = person.translate(tr("TOOLTIPCHARACTERSTANDING"))
+	var standing_code = person.get_character_standing_code()
+	var effect_code = "e_" + standing_code
+	if person.has_status(standing_code) and Effectdata.effect_table.has(effect_code):
+		var effect = Effectdata.effect_table[effect_code]
+		text += "\n\n[center]{color=yellow|%s}[/center]\n%s" % [
+			tr("TRAIT" + standing_code.to_upper()),
+			person.translate(tr("TRAIT" + standing_code.to_upper() + "DESCRIPT")),
+		]
+		var bonus_text = person.translate(globals.build_desc_for_bonusstats(effect.statchanges).strip_edges())
+		if bonus_text != "":
+			text += "\n" + bonus_text
+	return text

@@ -1,4 +1,4 @@
-[gd_scene load_steps=66 format=2]
+[gd_scene load_steps=70 format=2]
 
 [ext_resource path="res://assets/Fonts_v2/FontThemes/TitlesMiddle.tres" type="DynamicFont" id=1]
 [ext_resource path="res://gui_modules/Universal/Modules/NavigationModule.tscn" type="PackedScene" id=2]
@@ -62,6 +62,9 @@
 [ext_resource path="res://gui_modules/Universal/Modules/CapturedSlavesButton.gd" type="Script" id=76]
 [ext_resource path="res://assets/Themes_v2/UNIVERSAL/PT_24.tres" type="DynamicFont" id=77]
 [ext_resource path="res://assets/Textures_v2/DUNGEON/Icons/steps.png" type="Texture" id=78]
+[ext_resource path="res://assets/images/gui/ui_slot_cross.png" type="Texture" id=79]
+
+[ext_resource path="res://assets/Textures_v2/MANSION/yes.png" type="Texture" id=80]
 
 [sub_resource type="StyleBoxTexture" id=3]
 texture = ExtResource( 45 )
@@ -70,6 +73,34 @@ region_rect = Rect2( 0, 0, 53, 7 )
 [sub_resource type="ImageTexture" id=1]
 
 [sub_resource type="ImageTexture" id=2]
+
+[sub_resource type="StyleBoxFlat" id=4]
+bg_color = Color( 0.0156863, 0.0470588, 0.0117647, 0.94 )
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color( 0.376471, 1, 0.160784, 1 )
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_right = 5
+corner_radius_bottom_left = 5
+shadow_color = Color( 0.152941, 1, 0.0392157, 0.7 )
+shadow_size = 4
+
+[sub_resource type="StyleBoxFlat" id=5]
+bg_color = Color( 0.0666667, 0.196078, 0.0470588, 0.98 )
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color( 0.607843, 1, 0.454902, 1 )
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_right = 5
+corner_radius_bottom_left = 5
+shadow_color = Color( 0.152941, 1, 0.0392157, 0.9 )
+shadow_size = 6
 
 [node name="LocationGui" type="Panel"]
 margin_right = 1920.0
@@ -952,6 +983,32 @@ margin_bottom = 40.0
 texture = ExtResource( 37 )
 expand = true
 
+[node name="LevelUpIndicator" type="Button" parent="PresentedSlavesPanel/ScrollContainer/VBoxContainer/Button"]
+visible = false
+anchor_left = 1.0
+anchor_right = 1.0
+margin_left = -33.0
+margin_top = 3.0
+margin_right = -3.0
+margin_bottom = 33.0
+rect_min_size = Vector2( 30, 30 )
+focus_mode = 0
+mouse_default_cursor_shape = 2
+custom_styles/hover = SubResource( 5 )
+custom_styles/pressed = SubResource( 4 )
+custom_styles/normal = SubResource( 4 )
+
+[node name="Cross" type="TextureRect" parent="PresentedSlavesPanel/ScrollContainer/VBoxContainer/Button/LevelUpIndicator"]
+modulate = Color( 0.4, 3, 0.12, 1 )
+margin_left = 3.0
+margin_top = 3.0
+margin_right = 27.0
+margin_bottom = 27.0
+mouse_filter = 2
+texture = ExtResource( 79 )
+expand = true
+stretch_mode = 5
+
 [node name="Label" type="Label" parent="PresentedSlavesPanel"]
 margin_right = 615.0
 margin_bottom = 87.0
@@ -1234,6 +1291,16 @@ margin_right = 1905.0
 margin_bottom = 1060.0
 texture = ExtResource( 19 )
 expand = true
+
+[node name="cleared" type="TextureRect" parent="MapPanel"]
+visible = false
+margin_left = 795.0
+margin_top = 32.0
+margin_right = 835.0
+margin_bottom = 72.0
+texture = ExtResource( 80 )
+expand = true
+stretch_mode = 6
 
 [node name="RichTextLabel" type="RichTextLabel" parent="MapPanel"]
 margin_left = 37.0
@@ -1551,10 +1618,10 @@ margin_right = -19.0
 
 [node name="AvailableSlaves" parent="." instance=ExtResource( 41 )]
 visible = false
-margin_left = 1497.0
+margin_left = 1129.0
 margin_top = 235.0
 margin_right = 1865.0
-margin_bottom = 909.0
+margin_bottom = 941.0
 
 [node name="Resources" type="Panel" parent="."]
 visible = false
@@ -1618,18 +1685,6 @@ custom_fonts/font = ExtResource( 4 )
 text = "20"
 align = 1
 valign = 1
-__meta__ = {
-"_edit_use_anchors_": false
-}
-
-[node name="Forget" type="Button" parent="Resources"]
-visible = false
-margin_left = 135.0
-margin_top = 200.0
-margin_right = 315.0
-margin_bottom = 252.0
-theme = ExtResource( 7 )
-text = "FORGET_LOC_LABEL"
 __meta__ = {
 "_edit_use_anchors_": false
 }

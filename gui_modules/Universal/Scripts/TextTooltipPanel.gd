@@ -5,14 +5,17 @@ var Text_x = 565
 var pos_fix = 26
 
 var move_right = false
+#What to stand clear of, when that is not the node being hovered - see globals.connecttexttooltip
+var anchor = null
 
 
-func showup(node, text, move_right = false):
+func showup(node, text, move_right = false, anchor_node = null):
 #	if parentnode.is_connected("tree_exiting", self, "turnoff") == false:
 #		parentnode.connect("tree_exiting", self, "turnoff")
 	if _setup(node):
 		$RichTextLabel.bbcode_text = globals.TextEncoder(text)
 		self.move_right = move_right
+		self.anchor = anchor_node
 
 
 func update():
@@ -46,29 +49,35 @@ func update():
 	if !weakref(parentnode).get_ref():
 		emit_signal("update_completed")
 		return
-	rect_size.y = $RichTextLabel.get_v_scroll().get_max() + pos_fix
-	$Panel.rect_size.y = $RichTextLabel.get_v_scroll().get_max() + pos_fix
-	$RichTextLabel.rect_size.y = rect_size.y
-	
-	var pos = input_handler.get_real_global_rect(parentnode, true)
-	
+	#The scrollbar maximum keeps the label's previous viewport height in its range. Using
+	#it here made short tooltips (notably gold) inherit a very tall black background.
 	var screen = get_viewport().get_visible_rect()
+	var content_height = ceil($RichTextLabel.get_content_height())
+	var tooltip_height = clamp(content_height + pos_fix, 48, max(screen.size.y - 20, 48))
+	rect_size.y = tooltip_height
+	$Panel.rect_size.y = tooltip_height
+	$RichTextLabel.rect_size.y = tooltip_height - pos_fix + 2
+	
+	var against = parentnode
+	if anchor != null and is_instance_valid(anchor) and anchor.is_visible_in_tree():
+		against = anchor
+	var pos = input_handler.get_real_global_rect(against, true)
 	if move_right:
-		pos = Vector2(pos.end.x + 10, pos.position.y)
-		set_global_position(pos)
+		var room_right = pos.end.x + 10
+		#Off the edge to the right, this used to be clamped back - which laid the panel across
+		#the very thing it was explaining, and over the buttons beside it. Step to the other
+		#side instead, and only clamp when neither side has room.
+		if room_right + rect_size.x > screen.end.x and pos.position.x - rect_size.x - 10 >= screen.position.x:
+			room_right = pos.position.x - rect_size.x - 10
+		pos = Vector2(room_right, pos.position.y)
 	else:
 		pos = Vector2(pos.position.x, pos.end.y + 10)
-		set_global_position(pos)
-		if get_rect().end.x >= screen.size.x:
-			rect_global_position.x -= get_rect().end.x - screen.size.x
-		if get_rect().end.y >= screen.size.y:
-			rect_global_position.y = parentnode.get_global_rect().position.y - (get_rect().size.y+10)
-		if get_rect().position.y < 0:
-			if gui_controller.current_screen == gui_controller.mansion:
-				rect_global_position.y = screen.size.y - get_rect().size.y
-				rect_global_position.x -= 485
-			else:
-				rect_global_position.y = 0
-				rect_global_position.x -= get_rect().end.x - get_rect().size.x - 350
+		if pos.y + rect_size.y > screen.end.y:
+			pos.y = input_handler.get_real_global_rect(against, true).position.y - rect_size.y - 10
+	var max_x = max(screen.position.x, screen.end.x - rect_size.x)
+	var max_y = max(screen.position.y, screen.end.y - rect_size.y)
+	pos.x = clamp(pos.x, screen.position.x, max_x)
+	pos.y = clamp(pos.y, screen.position.y, max_y)
+	set_global_position(pos)
 	emit_signal("update_completed")
 

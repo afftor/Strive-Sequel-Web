@@ -49,21 +49,26 @@ func update():
 			slavename += "F"
 		text = tr('TYPE_LABEL' + ': ' + "[color=yellow]") + person.translate(slavename) + "[/color]\n"
 		if person.is_players_character == true:
-			if person.get_work() != 'disabled' and person.get_work() != '' and person.get_work() != 'Assignment' and person.get_work() != 'learning':
-				var task_id = person.get_work()
-				var task = ResourceScripts.game_res.tasks_progresses[task_id]
-				text += tr(task.name)
-			else:
-				text += "Occupation: None"
-			text += "\n"
+			var task_id = person.get_work()
+			var occupation = ""
+			#'travel' is a work value like any other - ch_leveling.remove_from_task guards on it -
+			#but it never gets an entry in tasks_progresses, and indexing it threw and took the rest
+			#of the tooltip with it. Anyone on the road was hovered to a half-built card.
+			if task_id == 'travel':
+				occupation = tr("TASKTRAVEL")
+			elif ResourceScripts.game_res.tasks_progresses.has(task_id):
+				occupation = tr(ResourceScripts.game_res.tasks_progresses[task_id].name)
+			if occupation == "":
+				occupation = "Occupation: None"
+			text += occupation + "\n"
 
 		$growth.text = ResourceScripts.descriptions.factor_descripts[int(floor(person.get_stat('growth_factor')))]
 		$growth.set("custom_colors/font_color", variables.hexcolordict['factor'+str(int(floor(person.get_stat('growth_factor'))))])
 		for i in ['physics','wits','charm']:
 			var color = set_color(person.get_stat(i+"_bonus"))
-			get_node(i).text = str(floor(person.get_stat(i)))
+			get_node(i).text = globals.base_stat_value_text(person, i)
 			get_node(i).set("custom_colors/font_color", color)
-			get_node(i+'2').text = str(person.get_stat(i+'_cap') + person.get_stat(i+"_bonus"))
+			get_node(i+'2').text = globals.base_stat_cap_text(person, i)
 			get_node(i+'2').set("custom_colors/font_color", color)
 
 		text = "[center]" + statdata.statdata.productivity.name + "[/center]\n" + statdata.statdata.productivity.descript + "\nTotal Productivity: " + str(floor(person.get_stat('productivity')))
@@ -77,15 +82,16 @@ func update():
 #		globals.connecttexttooltip($productivity, globals.TextEncoder(text))
 		
 		globals.build_buffs_for_char(person, $buffscontainer, 'mansion')
+		globals.ensure_trait_templates($traitscontainer, 44)
+		globals.build_traitlist_for_char(person, $traitscontainer)
 		#idk about showing buffs here - where this scene is shown anyway? 
 		input_handler.GetTweenNode(self).stop_all()
 		self.modulate.a = 1
 #		show()
-		var pos = parentnode.get_global_rect()
-		pos = Vector2(pos.end.x + 10, pos.position.y)
-		self.set_global_position(pos)
+		var anchor = parentnode.get_global_rect()
+		self.set_global_position(Vector2(anchor.end.x + 10, anchor.position.y))
 		if get_rect().end.x+100 > screen.size.x:
-			rect_global_position.x -= get_rect().end.x+100 - screen.size.x
+			rect_global_position.x = max(0, anchor.position.x - rect_size.x - 10)
 		if get_rect().end.y+125 > screen.size.y:
 			rect_global_position.y -= get_rect().end.y+125 - screen.size.y
 		set_process(true)

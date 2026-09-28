@@ -45,6 +45,10 @@ var state_map = [
 	'invoke_cleanup'
 ]
 
+const SPELLSWORD_FOLLOWUP_SPEED = 1.3
+const SPELLTRACE_SPELL_FOLLOWUP_TAG = 'spelltrace_spell_followup'
+const SPELLSWORD_FAST_ATTACK_FOLLOWUP_TAG = 'spellsword_fast_attack_followup'
+
 
 func _init(md = variables.SKILL_BASE):
 	caster = null
@@ -226,8 +230,12 @@ func process_event(ev, data = {}):
 func refine_target(skill, caster, ttarget): #s_skill, caster, target
 	var target = ttarget.position
 	var change = false
+	#The sandbox picks the target by hand, so honour it. Plenty of skills are
+	#TARGET_NOKEEP and would otherwise re-roll onto somebody else.
+	if variables.anim_sandbox and ttarget != null and !ttarget.defeated:
+		return ttarget
 	#var skill = Skillsdata.skilllist[s_code]
-	if skill.keep_target == variables.TARGET_FORCED: 
+	if skill.keep_target == variables.TARGET_FORCED:
 		change = false #intentional target lock
 	elif ttarget == null: 
 		change = true #forced change
@@ -334,6 +342,14 @@ func refine_target(skill, caster, ttarget): #s_skill, caster, target
 			avtargets.erase(caster)
 			if avtargets.empty():
 				return null
+			if skill.template.has('targetreqs'):
+				var avtargets_filtered = []
+				for ally in avtargets:
+					if ally.checkreqs(skill.template.targetreqs) :
+						avtargets_filtered.append(ally)
+				if avtargets_filtered.empty():
+					return null
+				return input_handler.random_from_array(avtargets_filtered)
 			return input_handler.random_from_array(avtargets)
 
 #real queue part
@@ -357,9 +373,10 @@ func invoke_init():
 	match mode:
 		variables.SKILL_BASE:
 			queuenode.add_combatlog(tr("LOG_COMBAT_USE_SKILL") % [caster.get_short_name(), template.name])
-			caster.pay_cost(template.cost)
-			if template.combatcooldown != 0:
-				caster.skills.combat_cooldowns[code] = template.combatcooldown
+			if !variables.anim_sandbox:
+				caster.pay_cost(template.cost)
+				if template.combatcooldown != 0:
+					caster.skills.combat_cooldowns[code] = template.combatcooldown
 			if caster.combatgroup == 'ally':
 				if !caster.has_status('ignore_catalysts_for_%s' % code):
 					for i in template.catalysts:
@@ -399,26 +416,52 @@ func invoke_init():
 	queuenode.call_deferred('invoke_resume')
 
 
+func prepare_spellsword_followup_animations(animations):
+	if mode != variables.SKILL_FA or parent == null:
+		return
+	var traced_spell = parent.tags.has(SPELLTRACE_SPELL_FOLLOWUP_TAG)
+	var fast_attack = parent.tags.has(SPELLSWORD_FAST_ATTACK_FOLLOWUP_TAG)
+	if !traced_spell and !fast_attack:
+		return
+	for animation in animations:
+		var base_speed = float(animation.speed) if animation.has('speed') else 1.0
+		animation.speed = base_speed * SPELLSWORD_FOLLOWUP_SPEED
+		if traced_spell and animation.period == 'predamage' and animation.target != 'caster':
+			animation.sync_to_hit = true
+	if traced_spell:
+		animations.append({
+			code = 'cast_weapon',
+			target = 'caster',
+			period = 'windup',
+			is_cast = true,
+			speed = SPELLSWORD_FOLLOWUP_SPEED,
+			alt_slot = 'spelltrace_weapon',
+		})
+
+
 func invoke_animations_1():
 	var animations = template.sfx.duplicate(true)
+	prepare_spellsword_followup_animations(animations)
 	#sort animations
+	#'weapon' and 'cast_weapon' become the codes the caster's equipment gives them here,
+	#once, before the entries are bucketed by period - has_predamage_hit_reaction and
+	#get_true_code only ever see resolved codes
+	var registry = queuenode.animationnode.get_registry()
 	for i in animations:
-		if i.code == 'weapon':
-			i.code = caster.get_weapon_animation()
-		elif i.code == 'cast_weapon':
-			i.code = caster.get_weapon_cast_animation()
+		i.code = registry.resolve(i.code, caster)
 		animationdict[i.period].append(i)
 	#casteranimations
 	#for sure at windup there should not be real_target-related animations
-	if template.has('sounddata') and !template.sounddata.empty() and template.sounddata.initiate != null:
-		caster.displaynode.process_sound(template.sounddata.initiate)
+	queuenode.animationnode.play_skill_sound('initiate', template, caster, target)
 	for i in animationdict.windup:
 		var sfxtarget = globals.ProcessSfxTarget(i.target, caster, target)
 		var params = globals.make_sfx_params(i)
 		#animations on the caster cannot reach the target otherwise - they only ever
-		#get one node, and the two sit in different containers
+		#get one node, and the two sit in different containers. foe_position is the
+		#target's slot number, read by the row charge; harmless for the rest.
 		if i.target == 'caster' and target != null and target.displaynode != null:
 			params.foe_node = target.displaynode
+			params.foe_position = target.position
 		queuenode.add_sfx(sfxtarget, i.code, params)
 	
 	combatnode.turns += 1
@@ -434,6 +477,14 @@ func invoke_instancing():
 		#refine target
 		combatnode.UpdateSkillTargets(caster, template, true)
 		last_target = refine_target(self, caster, last_target)
+		#nobody left to hit - the sandbox never ends the fight, and NT_BACK can come up empty
+		#as well: close the repeat loop the way a won fight does, so skillfinish still runs
+		#(devastation's return among others) instead of queueing an instance with no target
+		if last_target == null:
+			step += 1
+			combatnode.turns += 1
+			queuenode.call_deferred('invoke_resume')
+			return
 		
 		#make instance
 		iterations_played += 1
@@ -455,6 +506,10 @@ func invoke_instancing():
 
 
 func invoke_skillfinish():
+	if code == 'devastation' and caster != null and caster.displaynode != null:
+		queuenode.add_sfx(caster.displaynode, 'devastation_return', {})
+	if code in ['lightning', 'chain_lightning']:
+		queuenode.animationnode.clear_lightning_timing()
 	if mode != variables.SKILL_AUTO and !tags.has('passive'):
 		process_event(variables.TR_SKILL_FINISH, {skill = self})
 		caster.process_event(variables.TR_SKILL_FINISH, {skill = self})
@@ -475,7 +530,11 @@ func invoke_skillfinish():
 
 func invoke_finalize():
 	if !(mode in [variables.SKILL_FA, variables.SKILL_EFFECT, variables.SKILL_COPY]):
-		if !tags.has('instant') or caster.hp <= 0 or !caster.can_act():
+		#in the sandbox every skill behaves as instant: the turn comes back to the
+		#same fighter, the order never advances, and enemies never get one
+		if variables.anim_sandbox:
+			queuenode.add_end_action(caster, true)
+		elif !tags.has('instant') or caster.hp <= 0 or !caster.can_act():
 			queuenode.add_end_action(caster)
 		else:
 			queuenode.add_end_action(caster, true)

@@ -4,6 +4,8 @@ extends Node
 var effects: = {}
 var stacks: = {}
 
+const LEGACY_EFFECTS_TO_RETIRE = ['e_food_like', 'e_food_dislike']
+
 
 func get_new_id():
 	var s := "eid%d"
@@ -80,7 +82,15 @@ func make_stack(code, store = true):
 	return res
 
 
+#A stack id the pool cannot answer for. cleanup() below sweeps every emptied stack, and tells
+#its owner to forget the id only while characters_pool can still resolve that owner - so an id
+#can outlive its stack in a character's effects_temp_stored, and indexing `stacks` unguarded
+#then threw. That id is read again on every stat rebuild of that character, so the throw was
+#not a one-off: answer null instead and let the caller drop the id for good.
 func clone_stack(id):
+	if !stacks.has(id):
+		print("stack %s not found - nothing to clone" % id)
+		return null
 	var oldstack = stacks[id]
 	var newstack = make_stack(oldstack.code, false)
 	newstack.effects = oldstack.effects.duplicate()
@@ -108,13 +118,16 @@ func deserialize_stack(tmp, id):
 
 
 func cleanup():
-	for id in effects.keys().duplicate():
-		if !effects[id].is_applied:
-			remove_id(id)
-			continue
-		if effects[id].get_applied_obj() == null:
+	var doomed := {}
+	for id in effects:
+		var eff = effects[id]
+		if !eff.is_applied:
+			doomed[id] = true
+		elif eff.get_applied_obj() == null:
 			print("effect %s is removed as applied to no one" % id)
-			remove_id(id)
+			doomed[id] = true
+	if !doomed.empty():
+		remove_ids(doomed)
 	for id in stacks.keys().duplicate():
 		if stacks[id].effects.empty():
 			stacks[id].cleanup()
@@ -127,13 +140,26 @@ func postload():
 			eff.fill_sub_effects()
 
 
-func remove_id(id):
+#One pass over the pool for the whole batch. Removing effects one at a time cost a full
+#scan of every effect and every stack per removal, so a save paid dead_count x pool_size -
+#seconds of main-thread time once the pool grew.
+func remove_ids(doomed: Dictionary):
 	for eff in effects.values():
-		if typeof(eff.parent) == TYPE_STRING and eff.parent == id:
+		if typeof(eff.parent) == TYPE_STRING and doomed.has(eff.parent):
 			eff.parent = null
-		if eff.sub_effects.has(id):
-			eff.sub_effects.erase(id)
-	effects.erase(id)
+		for i in range(eff.sub_effects.size() - 1, -1, -1):
+			if doomed.has(eff.sub_effects[i]):
+				eff.sub_effects.remove(i)
+	for stack in stacks.values():
+		for sid in stack.effects.keys():
+			if doomed.has(sid):
+				stack.effects.erase(sid)
+	for id in doomed:
+		effects.erase(id)
+
+
+func remove_id(id):
+	remove_ids({id: true})
 
 
 func get_effects_linked_to(char_id):
@@ -177,6 +203,16 @@ func serialize():
 
 
 func deserialize_effect(tmp, id, caller = null):
+	if !tmp.has('type'):
+		print("effect %s is missing its saved type and was not loaded" % id)
+		return null
+	if tmp.has('template') and tmp.template is String:
+		if !Effectdata.effect_table.has(tmp.template):
+			print("effect %s uses missing template %s and was not loaded" % [id, tmp.template])
+			return null
+		if Effectdata.effect_table[tmp.template].type != tmp.type:
+			print("effect %s changed type from %s to %s and was not loaded" % [id, tmp.type, Effectdata.effect_table[tmp.template].type])
+			return null
 	var eff
 	match tmp.type:
 		'base': 
@@ -187,6 +223,9 @@ func deserialize_effect(tmp, id, caller = null):
 			eff = temp_e_simple.new(caller)
 		'temp_global': 
 			eff = temp_e_global.new(caller)
+		_:
+			print("effect %s has unsupported saved type %s and was not loaded" % [id, tmp.type])
+			return null
 	eff.id = id
 	eff.deserialize(tmp)
 	return eff
@@ -223,10 +262,29 @@ func deserialize(tmp):
 	for k in tmp.keys():
 		if k.begins_with('eid'):
 			var eff = deserialize_effect(tmp[k], k)
-			effects[k] = eff
+			if eff != null:
+				effects[k] = eff
 		elif k.begins_with('sid'):
 			var eff = deserialize_stack(tmp[k], k)
 			stacks[k] = eff
+	_retire_legacy_effects()
+	_prune_missing_stack_effects()
+
+
+func _retire_legacy_effects():
+	for id in effects.keys().duplicate():
+		var effect = effects[id]
+		if effect.template_id in LEGACY_EFFECTS_TO_RETIRE:
+			remove_id(id)
+
+
+func _prune_missing_stack_effects():
+	for stack in stacks.values():
+		for effect_id in stack.effects.keys().duplicate():
+			if effects.has(effect_id):
+				continue
+			print("effect %s is missing from stack %s and was removed" % [effect_id, stack.id])
+			stack.effects.erase(effect_id)
 
 
 func clean_effects_for_char(id):

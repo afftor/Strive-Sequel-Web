@@ -2,7 +2,10 @@ extends Control
 
 onready var sky = $Sky
 onready var tw = $Tween
+onready var turn_gain_tw = $TurnGainTween
 onready var ext_block = $TimeNode/external_block
+onready var turn_shine_clip = $TimeNode/TurnShineClip
+onready var turn_shine = $TimeNode/TurnShineClip/Shine
 var ext_blockers = []#{ref, act}
 
 var locked = false
@@ -14,10 +17,28 @@ var labels_dirty = false
 var turn_started_at = 0
 var sky_anim_token = 0
 var travel_arrival_sound_pending = false
+var turn_production_events = []
+var turn_production_layout_locked = false
+var turn_shine_progress = 0.0
+var turn_progress_hour_index = 0
+var turn_progress_hour_total = 1
 #only escape if the turn coroutine ever dies mid-way (input is blocked while it runs).
 #a 60-character turn measures ~2s, so this is ~13x the realistic worst case
 const TURN_WATCHDOG_MSEC = 30000
 const BUSY_MODULATE = Color(0.65, 0.65, 0.65, 1.0)
+const TURN_GAIN_DURATION = 1.35
+const TURN_GAIN_HOLD = 1.5
+const TURN_GAIN_COUNTER_RATIO = 0.72
+const TURN_GAIN_LABEL_RATIO = 0.82
+const TURN_SHINE_START_X = -36.0
+const TURN_SHINE_END_X = 144.0
+const TURN_SIMULATION_PROGRESS_SHARE = 0.94
+const COUNTER_SEPARATION = 4.0
+#the gold the three estate counters are authored in (variables.hexcolordict.k_yellow) and the
+#red of the same palette (k_red) a full store room is called out in. Literals rather than the
+#dict because a const cannot read an autoload, and the scene spells the gold out the same way.
+const COUNTER_COLOR = Color(0.976471, 0.882353, 0.505882, 1)
+const COUNTER_COLOR_FULL = Color(0.996078, 0.317647, 0.364706, 1)
 
 var atlas_pos = {
 	0: 28,
@@ -38,8 +59,18 @@ func _ready():
 	$TimeNode/food.connect("mouse_entered", self, "show_food_tooltip")
 	$TimeNode/gold.connect("mouse_entered", self, "show_gold_tooltip")
 	globals.connecttexttooltip($TimeNode/timetooltip, tr("TIME_TOOLTIP"))
+	hotkeys.connect("bindings_changed", self, "build_turn_tooltips")
+	build_turn_tooltips()
 	globals.connect("update_clock", self, 'request_labels_update')
+	#What the estate holds, sleeps and eats is read off its rooms and its roster, so the three
+	#numbers below the turn buttons are refreshed when either of those changes rather than on
+	#every tick of the clock.
+	globals.connect("rooms_changed", self, "refresh_estate_counters")
+	globals.connect("slave_added", self, "refresh_estate_counters")
+	globals.connect("slave_departed", self, "refresh_estate_counters")
+	refresh_estate_counters()
 	globals.connect("travel_completed", self, 'queue_travel_arrival_sound')
+	globals.connect("work_produced", self, "queue_turn_production_event")
 	ext_block.connect("pressed", self, "on_ext_block_press")
 #	$TimeNode/Date.text = "D: " + str(ResourceScripts.game_globals.date)
 #	$TimeNode/Time.text = tr(variables.timeword[ResourceScripts.game_globals.hour])
@@ -50,22 +81,48 @@ func tut_get_finish_turn():
 	return $TimeNode/HBoxContainer/finish_turn
 
 
-func hotkey_pressed(number):
-	if input_handler.combat_node != null:
-		return
-	match number:
-		1: advance_turn(1)
-		2: advance_turn(2)
-		3: advance_turn(4)
+#the key is printed in the tooltip, so it has to be read from the binding rather than
+#baked into the translation
+func build_turn_tooltips():
+	var buttons = {finish_turn = ['mansion_time_1', 'TOOLTIP_CLOCK1'],
+		x2 = ['mansion_time_2', 'TOOLTIP_CLOCK2'],
+		x4 = ['mansion_time_3', 'TOOLTIP_CLOCK3']}
+	for btn_name in buttons:
+		var data = buttons[btn_name]
+		globals.connecttexttooltip($TimeNode/HBoxContainer.get_node(btn_name), hotkeys.get_tooltip_text(data[1], data[0]))
 
 
 #both of these walk every character, so they are built when the player actually hovers
 #rather than on every clock update - the text is only ever read from the tooltip
 func show_food_tooltip():
-	var resources = ResourceScripts.game_party.calculate_food_consumption()
+	var stock = {}
+	var requirements = {}
+	for tier in variables.food_demand_order:
+		stock[tier] = 0
+		requirements[tier] = 0.0
+
+	for code in ResourceScripts.game_res.materials:
+		if !Items.materiallist.has(code):
+			continue
+		var item = Items.materiallist[code]
+		if item.type == 'food' and stock.has(item.demand):
+			stock[item.demand] += ResourceScripts.game_res.materials[code]
+
+	#calculate_food_consumption() predicts items used per day. Convert it to one turn,
+	#then collect the preferred items under their demand tiers.
+	var consumption = ResourceScripts.game_party.calculate_food_consumption()
+	for code in consumption:
+		if !Items.materiallist.has(code):
+			continue
+		var item_demand = Items.materiallist[code].demand
+		if requirements.has(item_demand):
+			requirements[item_demand] += consumption[code] / float(variables.HoursPerDay)
+
 	var text = "\n\n" + tr('CURRENT_PREFERRED_FOOD_CONSUMPTION') + ":"
-	for i in resources.keys():
-		text +=  "\n" + Items.materiallist[i].name + ": " + str(stepify(resources[i], 0.1))
+	for tier in variables.food_demand_order:
+		text += "\n%s: %s / %s" % [tr("FOODDEMAND" + tier.to_upper()),
+			ResourceScripts.custom_text.transform_number(stock[tier]),
+			str(stepify(requirements[tier], 0.1))]
 	globals.showtexttooltip($TimeNode/food, tr("TOOLTIPFOOD") + text, false)
 
 
@@ -89,6 +146,35 @@ func set_sky_pos():
 				bg.modulate = Color(1.0,1.0,1.0,1.0)
 			else:
 				bg.modulate = Color(1.0,1.0,1.0,0.0)
+	var backdrop = mansion_backdrop()
+	if backdrop != null:
+		backdrop.set_hour(ResourceScripts.game_globals.hour)
+	var rooms = mansion_rooms()
+	if rooms != null and rooms.has_method('apply_weather'):
+		rooms.apply_weather()
+
+
+#The picture the mansion's floorplan stands on, which keeps the hour as well - its colours and its
+#lanterns, see mansion_backdrop.gd - or null when there is no mansion on screen or no picture in it.
+#The mansion floorplan screen, or null when there is none on screen.
+func mansion_rooms():
+	if gui_controller.mansion == null or !is_instance_valid(gui_controller.mansion):
+		return null
+	var rooms = gui_controller.mansion.get('RoomsModule')
+	return rooms if rooms != null and is_instance_valid(rooms) else null
+
+
+func mansion_backdrop():
+	var rooms = mansion_rooms()
+	if rooms == null:
+		return null
+	var grid = rooms.get('grid')
+	if grid == null or !is_instance_valid(grid):
+		return null
+	var backdrop = grid.get_node_or_null("Backdrops")
+	if backdrop == null or !backdrop.has_method('set_hour'):
+		return null
+	return backdrop
 
 
 func move_sky(from, to, init_delay):
@@ -134,6 +220,18 @@ func move_sky(from, to, init_delay):
 					tw.interpolate_callback(bg, init_delay + speed * t1, 'set_modulate', Color(1.0,1.0,1.0,0.0))
 			for b1 in range(0, to):
 				tw.interpolate_property(bghold.get_child(b1 + 1), 'modulate', Color(1.0,1.0,1.0,0.0), Color(1.0,1.0,1.0,1.0), speed, 0, 2, init_delay + (b1 + t1) * speed)
+
+	#The house's picture goes through the same hours on the same beat, its colour and its lanterns
+	#both: from 'from' up to 'to', or on to the night at 4 and round from 0 when the turn runs past
+	#midnight - 4 and 0 are both the night, so the two halves meet on one hour.
+	var backdrop = mansion_backdrop()
+	if backdrop != null:
+		backdrop.set_hour(from)
+		var hours = range(from, to) if from < to else range(from, 4) + range(0, to)
+		var step = (variables.SecndsPerTransition - init_delay) / max(1, hours.size())
+		for i in range(hours.size()):
+			tw.interpolate_property(backdrop, 'hour_blend', float(hours[i]), float(hours[i] + 1),
+				step, 0, 2, init_delay + i * step)
 			
 	tw.start()
 	#a timer instead of "tween_all_completed": remove_all() never fires that signal,
@@ -168,6 +266,15 @@ func queue_travel_arrival_sound():
 		travel_arrival_sound_pending = true
 
 
+func queue_turn_production_event(person_id, task_id, texture):
+	if !turn_in_progress or texture == null or !input_handler.globalsettings.get("item_flight_animation", false):
+		return
+	for event in turn_production_events:
+		if str(event.person_id) == str(person_id) and str(event.task_id) == str(task_id) and event.texture == texture:
+			return
+	turn_production_events.append({person_id = person_id, task_id = task_id, texture = texture})
+
+
 func _process(delta): #nearly obsolete
 	if labels_dirty:
 		labels_dirty = false
@@ -176,6 +283,8 @@ func _process(delta): #nearly obsolete
 	if turn_in_progress and OS.get_ticks_msec() - turn_started_at > TURN_WATCHDOG_MSEC:
 		print("ERROR - turn processing watchdog fired, releasing input lock")
 		turn_in_progress = false
+		turn_production_layout_locked = false
+		hide_turn_shine()
 	if input_locked and !turn_in_progress:
 		set_input_lock(false)
 	if self.visible == false:
@@ -200,22 +309,42 @@ func set_input_lock(state):
 		$TimeNode/HBoxContainer.modulate = Color(1.0, 1.0, 1.0, 1.0)
 
 
+func show_turn_shine(turn_count):
+	turn_progress_hour_index = 0
+	turn_progress_hour_total = max(int(turn_count), 1)
+	turn_shine_progress = 0.0
+	turn_shine.rect_position.x = TURN_SHINE_START_X
+	turn_shine_clip.show()
+
+
+func set_turn_simulation_progress(hour_fraction):
+	var completed = turn_progress_hour_index + clamp(float(hour_fraction), 0.0, 1.0)
+	set_turn_shine_progress(100.0 * TURN_SIMULATION_PROGRESS_SHARE * completed / turn_progress_hour_total)
+
+
+func set_turn_shine_progress(value):
+	turn_shine_progress = max(turn_shine_progress, clamp(float(value), 0.0, 100.0))
+	turn_shine.rect_position.x = lerp(TURN_SHINE_START_X, TURN_SHINE_END_X, turn_shine_progress / 100.0)
+
+
+func hide_turn_shine():
+	turn_shine_clip.hide()
+	turn_shine_progress = 0.0
+
+
 var continue_timer = false
 func advance_turn(amount = 1):
 	if turn_in_progress: #ignore spam clicks instead of stacking whole turns
 		return
-	if ResourceScripts.game_party.characters.size() > ResourceScripts.game_res.get_pop_cap() and ResourceScripts.game_party.has_nonunics():
-		if ResourceScripts.game_res.get_pop_cap() < ResourceScripts.game_res.get_pop_cap_limit():
-			input_handler.SystemMessage("You don't have enough rooms")
-		else:
-			input_handler.SystemMessage("Population limit reached")
-		return
-	if globals.log_node != null && weakref(globals.log_node).get_ref():
-		globals.log_node.clear_log()
-
+	#Running out of beds no longer stops the day. Both refusals here were the same shortage said
+	#twice - the population cap IS the bed count (game_res.get_pop_cap) - and a day that cannot
+	#end is a day the player cannot trade or build their way out of. Sleeping on the floor costs
+	#them instead: game_res.mark_slept_rough() writes one line to the mansion log and hangs a
+	#penalty on whoever had nowhere to sleep, for as long as it lasts.
 	turn_in_progress = true
 	turn_started_at = OS.get_ticks_msec()
 	travel_arrival_sound_pending = false
+	show_turn_shine(amount)
 	set_input_lock(true)
 	input_handler.PlaySound("mansion_turn_end")
 
@@ -243,18 +372,28 @@ func advance_turn(amount = 1):
 
 	#gathering/farming/crafting all land as plain += on the resource pool during the tick,
 	#so the only reliable way to show what came in is to diff it across the whole turn
-	#TEMP disabled for freeze testing - restore together with the show_turn_gains call below
-#	var materials_before = ResourceScripts.game_res.materials.duplicate()
-#	var gold_before = ResourceScripts.game_res.money
+	var food_before = ResourceScripts.game_res.get_food()
+	var gold_before = ResourceScripts.game_res.money
 
 	#reworked
 	continue_timer = false
 	var requested = amount
 	var tmp = amount
 	while amount > 0:
+		turn_progress_hour_index = requested - amount
+		set_turn_simulation_progress(0.01)
 		if ResourceScripts.game_globals.autosave_due():
 			yield(globals.autosave(false, true), 'completed')
-		yield(ResourceScripts.game_globals.advance_hour(true), 'completed')
+		turn_production_events.clear()
+		var production_animation_enabled = input_handler.globalsettings.get("item_flight_animation", false)
+		turn_production_layout_locked = production_animation_enabled
+		var production_layout = {sources = {}, targets = {}}
+		if production_animation_enabled and gui_controller.mansion != null and is_instance_valid(gui_controller.mansion) and gui_controller.mansion.has_method("capture_turn_production_layout"):
+			production_layout = gui_controller.mansion.capture_turn_production_layout()
+		yield(ResourceScripts.game_globals.advance_hour(true, self), 'completed')
+		if production_animation_enabled and gui_controller.mansion != null and is_instance_valid(gui_controller.mansion) and gui_controller.mansion.has_method("play_turn_production_animations"):
+			yield(gui_controller.mansion.play_turn_production_animations(production_layout, turn_production_events.duplicate()), 'completed')
+		turn_production_layout_locked = false
 		amount -= 1
 		yield(get_tree(), 'idle_frame') #the tick and the gui listeners it wakes get a frame each
 		globals.emit_signal("hour_tick")
@@ -269,13 +408,19 @@ func advance_turn(amount = 1):
 	if tmp != requested: #event interrupted the turn, the predicted transition is wrong now
 		stop_sky_anim()
 
+	set_turn_shine_progress(94.0)
 	yield(get_tree(), 'idle_frame')
 	update_labels()
-#	show_turn_gains(materials_before, gold_before) #TEMP disabled for freeze testing
+	show_turn_gains(food_before, gold_before)
+	set_turn_shine_progress(96.0)
 	yield(get_tree(), 'idle_frame')
+	var day_passed = ResourceScripts.game_globals.date != start_date
 	if gui_controller.mansion != null and is_instance_valid(gui_controller.mansion) and !gui_controller.mansion.is_queued_for_deletion():
-		var day_passed = ResourceScripts.game_globals.date != start_date
 		yield(gui_controller.mansion.rebuild_after_turn(day_passed), 'completed')
+	set_turn_shine_progress(100.0)
+	yield(get_tree(), 'idle_frame')
+	hide_turn_shine()
+	turn_production_layout_locked = false
 	turn_in_progress = false
 	set_input_lock(false)
 	if travel_arrival_sound_pending:
@@ -284,36 +429,140 @@ func advance_turn(amount = 1):
 #	set_sky_pos()
 
 
-#A turn can touch a dozen resources. Show only the biggest few so the end of every turn
-#stays a glance-sized "something came in" and not an itemised receipt flying across the screen.
-const TURN_GAIN_ICONS = 3
+#The final value already exists by this point. Briefly restore the old value and roll it
+#forward so the player can read the gain without delaying the turn simulation itself.
+func show_turn_gains(food_before, gold_before):
+	turn_gain_tw.remove_all()
+	_reset_turn_gain_nodes()
+	var food_after = ResourceScripts.game_res.get_food()
+	var gold_after = ResourceScripts.game_res.money
+	var has_gain = false
+	if gold_after > gold_before:
+		_animate_gain_counter($TimeNode/gold, "_set_gold_counter", gold_before, gold_after, 0.21)
+		_animate_gain_label($TimeNode/GoldGain, gold_after - gold_before, 0.12)
+		has_gain = true
+	if food_after > food_before:
+		_animate_gain_counter($TimeNode/food, "_set_food_counter", food_before, food_after, 0.30)
+		_animate_gain_label($TimeNode/FoodGain, food_after - food_before, 0.21)
+		has_gain = true
+	if has_gain:
+		turn_gain_tw.start()
 
-func show_turn_gains(materials_before, gold_before):
-	if ResourceScripts.core_animations.get_flight_overlay() == null:
+
+func _reset_turn_gain_nodes():
+	$TimeNode/gold.rect_scale = Vector2.ONE
+	$TimeNode/food.rect_scale = Vector2.ONE
+	for label in [$TimeNode/GoldGain, $TimeNode/FoodGain]:
+		label.hide()
+		label.modulate = Color(1.0, 1.0, 1.0, 0.0)
+		label.rect_position.y = 12.0
+		label.rect_scale = Vector2(0.78, 0.78)
+
+
+func _animate_gain_counter(label, setter, from_value, to_value, delay):
+	call(setter, from_value)
+	var count_duration = TURN_GAIN_DURATION * TURN_GAIN_COUNTER_RATIO
+	turn_gain_tw.interpolate_method(self, setter, float(from_value), float(to_value),
+		count_duration, Tween.TRANS_CUBIC, Tween.EASE_OUT, delay)
+	turn_gain_tw.interpolate_property(label, "rect_scale", Vector2.ONE, Vector2(1.18, 1.18),
+		0.14, Tween.TRANS_QUAD, Tween.EASE_OUT, delay + count_duration)
+	turn_gain_tw.interpolate_property(label, "rect_scale", Vector2(1.18, 1.18), Vector2.ONE,
+		0.18, Tween.TRANS_QUAD, Tween.EASE_IN, delay + count_duration + 0.14)
+
+
+func _animate_gain_label(label, amount, delay):
+	var motion_duration = TURN_GAIN_DURATION * TURN_GAIN_LABEL_RATIO
+	var enter_duration = motion_duration * 0.28
+	var travel_duration = motion_duration * 0.78
+	var fade_duration = motion_duration * 0.22
+	var start_pos = Vector2(label.rect_position.x, 12.0)
+	var hold_pos = Vector2(label.rect_position.x, -22.0)
+	var exit_pos = Vector2(label.rect_position.x, -34.0)
+	label.text = "+" + ResourceScripts.custom_text.transform_number(amount)
+	label.rect_position = start_pos
+	label.rect_scale = Vector2(0.78, 0.78)
+	label.modulate = Color(1.0, 1.0, 1.0, 0.0)
+	label.show()
+	turn_gain_tw.interpolate_property(label, "modulate", Color(1.0, 1.0, 1.0, 0.0),
+		Color(1.0, 1.0, 1.0, 1.0), enter_duration, Tween.TRANS_CUBIC, Tween.EASE_OUT, delay)
+	turn_gain_tw.interpolate_property(label, "rect_position", start_pos, hold_pos,
+		travel_duration, Tween.TRANS_CUBIC, Tween.EASE_OUT, delay)
+	turn_gain_tw.interpolate_property(label, "rect_scale", Vector2(0.78, 0.78), Vector2(1.12, 1.12),
+		enter_duration, Tween.TRANS_BACK, Tween.EASE_OUT, delay)
+	turn_gain_tw.interpolate_property(label, "rect_scale", Vector2(1.12, 1.12), Vector2.ONE,
+		motion_duration * 0.5, Tween.TRANS_QUAD, Tween.EASE_OUT, delay + enter_duration)
+	var fade_delay = delay + travel_duration + TURN_GAIN_HOLD
+	turn_gain_tw.interpolate_property(label, "modulate", Color(1.0, 1.0, 1.0, 1.0),
+		Color(1.0, 1.0, 1.0, 0.0), fade_duration, Tween.TRANS_QUAD, Tween.EASE_IN, fade_delay)
+	turn_gain_tw.interpolate_property(label, "rect_position", hold_pos, exit_pos,
+		fade_duration, Tween.TRANS_QUAD, Tween.EASE_IN, fade_delay)
+	turn_gain_tw.interpolate_callback(label, fade_delay + fade_duration, "hide")
+
+
+func _set_gold_counter(value):
+	$TimeNode/gold.text = ResourceScripts.custom_text.transform_number(value)
+
+
+func _set_food_counter(value):
+	$TimeNode/food.text = ResourceScripts.custom_text.transform_number(value)
+
+
+#The three estate counters that used to sit on the slave bar: what one material can fill on
+#the shelves, how many the beds hold, and what the household eats in a day.
+func refresh_estate_counters():
+	#Loading a save gets here before the party exists: game_res.fix_serialization() emits
+	#'rooms_changed'/'update_clock' while game_party.characters is still the dictionaries the
+	#file was saved as, and _process picks the dirty flag up on the frame LoadGame() yields
+	#next. Nothing here can be answered yet; LoadGame() refreshes the labels itself once the
+	#household is real.
+	if !ResourceScripts.game_party.is_deserialized():
 		return
-	var source = $TimeNode/HBoxContainer/finish_turn
-	var gained = []
-	var current = ResourceScripts.game_res.materials
-	for res in current:
-		var diff = current[res] - materials_before.get(res, 0)
-		if diff > 0:
-			gained.append({code = res, diff = diff})
-	gained.sort_custom(self, "sort_gains_desc")
+	var res = ResourceScripts.game_res
+	var limit = res.storage_limit()
+	$Counters/Storage.visible = limit > 0
+	$Counters/StorageIcon.visible = limit > 0
+	if limit > 0:
+		$Counters/Storage.text = str(limit)
+		#a material that has reached the limit turns every further delivery of it into spillage,
+		#and the counter is the only place that is visible before the sacks go missing
+		$Counters/Storage.add_color_override("font_color",
+			COUNTER_COLOR_FULL if res.has_capped_material() else COUNTER_COLOR)
+		var text = tr("MSLMSTORAGELIMIT") % limit
+		for row in res.fullest_materials(3):
+			text += "\n%s: %d/%d" % [tr(Items.materiallist[row[0]].name), row[1], limit]
+		globals.connecttexttooltip($Counters/Storage, text)
+	$Counters/Population.text = "%d/%d" % [
+		ResourceScripts.game_party.characters.size(), res.get_pop_cap()]
+	$Counters/Food.text = "%d/%s" % [
+		ResourceScripts.game_party.get_food_consumption(), tr("MSLMDAY")]
+	_layout_estate_counters()
+	globals.connecttexttooltip($Counters/Population, tr("TOOLTIPPOPULATION"))
+	globals.connecttexttooltip($Counters/Food, tr("TOOLTIPFOODCONSUMPTION"))
 
-	var delay = 0.0
-	for i in range(min(gained.size(), TURN_GAIN_ICONS)):
-		ResourceScripts.core_animations.ItemFlightMaterial(gained[i].code, source,
-			{delay = delay, amount = gained[i].diff})
-		delay += 0.12
-	if ResourceScripts.game_res.money > gold_before:
-		ResourceScripts.core_animations.ItemFlightGold(source, {delay = delay})
 
-
-func sort_gains_desc(first, second):
-	return first.diff > second.diff
+#Keep the six public Counters/* paths while giving them the same visibility-aware reflow as
+#an HBoxContainer. Each label reserves its widest supported value in the scene, so a later
+#text assignment cannot grow through the following icon.
+func _layout_estate_counters():
+	var row = [$Counters/StorageIcon, $Counters/Storage, $Counters/PopulationIcon,
+		$Counters/Population, $Counters/FoodIcon, $Counters/Food]
+	var visible_nodes = []
+	var row_width = 0.0
+	for node in row:
+		if node.visible:
+			visible_nodes.append(node)
+			row_width += node.rect_min_size.x
+	if visible_nodes.size() > 1:
+		row_width += COUNTER_SEPARATION * (visible_nodes.size() - 1)
+	var x = round(($Counters.rect_size.x - row_width) * 0.5)
+	for node in visible_nodes:
+		node.rect_position = Vector2(x, round(($Counters.rect_size.y - node.rect_min_size.y) * 0.5))
+		node.rect_size = node.rect_min_size
+		x += node.rect_min_size.x + COUNTER_SEPARATION
 
 
 func update_labels():
+	refresh_estate_counters()
 	$TimeNode/Date.text = "W: %d, D: %d" % ResourceScripts.game_globals.get_week_and_day()
 	$TimeNode/Time.text = tr(variables.timeword[ResourceScripts.game_globals.hour])
 	$TimeNode/food.text = ResourceScripts.custom_text.transform_number(ResourceScripts.game_res.get_food())

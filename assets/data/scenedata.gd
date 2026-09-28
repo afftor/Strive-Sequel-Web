@@ -153,7 +153,8 @@ var scenedict = {
 				text = tr('DIALOGUETUTACADEMY'), 
 				reqs = [
 					{type = 'has_money', value = 1500}, 
-					{type = "has_upgrade", name = 'academy', value = 1}
+					{type = "has_room_upgrade", name = 'practice_room',
+						code = 'tutoring_area', value = 1}
 				], 
 				not_hide = true, 
 				bonus_effects = [
@@ -249,7 +250,7 @@ var scenedict = {
 		{type = 'function',
 		function = 'make_local_recruit',
 		args = {
-			races = [['local', 3],['random', 1]],
+			races = [['dungeon', 1]],
 			difficulty = [1,2],
 			type = 'slave'
 			}
@@ -1090,6 +1091,52 @@ var scenedict = {
 		{code = 'close', reqs = [], text = tr("DIALOGUECLOSE")},
 		],
 	},
+	#the ritual room's body rites (gui_modules/mansion_view/body_rites_panel.gd): what a rite did, told before
+	#its upgrade animation or its before-and-after window
+	body_rite_upgrade = {
+		text = tr("BODYRITE_SCENE_UPGRADE"),
+		image = 'ritual_room',
+		tags = ['active_character_translate'],
+		options = [
+		{code = 'close', reqs = [], text = tr("DIALOGUECLOSE")},
+		],
+	},
+	body_rite_form_change = {
+		text = tr("BODYRITE_SCENE_FORM_CHANGE"),
+		image = 'ritual_room',
+		tags = ['active_character_translate'],
+		options = [
+		{code = 'close', reqs = [], text = tr("DIALOGUECLOSE")},
+		],
+	},
+	body_rite_sex_change = {
+		text = tr("BODYRITE_SCENE_SEX_CHANGE"),
+		image = 'ritual_room',
+		tags = ['active_character_translate'],
+		options = [
+		{code = 'close', reqs = [], text = tr("DIALOGUECLOSE")},
+		],
+	},
+	body_rite_virginity = {
+		text = tr("BODYRITE_SCENE_VIRGINITY"),
+		image = 'ritual_room',
+		tags = ['active_character_translate'],
+		options = [
+		{code = 'close', reqs = [], text = tr("DIALOGUECLOSE")},
+		],
+	},
+	#the body rite personality choice; its options are handled in custom_effects.gd
+	body_rite_personality = {
+		text = tr("BODYRITE_SCENE_PERSONALITY"),
+		image = 'ritual_room',
+		tags = ['custom_effect', 'active_character_translate'],
+		options = [
+		{code = 'body_rite_personality_kind', reqs = [{type = 'active_character_checks', value = [{code = 'stat', stat = 'personality', operant = 'neq', value = 'kind'}]}], text = tr("PERSONALITYNAMEKIND")},
+		{code = 'body_rite_personality_bold', reqs = [{type = 'active_character_checks', value = [{code = 'stat', stat = 'personality', operant = 'neq', value = 'bold'}]}], text = tr("PERSONALITYNAMEBOLD")},
+		{code = 'body_rite_personality_shy', reqs = [{type = 'active_character_checks', value = [{code = 'stat', stat = 'personality', operant = 'neq', value = 'shy'}]}], text = tr("PERSONALITYNAMESHY")},
+		{code = 'body_rite_personality_serious', reqs = [{type = 'active_character_checks', value = [{code = 'stat', stat = 'personality', operant = 'neq', value = 'serious'}]}], text = tr("PERSONALITYNAMESERIOUS")},
+		],
+	},
 	
 	zephyra_underwear = {
 		text = tr("DIALOGUEZEPHYRA_UNDERWEAR"),
@@ -1395,13 +1442,59 @@ var scenedict = {
 		text = "STARTUPGRADEBONUS",
 		common_effects = [],
 		options = [
-		{code = 'close', reqs = [], bonus_effects = [{code ='unlock_upgrade', upgrade = 'forge', level = 1}], text = tr("STARTUPGRADEBONUS1"), type = 'next_dialogue'},
-		{code = 'close', reqs = [], bonus_effects = [{code ='unlock_upgrade', upgrade = 'tailor', level = 1}], text = tr("STARTUPGRADEBONUS2"), type = 'next_dialogue'},
-		{code = 'close', reqs = [], bonus_effects = [{code ='unlock_upgrade', upgrade = 'alchemy', level = 1}], text = tr("STARTUPGRADEBONUS3"), type = 'next_dialogue'},
+		{code = 'close', reqs = [], bonus_effects = [{code ='grant_room', name = 'kitchen'}], text = tr("MANSIONROOM_KITCHEN"), type = 'next_dialogue'},
+		{code = 'close', reqs = [], bonus_effects = [{code ='grant_room', name = 'forge'}], text = tr("STARTUPGRADEBONUS1"), type = 'next_dialogue'},
+		{code = 'close', reqs = [], bonus_effects = [{code ='grant_room', name = 'tailor_workshop'}], text = tr("STARTUPGRADEBONUS2"), type = 'next_dialogue'},
+		{code = 'close', reqs = [], bonus_effects = [{code ='grant_room', name = 'alchemy_room'}], text = tr("STARTUPGRADEBONUS3"), type = 'next_dialogue'},
 		{code = 'close', reqs = [], bonus_effects = [{code = 'make_loot', type = 'tableloot', pool = [['start_corruptive_essence',1]]},{code = 'open_loot'},{code = 'decision', value = 'start_corruptive_essence_reward'}], text = tr("STARTUPGRADEBONUS4"), type = 'next_dialogue'},
 		],
 	},
 	
+	#Turning out a cluttered room. Which of the three a room is hiding is settled when the
+	#mansion is first laid out (MansionLayout.hide_finds_in_rubble); game_res.claim_rubble_find()
+	#is what opens the matching one, whether the rubble went to builders or was pulled down to
+	#make room for something the estate was given.
+	#The find is handed over by the loot window rather than by an effect of its own, so the
+	#player sees what they got the same way a chest shows it.
+	mansion_rubble_gold = {
+		image = null,
+		tags = ['dialogue_scene'],
+		text = "MANSIONFIND_GOLD",
+		common_effects = [],
+		options = [
+		{code = 'close', reqs = [], bonus_effects = [{code = 'make_loot', type = 'tableloot', pool = [['mansion_rubble_gold',1]]},{code = 'open_loot'}], text = tr("DIALOGUECLOSE"), type = 'next_dialogue'},
+		],
+	},
+	mansion_rubble_materials = {
+		image = null,
+		tags = ['dialogue_scene'],
+		text = "MANSIONFIND_MATERIALS",
+		common_effects = [],
+		options = [
+		{code = 'close', reqs = [], bonus_effects = [{code = 'make_loot', type = 'tableloot', pool = [['mansion_rubble_materials',1]]},{code = 'open_loot'}], text = tr("DIALOGUECLOSE"), type = 'next_dialogue'},
+		],
+	},
+	mansion_rubble_sword = {
+		image = null,
+		tags = ['dialogue_scene'],
+		text = "MANSIONFIND_SWORD",
+		common_effects = [],
+		options = [
+		{code = 'close', reqs = [], bonus_effects = [{code = 'make_loot', type = 'tableloot', pool = [['mansion_rubble_sword',1]]},{code = 'open_loot'}], text = tr("DIALOGUECLOSE"), type = 'next_dialogue'},
+		],
+	},
+	#The upper floor hides one thing rather than three, and it is only turned up once the
+	#staircase is sound and the rubble up there is worked through.
+	mansion_rubble_goggles = {
+		image = null,
+		tags = ['dialogue_scene'],
+		text = "MANSIONFIND_GOGGLES",
+		common_effects = [],
+		options = [
+		{code = 'close', reqs = [], bonus_effects = [{code = 'make_loot', type = 'tableloot', pool = [['mansion_rubble_goggles',1]]},{code = 'open_loot'}], text = tr("DIALOGUECLOSE"), type = 'next_dialogue'},
+		],
+	},
+
 	loan_event1 = {
 		variations = [{
 			reqs = [{type = 'has_loan_money', stage = 1}],
@@ -1904,6 +1997,15 @@ var scenedict = {
 		text = '',
 		image = 'abuse',
 		tags = ["dialogue_scene", "active_character_translate"],
+		options = [
+			{code = "close", text = "DIALOGUECLOSE", type = "next_dialogue", reqs = []}
+		]
+	},
+	#the text is filled in by game_res.run_away_unhoused()
+	nobed_escape_event = {
+		text = '',
+		image = 'slaveescape',
+		tags = ["dialogue_scene"],
 		options = [
 			{code = "close", text = "DIALOGUECLOSE", type = "next_dialogue", reqs = []}
 		]
@@ -3053,6 +3155,20 @@ var quests = {
 			report_warehouse_solution = {code = 'report_warehouse_solution', name = 'ACT4_SEBASTIAN_RAILROAD_NAME', descript = 'ACT4_SEBASTIAN_STAGE_REPORT_WAREHOUSE_SOLUTION'},
 			sebastian_route_complete = {code = 'sebastian_route_complete', name = 'ACT4_SEBASTIAN_RAILROAD_NAME', descript = 'ACT4_SEBASTIAN_STAGE_WAIT_CONTINUATION'},
 			church_protected_complete = {code = 'church_protected_complete', name = 'ACT4_SEBASTIAN_RAILROAD_NAME', descript = 'ACT4_SEBASTIAN_STAGE_WAIT_CONTINUATION'},
+		}
+	},
+	act4_road_project_quest = {
+		code = 'act4_road_project_quest',
+		summary = 'ACT4_ROAD_PROJECT_SUMMARY',
+		stages = {
+			visit_road_project = {code = 'visit_road_project', name = 'ACT4_ROAD_PROJECT_NAME', descript = 'ACT4_ROAD_STAGE_VISIT_ROAD_PROJECT'},
+			guild_quarters = {code = 'guild_quarters', name = 'ACT4_ROAD_PROJECT_NAME', descript = 'ACT4_ROAD_STAGE_GUILD_QUARTERS'},
+			meet_melchor = {code = 'meet_melchor', name = 'ACT4_ROAD_PROJECT_NAME', descript = 'ACT4_ROAD_STAGE_MEET_MELCHOR'},
+			ask_senerus = {code = 'ask_senerus', name = 'ACT4_ROAD_PROJECT_NAME', descript = 'ACT4_ROAD_STAGE_ASK_SENERUS'},
+			imbue_arrow = {code = 'imbue_arrow', name = 'ACT4_ROAD_PROJECT_NAME', descript = 'ACT4_ROAD_STAGE_IMBUE_ARROW'},
+			return_to_melchor = {code = 'return_to_melchor', name = 'ACT4_ROAD_PROJECT_NAME', descript = 'ACT4_ROAD_STAGE_RETURN_TO_MELCHOR'},
+			charge_palace = {code = 'charge_palace', name = 'ACT4_ROAD_PROJECT_NAME', descript = 'ACT4_ROAD_STAGE_CHARGE_PALACE'},
+			story_end = {code = 'story_end', name = 'ACT4_ROAD_STORY_END_NAME', descript = 'ACT4_ROAD_STORY_END_DESC'},
 		}
 	},
 	erdyna_quest = {

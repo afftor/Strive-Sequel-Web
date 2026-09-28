@@ -148,7 +148,6 @@ func _ready():
 	$LocationGui/ItemUsePanel/ItemsButton.pressed = true
 	$LocationGui/Resources/SelectWorkers.connect("pressed", self, "select_workers")
 	$LocationGui/Resources/SelectWorkers.text = tr("SELECT_WORKERS_LABEL")
-	$LocationGui/Resources/Forget.connect("pressed", self, "forget_location")
 	return_all_btn.connect("pressed", self, "return_all_to_mansion")
 	$JournalButton.connect("pressed", self, "open_journal")
 	cast_panel.connect("set_entity_use", self, "start_use_state")
@@ -295,13 +294,33 @@ func build_location_description():
 	text += " - "
 	
 	text += tr("DUNGEONLEVEL") + ": " + str(active_location.current_level + 1)
-	if active_location.completed:
+	if active_location.get('cleared', false):
+		text += " - {color=aqua|" + tr("LOC_ABANDONED" if active_location.get('abandoned', false) \
+			else "LOC_CLEARED") + "}"
+	elif active_location.completed:
 		text += " - {color=aqua|" + tr("LOC_COMPLETE") + "}"
 	map_panel.get_node('RichTextLabel').bbcode_text = (
 		'[center]'
 		+ globals.TextEncoder(text)
 		+ "[/center]"
 	)
+	update_cleared_badge()
+
+
+#A bbcode segment cannot carry a tooltip of its own, so the explanation hangs on the badge beside
+#the header - and on the header itself, which is a node.
+func update_cleared_badge():
+	var cleared = active_location.get('cleared', false)
+	var nodes = [map_panel.get_node_or_null('cleared'), map_panel.get_node('RichTextLabel')]
+	for node in nodes:
+		if node == null:
+			continue
+		if node.name == 'cleared':
+			node.visible = cleared
+		if cleared:
+			globals.connecttexttooltip(node, globals.get_location_cleared_tooltip(active_location))
+		else:
+			globals.disconnect_text_tooltip(node)
 
 
 func slave_position_selected(pos, character):
@@ -531,12 +550,13 @@ func execute_skill(s_skill2):  #to update to exploration version
 				print('error in damagestat %s' % i.damagestat)  #obsolete in new format
 
 
-func StartCombat(data): 
-	if !data.has('instawin') or !data.instawin:
+func StartCombat(data):
+	var skipped = (data.has('instawin') and data.instawin) or (data.has('intimidate') and data.intimidate)
+	if !skipped: #no battle screen is entered on a skipped fight, so no transition into it either
 		input_handler.play_animation("fight")
 		yield(get_tree().create_timer(1), "timeout")
-	ResourceScripts.core_animations.BlackScreenTransition(0.5)
-	yield(get_tree().create_timer(0.5), "timeout")
+		ResourceScripts.core_animations.BlackScreenTransition(0.5)
+		yield(get_tree().create_timer(0.5), "timeout")
 #	globals.current_level = current_level
 #	globals.current_stage = current_stage
 	globals.StartFixedAreaCombat(data)
@@ -563,34 +583,7 @@ func StartCombat(data):
 # 			anim_scene.queue_free()
 
 
-var action_type
 var active_skill
-
-
-func clear_dungeon():
-	input_handler.get_spec_node(
-		input_handler.NODE_YESNOPANEL,
-		[
-			self,
-			'clear_dungeon_confirm',
-			tr("FORGETLOCATIONQUESTION")
-		]
-	)
-
-func forget_location():
-	input_handler.get_spec_node(
-		input_handler.NODE_YESNOPANEL,
-		[
-			self,
-			'clear_dungeon_confirm',
-			tr("FORGETLOCATIONQUESTION")
-		]
-	)
-
-
-func clear_dungeon_confirm():
-	globals.remove_location(active_location.id)
-	action_type = 'location_finish'
 
 
 func build_location_group():
@@ -695,18 +688,48 @@ func build_location_group():
 		if active_location.group.values().has(i.id):
 			newbutton.get_node("icon").modulate = Color(0.3, 0.3, 0.3)
 		globals.connectslavetooltip(newbutton, i)
+		setup_levelup_indicator(newbutton, i)
 		for anim_num in range(planed_animations.size()-1, -1, -1):
 			var animation = planed_animations[anim_num]
 			if animation.person_id == i.id:
 				animate(newbutton, animation.skill)
 				planed_animations.remove(anim_num)
+	#input_handler.active_location is null between locations, and reading .id off it threw before
+	#the empty-group check could send the party home
 	if (counter == 0
+		&& input_handler.active_location != null
 		&& input_handler.active_location.id == active_location.id
 		&& is_visible()):#$LocationGui.is_visible()
 		nav.return_to_mansion()
 		return
 	build_item_panel()
 #	build_spell_panel()
+
+#A traveler with enough experience banked for the next class carries the same green cross the
+#mansion card shows, and out here the cross is also the way back to that character's leveling window.
+func setup_levelup_indicator(button, person):
+	var indicator = button.get_node("LevelUpIndicator")
+	indicator.visible = person.get_stat('base_exp') >= person.get_next_class_exp()
+	if !indicator.visible:
+		return
+	globals.connecttexttooltip(indicator, tr("BTNLEVELING"))
+	indicator.connect("pressed", self, "open_levelup_menu", [person])
+	set_levelup_indicator_clickable(button, !is_in_use_state())
+
+
+#The leveling window belongs to the mansion screen, so the journey home has to finish before it can
+#be opened - return_to_mansion ends on close_all_closeable_windows, which would shut it again. It
+#only yields when there is a journey to make, hence the guard.
+func open_levelup_menu(person):
+	if gui_controller.current_screen != gui_controller.mansion:
+		yield(nav.return_to_mansion(), "completed")
+	if gui_controller.mansion == null:
+		return
+	var popup = gui_controller.mansion.get_node_or_null("CharacterProgressionPopup")
+	if popup == null:
+		return
+	popup.open(person)
+
 
 func add_rolled_chars(tarr):
 	if active_location != null:
@@ -930,11 +953,12 @@ func build_level():
 	yield(get_tree(), 'idle_frame')
 #	scout_room(data.first_room, get_scouting_range(), true)
 	update_map()
-	build_location_description()
 	var tooltip = input_handler.get_spec_node(input_handler.NODE_TEXTTOOLTIP)
 	globals.disconnect_text_tooltip(tooltip.parentnode)
 #	tooltip.turnoff()
 	tooltip.hide()
+	#after the blanket disconnect above, or the header would lose the tooltip it just got
+	build_location_description()
 
 
 func update_map():
@@ -952,6 +976,13 @@ func room_pressed(room_id, room_node):
 		if use_state.entity.target != "room": return
 		var data = ResourceScripts.game_world.rooms[room_id]
 		if data.status != "scouted" or data.type != 'combat': return
+		#room skills resolve the fight right away, so the room must be enterable
+		if data.challenge != null: return
+		if !ResourceScripts.game_world.can_enter_room(room_id): return
+		if selected_room != null: return
+		if get_current_stamina() < data.stamina_cost:
+			input_handler.SystemMessage(tr("NO_STAMINA_LABEL"))
+			return
 		use_skill_on_room(use_state.caster, room_id, room_node, use_state.entity)
 		return
 	reset_active_location()
@@ -1094,6 +1125,9 @@ func move_to_room(room_id = null):
 		build_location_description()
 		globals.start_fixed_event('event_dungeon_complete_loot_' + active_location.difficulty)
 		globals.check_events('complete_location')
+		#a story dungeon is declared done with by its own quest, never by the boss alone
+		if !active_location.tags.has('quest') and !active_location.tags.has('infinite'):
+			globals.declare_location_cleared(active_location.id)
 		input_handler.achievements.try_add_dungeon_achimnt(active_location.code)
 		#fame
 		var char_group = active_location.group.values()
@@ -1179,6 +1213,9 @@ func subroom_pressed(room_id, subroom_id):
 				selected_room = room_id
 				active_subroom = subroom_id
 				pay_stamina(subroom_data.stamina_cost)
+				#anything the floor generator already put in this subroom - make_loot
+				#picks it up and clears it, so it reaches this chest and no other
+				input_handler.scene_bonus_materials = subroom_data.get('bonus_materials', {})
 				#2test
 	#			input_handler.combat_advance = true
 				var _event = globals.start_fixed_event(subroom_data.event)
@@ -1300,9 +1337,25 @@ func reveal_map(caster):
 #	active_location.intimidate = true
 
 func set_intimidate(room_id):
+	#deferred, so the skill cost is paid and the cast panel is closed before the fight resolves
+	call_deferred('start_intimidated_combat', room_id)
+
+
+func start_intimidated_combat(room_id):
 	var data = ResourceScripts.game_world.rooms[room_id]
+	if data.status != "scouted" or data.type != 'combat' or data.challenge != null:
+		return
 	data.intimidate = true
-	globals.start_fixed_event('dungeon_intimidate')
+	globals.reset_roll_data()
+	globals.char_roll_data.diff = active_location.difficulty
+	globals.char_roll_data.lvl = active_location.current_level
+	for ch_id in active_location.group.values():
+		globals.char_roll_data.mf += characters_pool.get_char_by_id(ch_id).get_stat('magic_find')
+	pay_stamina(data.stamina_cost)
+	update_stamina()
+	selected_room = room_id
+	StartCombat(data) #data.intimidate makes it an instant win and skips the battle screen
+
 
 func process_cast_use(port_node, with_return = false, bottom = false):
 	if !is_in_use_state():#open_cast_panel
@@ -1436,6 +1489,15 @@ func highlight_spelltar_chars_true(value, char_id = null):
 			continue
 		if !value or char_id == null or (node.dragdata != null and node.dragdata.id == char_id):
 			node.get_node("mark").visible = value
+		#while an item or a spell is being aimed the whole card is the target, so the level-up
+		#cross has to let that click through instead of answering it
+		set_levelup_indicator_clickable(node, !value)
+
+
+func set_levelup_indicator_clickable(button, clickable):
+	button.get_node("LevelUpIndicator").mouse_filter = (
+		Control.MOUSE_FILTER_STOP if clickable else Control.MOUSE_FILTER_IGNORE
+	)
 
 func highlight_spelltar_rooms():
 	highlight_spelltar_rooms_true(true)

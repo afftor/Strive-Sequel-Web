@@ -1,5 +1,7 @@
 extends CanvasItem
 
+const UNKNOWN_RACE_ICON = "res://assets/Textures_v2/icon_question_small.png"
+
 #map inputs
 var map_zoom_max = 1.5
 var map_zoom_min = 0.9
@@ -58,7 +60,6 @@ var can_teleport = false
 onready var info_btn_teleport = $InfoPanel/buttons/Teleport
 onready var info_btn_separator = $InfoPanel/buttons/separator
 onready var info_btn_send = $InfoPanel/buttons/Sendbutton
-onready var info_btn_forget = $InfoPanel/buttons/Forget
 onready var info_btns = $InfoPanel/buttons
 onready var info_teleport_menu = $InfoPanel/teleport_menu
 
@@ -213,6 +214,9 @@ var selected_chars = []
 var selected_area
 
 var sorted_locations = []
+var lists_signature = ""
+var cached_mass_select = []
+const LAZY_CHARACTER_LIST_LIMIT = 30
 var lands_order = ['plains', 'forests', 'mountains', 'empire', 'steppe', 'seas']
 var lands_count = {}
 var locs_order = ['capital', 'settlement', 'quest_location', 'dungeon', 'encounter']
@@ -254,7 +258,6 @@ func _ready():#2add button connections
 	$InfoPanel/Label.text = tr("INFORMATION_LABEL")
 	$InfoPanel/buttons/Sendbutton/Label.text = tr("CONFIRM")
 	$InfoPanel/buttons/Teleport/Label.text = tr("SKILLTELEPORT")
-	$InfoPanel/buttons/Forget/Label.text = tr("FORGET_LABEL")
 	$InfoPanel/VBoxContainer/Label2.text = tr("GALLERYCHAR")
 	$InfoPanel/VBoxContainer/Label3.text = tr("UPGRADERES")
 	$FromLocList/Label.text = tr("SELECT_CHAR_LABEL")
@@ -270,9 +273,9 @@ func _ready():#2add button connections
 #	$zoom.connect("value_changed", self, 'zoom_change')
 #	$zoom/minus.connect("pressed", self, 'zoom_change_step', [ -1])
 #	$zoom/plus.connect("pressed", self, 'zoom_change_step', [ 1])
-	info_btn_forget.connect("pressed", self, "forget_location")
 #	match_state()
 	input_handler.connect("mass_select_in_act", self, "off_mass_select_effect")
+	input_handler.connect("clear_cashed", self, "clear_cached_lists")
 	input_handler.register_btn_source('travel_master', self, 'tut_get_master')
 	input_handler.register_btn_source('travel_servant', self, 'tut_get_servant')
 	input_handler.register_btn_source('travel_chars_highlight', self, null, self, 'tut_get_chars_highlight')
@@ -281,6 +284,11 @@ func _ready():#2add button connections
 	input_handler.register_btn_source('travel_confirm', self, 'tut_get_send_confirm')
 	input_handler.register_btn_source('travel_back', self, 'tut_get_back_btn')
 	$map_control.connect("mouse_exited", self, "map_all_mouse_exited")
+
+
+func clear_cached_lists():
+	lists_signature = ""
+	cached_mass_select.clear()
 
 func tut_get_master():
 	return tut_get_chara(ResourceScripts.game_party.get_unique_slave('tutorial_master'))
@@ -315,36 +323,6 @@ func tut_get_send_confirm():
 	return info_btn_send
 func tut_get_back_btn():
 	return $Back
-
-func forget_location():
-	input_handler.get_spec_node(
-		input_handler.NODE_YESNOPANEL,
-		[
-			self,
-			'clear_dungeon_confirm',
-			tr("FORGETLOCATIONQUESTION")
-		]
-	)
-
-
-func clear_dungeon_confirm():
-	if to_loc == null:
-		return
-	globals.remove_location(to_loc)
-	input_handler.SystemMessage(tr("LOC_BEEN_REMOVED_LABEL"))
-	selected_loc = null
-	selected_chars.clear()
-	selected_groups.clear()
-	build_locations_list()
-	reset_from()
-	reset_to()
-	unselect_location()
-	build_from_locations()
-	update_location_chars()
-	build_to_locations()
-	match_state()
-	build_info()
-
 
 func set_return_context(screen, nav_module, location):
 	return_screen = screen
@@ -404,9 +382,15 @@ func open():
 	selected_loc = null
 	selected_area = null
 	build_locations_list()
-	build_from_locations()
+	var new_lists_signature = build_lists_signature()
+	if new_lists_signature != lists_signature:
+		build_from_locations()
+		build_to_locations()
+		#build_from_locations can repair duplicate group names, so capture the final state.
+		lists_signature = build_lists_signature()
+	elif !cached_mass_select.empty():
+		input_handler.start_mass_select(self, cached_mass_select)
 	update_location_chars()
-	build_to_locations()
 #	selected_area = 'plains'
 	update_selected_area()
 	match_state()
@@ -456,6 +440,8 @@ func build_locations_list():
 			temp.icon = null
 		if cdata[id].has('captured'): temp.captured = cdata[id].captured
 		if cdata[id].has('locked'): temp.locked = cdata[id].locked
+		if cdata[id].get('cleared', false):
+			temp.cleared = true
 		if temp.area == 'beastkin_tribe':
 			temp.area = 'forests'
 		if lands_count.has(temp.area): lands_count[temp.area] += 1
@@ -481,12 +467,48 @@ func build_locations_list():
 			continue
 		else:
 			temp_locations[loc].heroes.push_back(character.id)
-			if !locs_chosen.has(loc):
+			#Large rosters build their character rows only after the player expands a
+			#location. Creating every portrait button before the map becomes visible
+			#is the dominant first-open cost on long saves.
+			if ResourceScripts.game_party.character_order.size() <= LAZY_CHARACTER_LIST_LIMIT and !locs_chosen.has(loc):
 				locs_chosen.push_back(loc)
 	
 	sorted_locations = temp_locations.values().duplicate()
 	sorted_locations.sort_custom(self, 'sort_locations')
 	sorted_locations.push_back(temp)
+
+
+#The map nodes survive close(), so reopening an unchanged world should only reset selection.
+#This signature covers every value that changes the location/group/character tree.
+func build_lists_signature():
+	var parts = PoolStringArray()
+	for loc_data in sorted_locations:
+		parts.append("L:%s:%s:%s:%s:%s:%s:%s:%s" % [
+			str(loc_data.get('id', '')),
+			str(loc_data.get('area', '')),
+			str(loc_data.get('type', '')),
+			str(loc_data.get('quest', false)),
+			str(loc_data.get('captured', false)),
+			str(loc_data.get('locked', false)),
+			str(loc_data.get('icon', '')),
+			str(loc_data.get('cleared', false)),
+		])
+		for ch_id in loc_data.heroes:
+			var person = characters_pool.get_char_by_id(ch_id)
+			if person == null:
+				continue
+			parts.append("C:%s:%s:%s:%s" % [
+				str(ch_id),
+				str(person.get_loc_group()),
+				str(person.get_full_name()),
+				str(person.get_icon(true)),
+			])
+	var group_names = ResourceScripts.game_party.travel_groups_ref.keys()
+	group_names.sort()
+	for group_name in group_names:
+		var group_data = ResourceScripts.game_party.travel_groups_ref[group_name]
+		parts.append("G:%s:%s" % [str(group_name), str(group_data.get('priority', 10))])
+	return parts.join("|")
 
 
 func sort_locations(first, second):
@@ -535,10 +557,8 @@ func build_info(loc = null):
 	var adata = ResourceScripts.game_world.areas[tdata.area]
 	
 	var location_selected = get_location_data(loc)
-	info_btn_forget.visible = (!location.tags.has('quest') and location_selected.type in ['dungeon', 'encounter'])
-#	if to_loc != null:
-#		info_btn_forget.visible = false
-	
+	build_cleared_info(location)
+
 	#build info
 	$InfoPanel/Label.text = tr(location.name)
 	var icon = null
@@ -631,6 +651,7 @@ func build_info(loc = null):
 				newbutton.set_meta("exploration", true)
 				newbutton.get_node("amount").text = ""
 				globals.connecttexttooltip(newbutton, tr('TOOLTIPHIDDENRESOURCE'))
+	build_races(location)
 	#build chars
 	input_handler.ClearContainer($InfoPanel/VBoxContainer/CharScroll/Characters)
 	var f = false
@@ -669,19 +690,60 @@ func build_info(loc = null):
 		$InfoPanel/time.visible = false
 
 
+#What the info panel says about a place that is waiting to be removed: the label, how far the
+#wait has gone, and the tooltip explaining both.
+func build_cleared_info(location):
+	var node = $InfoPanel/InfoFrame.get_node_or_null("cleared")
+	if node == null:
+		return
+	var state = ResourceScripts.game_world.get_location_removal_state(location)
+	node.visible = state.cleared
+	if !state.cleared:
+		globals.disconnect_text_tooltip(node)
+		return
+	node.get_node("Label").text = tr("LOC_ABANDONED") if state.abandoned else tr("LOC_CLEARED")
+	var bar = node.get_node("bar")
+	bar.max_value = max(state.limit, 1)
+	bar.value = state.elapsed
+	globals.connecttexttooltip(node, globals.get_location_cleared_tooltip(location))
+
+
+#The races this location can yield, in its own order. A race the player has never taken here stays a
+#question mark. The row lives in the scene beside the resources; a scene without it simply shows nothing.
+func build_races(location):
+	if !has_node("InfoPanel/VBoxContainer/RaceScroll/Races"):
+		return
+	var row = $InfoPanel/VBoxContainer/RaceScroll/Races
+	input_handler.ClearContainer(row)
+	var slots = globals.location_race_slots(location)
+	$InfoPanel/VBoxContainer/RaceScroll.visible = !slots.empty()
+	if has_node("InfoPanel/VBoxContainer/Label4"):
+		$InfoPanel/VBoxContainer/Label4.text = tr("MAPRACES")
+		$InfoPanel/VBoxContainer/Label4.visible = !slots.empty()
+	for slot in slots:
+		var newbutton = input_handler.DuplicateContainerTemplate(row)
+		var known = slot.known
+		newbutton.get_node("Icon").texture = races.racelist[slot.race].icon if known else load(UNKNOWN_RACE_ICON)
+		newbutton.get_node("Icon").modulate = Color(1, 1, 1, 1) if known else Color(1, 1, 1, 0.5)
+		globals.connecttexttooltip(newbutton,
+			races.racelist[slot.race].name if known else tr("MAPRACEUNKNOWN"))
+
+
 func make_panel_for_location(panel, loc):
 	if loc.id == 'travel':
 		set_loc_text(panel, tr("CHARS_ON_ROAD_LABEL"))
 	else:
 		var data = ResourceScripts.world_gen.get_location_from_code(loc.id)
 		var text = data.name
+		var cleared = loc.get('cleared', false)
 #		if ResourceScripts.game_world.areas[loc.area].questlocations.has(loc.id):
-		if loc.quest:
+		if loc.quest and !cleared:
 			text = "Q:" + text
 			panel.get_node("Label").set("custom_colors/font_color", variables.hexcolordict.yellow)
-		if  data.has('active') and data.active == false:
-			text += "(!)"
 		set_loc_text(panel, text)
+		#the tick lives in the row template, and the logic works without it
+		if panel.has_node("cleared"):
+			panel.get_node("cleared").visible = cleared
 #		panel.get_node("Label").text = text
 		if loc.has('captured'):
 			if loc.captured:
@@ -706,6 +768,9 @@ func make_panel_for_location(panel, loc):
 				icon = images.get_icon('travel_event')
 		if panel.has_node('icon'):
 			panel.get_node("icon").texture = icon
+		#the races this dungeon can yield, the ones never taken here kept behind a question mark
+		if loc.type == 'dungeon':
+			globals.connectracetooltip(panel, data)
 
 
 func make_panel_for_character(panel, ch_id):
@@ -719,6 +784,28 @@ func make_panel_for_character(panel, ch_id):
 
 func make_panel_for_group(panel, group_name):
 	set_loc_text(panel, group_name)
+
+
+func _populate_group_character_buttons(group_cont):
+	if group_cont.get_meta("characters_built", false):
+		return false
+	group_cont.set_meta("characters_built", true)
+	var loc_id = group_cont.get_meta("location")
+	for ch_id in group_cont.get_meta("character_ids", []):
+		var loc_button = input_handler.DuplicateContainerTemplate(group_cont.get_node('offset/LocList'), 'Button')
+		loc_button.set_meta('location', loc_id)
+		loc_button.set_meta('character', ch_id)
+		loc_button.connect('pressed', self, 'char_loc_press', [ch_id, loc_id])
+		loc_button.get_node('group').connect('pressed', self, 'open_char_menu', [ch_id, loc_id])
+		globals.connecttexttooltip(loc_button.get_node('group'), tr("TRAVEL_RENAME"))
+		loc_button.visible = true
+		make_panel_for_character(loc_button, ch_id)
+		cached_mass_select.append({
+			btn_node = loc_button,
+			act_func = 'char_loc_press_mass',
+			act_args = [weakref(loc_button)]
+		})
+	return true
 
 
 func build_from_locations():
@@ -745,7 +832,8 @@ func build_from_locations():
 	if travel_data != null:
 		areas.travel_data = [travel_data]
 		sorted_keys.append('travel_data')
-	var mass_select = []
+	cached_mass_select.clear()
+	var lazy_character_lists = ResourceScripts.game_party.character_order.size() > LAZY_CHARACTER_LIST_LIMIT
 	for area in sorted_keys:
 		#no need to clear container
 		for loc_data in areas[area]:
@@ -782,30 +870,17 @@ func build_from_locations():
 				var group_cont = input_handler.DuplicateContainerTemplate(category.get_node('offset/LocGroupList'), 'LocGroup')
 				group_cont.set_meta('location', loc_data.id)
 				group_cont.set_meta('group', group_name)
+				group_cont.set_meta('character_ids', loc_char_groups[group_name].duplicate())
+				group_cont.set_meta('characters_built', false)
 				group_cont.get_node('Button').connect('pressed', self, 'group_press', [group_name, loc_data.id])
 				group_cont.get_node('Button/menu').connect("pressed", self, "open_group_menu", [group_name, loc_data.id])
 				globals.connecttexttooltip(group_cont.get_node('Button/menu'), tr("TRAVEL_GROUP_RENAME"))
 				group_cont.visible = true
 				make_panel_for_group(group_cont.get_node('Button'), group_name)
-				for ch_id in loc_char_groups[group_name]:
-					var loc_button = input_handler.DuplicateContainerTemplate(group_cont.get_node('offset/LocList'), 'Button')
-					loc_button.set_meta('location', loc_data.id)
-					loc_button.set_meta('character', ch_id)
-					loc_button.connect('pressed', self, 'char_loc_press', [ch_id, loc_data.id])
-					loc_button.get_node('group').connect('pressed', self, 'open_char_menu', [ch_id, loc_data.id])
-					globals.connecttexttooltip(loc_button.get_node('group'), tr("TRAVEL_RENAME"))
-	#				loc_button.connect('pressed', self, 'location_press', [loc_data.id, 'from'])
-	#				loc_button.connect('mouse_entered', self, 'build_info', [loc_data.id])
-	#				loc_button.connect('mouse_exited', self, 'build_info')
-					loc_button.visible = true
-					make_panel_for_character(loc_button, ch_id)
-					mass_select.append({
-						btn_node = loc_button,
-						act_func = 'char_loc_press_mass',
-						act_args = [weakref(loc_button)]
-					})
+				if !lazy_character_lists:
+					_populate_group_character_buttons(group_cont)
 	update_groups_ref()
-	input_handler.start_mass_select(self, mass_select)
+	input_handler.start_mass_select(self, cached_mass_select)
 
 
 
@@ -1021,6 +1096,7 @@ func try_erase_selected_group(group_name):
 	return true
 
 func update_location_chars():
+	var mass_select_changed = false
 	for loc in $FromLocList/LocScroll/LocCatList.get_children():
 #		for loc in cat.get_node('offset/LocList').get_children():
 		if loc.is_queued_for_deletion() or !loc.has_meta('location'):
@@ -1036,6 +1112,8 @@ func update_location_chars():
 			if !group.has_meta('group'):
 				continue
 			group.visible = show_chars
+			if show_chars and _populate_group_character_buttons(group):
+				mass_select_changed = true
 			var loc_id = group.get_meta('location')
 			var group_btn = group.get_node('Button')
 			group_btn.pressed = selected_groups.has(group.get_meta('group'))
@@ -1057,6 +1135,8 @@ func update_location_chars():
 #				ch.get_node('group').disabled = ch.disabled
 #				if !person.is_controllable(): 
 #					ch.disabled = true
+	if mass_select_changed:
+		input_handler.start_mass_select(self, cached_mass_select)
 
 
 func location_press(location, mode):

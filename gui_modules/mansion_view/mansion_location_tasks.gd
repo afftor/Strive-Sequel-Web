@@ -1,0 +1,531 @@
+extends Reference
+#Turns a location's available work into a flat list the mansion screen can draw as rooms.
+#
+#Nothing here is new mechanics. It calls the same idempotent task creators the old job
+#screen calls (game_res.add_gathering_job_temp and friends) and reads the same progress
+#records, so a character placed through this screen is a worker in exactly the sense the
+#rest of the game means. The enumeration mirrors MansionJobModule.update_resources().
+#
+#This file may touch autoloads: unlike mansion_layout.gd it is preloaded only by the
+#screen, never by game_res, so it is not part of the compile-time preload chain.
+
+const MansionLayout = preload("res://src/core/mansion_layout.gd")
+
+const MANSION_CODE = 'aliron'
+
+
+#Every location the household is currently spread across, mansion first. Same source the
+#navigation panel uses - the places people actually are.
+static func accessible_locations():
+	var res = [MANSION_CODE]
+	for char_id in ResourceScripts.game_party.character_order:
+		var person = ResourceScripts.game_party.characters[char_id]
+		var code = person.get_location()
+		if code == 'mansion':
+			code = MANSION_CODE
+		if code == 'travel' or res.has(code):
+			continue
+		res.append(code)
+	#A quest waiting somewhere is a reason to look at that place whether or not anybody has
+	#ever stood in it - otherwise the work is only visible after somebody happens to walk past.
+	for code in quest_locations():
+		if !res.has(code):
+			res.append(code)
+	return res
+
+
+#Places with story work pinned to them. Read off the task records rather than the world, so a
+#quest that has been dealt with stops naming its place the moment its task is gone.
+static func quest_locations():
+	var res = []
+	for task_id in ResourceScripts.game_res.active_tasks.special:
+		if !ResourceScripts.game_res.tasks_progresses.has(task_id):
+			continue
+		var code = ResourceScripts.game_res.tasks_progresses[task_id].location
+		if code != null and code != '' and !res.has(code):
+			res.append(code)
+	return res
+
+
+static func location_name(code):
+	var location = ResourceScripts.world_gen.get_location_from_code(code)
+	if location == null:
+		return code
+	if location.has('name') and location.name != '':
+		#a capital's name is a key until something translates it - worlddata writes it before the
+		#locale is up, and the navigation strip tr()s it at display time for the same reason
+		return globals.tr(location.name)
+	return code
+
+
+static func location_background(code):
+	var location = ResourceScripts.world_gen.get_location_from_code(code)
+	if location == null:
+		return null
+	if location.has('background'):
+		return images.get_background(location.background)
+	#a capital carries none of its own: its picture belongs to its land, where the navigation strip
+	#also goes for its icon
+	if location.get('type', '') == 'capital' and worlddata.lands.has(location.get('area', '')):
+		return images.get_background(worlddata.lands[location.area].get('capital_background', ''))
+	return null
+
+
+static func characters_at(code):
+	var res = []
+	for char_id in ResourceScripts.game_party.character_order:
+		var person = ResourceScripts.game_party.characters[char_id]
+		var here = person.get_location()
+		if here == 'mansion':
+			here = MANSION_CODE
+		if here == code:
+			res.append(char_id)
+	return res
+
+
+#Rooms on the local-tasks screen that hold an upgrade rather than people. The upgrades
+#themselves are a separate kind from the mansion's room upgrades and are not written yet, so
+#this names the slots and nothing else - each draws as an empty room waiting for them.
+const LOCAL_UPGRADE_SLOTS = ['local_upgrade_1', 'local_upgrade_2', 'local_upgrade_3']
+
+
+#### the work itself ####
+
+#One entry per thing that can be worked on here. Creating the progress records is the
+#creators' own business and they are idempotent, so calling this repeatedly is safe.
+static func tasks_for(code):
+	var res = []
+	var location = ResourceScripts.world_gen.get_location_from_code(code)
+	if location == null:
+		return res
+	if location.has('locked') and location.locked:
+		return res
+
+	for r_task in ['recruit_easy', 'recruit_hard']:
+		if location.has('tags') and location.tags.has(r_task):
+			res.append(entry_for(ResourceScripts.game_res.add_recruiting_job_temp(r_task, code)))
+
+	for task_id in ResourceScripts.game_res.active_tasks.special:
+		var jobdata = ResourceScripts.game_res.tasks_progresses[task_id]
+		if jobdata.location == code:
+			res.append(entry_for(task_id))
+
+	#Each kind of place gathers from exactly one source, never two. The estate works its own
+	#land through the global task list, gated by what its upgrades have unlocked; everywhere
+	#else offers only what that place itself has. Running both lists for a settlement listed
+	#the estate's whole production on top of the settlement's own - the same resources twice,
+	#and a shelf of them with nowhere to stand because their upgrades are the estate's.
+	#A settlement whose clients buy service offers it, wherever it is: its own work, its own people,
+	#its own purse. It is the one piece of work with a screen of its own behind it rather than a row
+	#of places on the card.
+	var service_id = ResourceScripts.game_res._add_service_job(code)
+	if service_id != '':
+		add_entry(res, service_id)
+	if code == MANSION_CODE:
+		#Gathering is not listed here. Each of those jobs is worked out of a building on the
+		#grounds, and that building's own card carries its places - listing the job as well
+		#drew the same work twice, once as a barn and once as "fishing". The records still
+		#have to exist for anyone to be put on them, so they are still created.
+		ensure_gather_jobs()
+		return res
+
+	if location.type == 'dungeon':
+		#a dungeon's seams run out rather than filling up, and take as many hands as you
+		#send: gather_limited carries no max_workers at all
+		for resource in location.gather_limit_resources:
+			if location.gather_limit_resources[resource] <= 0:
+				continue
+			var entry = entry_for(ResourceScripts.game_res.add_gathering_limited_job_temp(resource, code))
+			entry.remaining = int(location.gather_limit_resources[resource])
+			res.append(entry)
+		return res
+
+	#an encounter is a place something happened, not a place with work in it
+	if location.type == 'encounter' or !location.has('gather_resources'):
+		return res
+	for resource in location.gather_resources:
+		if !ResourceScripts.game_progress.can_gather_item(resource):
+			continue
+		add_entry(res, ResourceScripts.game_res.add_gathering_res_temp(resource, code))
+	return res
+
+
+#### the estate's gathering, which belongs to its buildings ####
+
+#Every gathering job the estate can currently do, created if it does not exist yet. A job
+#whose building has not been raised has nowhere to stand and is not the estate's to do -
+#what used to be a separate job per metal is the mine's loot table widening instead.
+#The work template a building of this kind is raised for, or null when it is not that sort of
+#building or the estate cannot do that job yet.
+static func gather_template_for_room(room_type):
+	if room_type == null or room_type == '':
+		return null
+	for task in tasks.tasklist.values():
+		if task.get('room_type', '') != room_type:
+			continue
+		return task if globals.checkreqs(task.reqs) else null
+	return null
+
+
+#Every building standing on the grounds, as [plot code, room]. Each is its own piece of work.
+static func gather_buildings():
+	var res = []
+	var layout = ResourceScripts.game_res.mansion_layout
+	var grounds = MansionLayout.grounds_floor(layout)
+	if grounds < 0:
+		return res
+	var floor_data = MansionLayout.get_floor(layout, grounds)
+	for slot_code in floor_data.slots:
+		var room = MansionLayout.get_room(floor_data, slot_code)
+		if room != null:
+			res.append([slot_code, room])
+	return res
+
+
+static func ensure_gather_jobs():
+	for pair in gather_buildings():
+		gather_entry_for_room(pair[1].type, pair[0])
+
+
+#The job THIS building is worked for. Two mines are two jobs: what a mine yields is what that
+#mine has been dug out to yield, and its hands are its own. The plot code is what tells them
+#apart - without it they would find each other's task and collapse into one.
+static func gather_entry_for_room(room_type, slot = ''):
+	var task = gather_template_for_room(room_type)
+	if task == null:
+		return null
+	if ResourceScripts.game_res.gather_places(room_type, slot) <= 0:
+		return null
+	return entry_for(ResourceScripts.game_res.add_gathering_job_temp(
+		task.code, MANSION_CODE, slot))
+
+
+#Work with nowhere to stand is not work the player can do anything about, so it is not drawn.
+#Seams are the exception: they take as many hands as you send and carry no places at all.
+static func add_entry(res, task_id):
+	var entry = entry_for(task_id)
+	if entry.unlimited or entry.max_workers > 0 or entry.own_screen:
+		res.append(entry)
+
+
+static func entry_for(task_id):
+	var data = ResourceScripts.game_res.tasks_progresses[task_id]
+	return {
+		id = task_id,
+		#a task may carry icon = null as well as no icon at all; the card load()s this
+		icon = data.icon if data.get('icon', null) != null else '',
+		name = data.name if data.has('name') else task_id,
+		descript = data.descript if data.has('descript') else '',
+		#gather_limited is the one kind with no cap on hands
+		unlimited = data.type == 'gather_limited',
+		max_workers = int(data.max_workers) if data.has('max_workers') else 0,
+		remaining = null,
+		#service takes as many as you send and is arranged on a screen of its own, so it has
+		#neither a cap to draw nor a row of places to draw it in
+		own_screen = ResourceScripts.game_res.is_service_task(task_id),
+		#a quest is worked at until it is done rather than producing anything, so what it has
+		#to show is how far along it is
+		quest = data.type == 'special',
+		progress = float(data.get('progress', 0.0)),
+		progress_limit = float(data.get('progress_limit', 0.0)),
+	}
+
+
+static func workers_of(task_id):
+	if !ResourceScripts.game_res.tasks_progresses.has(task_id):
+		return []
+	return ResourceScripts.game_res.tasks_progresses[task_id].workers
+
+
+#### the purse behind service ####
+
+#green while the purse covers what everybody on service is expected to earn next turn, gold once it
+#may not, red once it is empty and pays only variables.service_gold_exhausted_mult
+const SERVICE_POOL_COLORS = {
+	ok = Color(0.541176, 0.85098, 0.541176),
+	low = Color(0.976471, 0.882353, 0.505882),
+	empty = Color(0.85098, 0.372549, 0.372549),
+}
+
+
+#What the settlement behind a service task can still pay this week (game_world.get_service_gold),
+#read against the whole household's estimate - or null when that settlement has no limit. The service
+#screen, its rows and the service card all read this one answer, so they cannot disagree.
+static func service_pool_state(task_id):
+	if !ResourceScripts.game_res.tasks_progresses.has(task_id):
+		return null
+	var code = ResourceScripts.game_res.tasks_progresses[task_id].get('location', MANSION_CODE)
+	var pool = ResourceScripts.game_world.get_service_gold(code)
+	if pool == null:
+		return null
+	var estimated = 0.0
+	for char_id in workers_of(task_id):
+		var person = ResourceScripts.game_party.characters.get(char_id)
+		if person != null:
+			estimated += person.get_estimated_current_service_value()
+	var status = 'ok'
+	if pool.current <= 0:
+		status = 'empty'
+	elif pool.current < estimated:
+		status = 'low'
+	return {
+		code = code,
+		name = ResourceScripts.game_world.get_service_location_name(code),
+		current = int(pool.current),
+		max = int(pool.max),
+		days = ResourceScripts.game_world.days_until_service_gold_refill(),
+		estimated = estimated,
+		status = status,
+	}
+
+
+#The purse as a bar rather than a sum. What a player does with "5459 gold" is nothing - the figure
+#has no scale to be read against - while a bar says at a glance how much of the week's work is still
+#paid in full. The word under it is the same at every level and the colour is the one the line carried.
+static func fill_service_bar(bar, state):
+	bar.visible = state != null
+	if state == null:
+		return
+	bar.max_value = max(1, state.max)
+	bar.value = clamp(state.current, 0, bar.max_value)
+	var label = bar.get_node("Label")
+	label.text = globals.tr("MANSIONVIEW_SERVICEPOOL_BAR")
+	#The word stands in the middle of the bar, so the fill runs under one half of it and the empty
+	#track under the other. Green on the orange fill is the one pairing that cannot be read at all -
+	#and a full purse has nothing to warn about anyway, so a full one is simply written in cream. The
+	#two warnings keep the colours the old line had; by then the bar is dark enough to carry them.
+	var colour = SERVICE_POOL_COLORS[state.status]
+	if state.status == 'ok':
+		colour = Color(0.94, 0.9, 0.82)
+	label.add_color_override("font_color", colour)
+	label.add_color_override("font_color_shadow", Color(0, 0, 0, 0.65))
+	label.add_constant_override("shadow_offset_x", 1)
+	label.add_constant_override("shadow_offset_y", 1)
+
+
+static func service_exhausted_percent():
+	return int(round(variables.service_gold_exhausted_mult * 100.0))
+
+
+#Where a task is worked - for service, the settlement whose clients pay for it.
+static func task_location(task_id):
+	if !ResourceScripts.game_res.tasks_progresses.has(task_id):
+		return MANSION_CODE
+	return ResourceScripts.game_res.tasks_progresses[task_id].get('location', MANSION_CODE)
+
+
+static func _name_list(names):
+	return PoolStringArray(names).join(", ")
+
+
+#What this settlement refuses: the acts nobody here buys, and the races it takes at all.
+static func service_limit_lines(code):
+	var res = []
+	var banned = ResourceScripts.game_world.service_banned_rules(code)
+	if !banned.empty():
+		var names = []
+		for rule in banned:
+			names.append(globals.tr("BROTHEL" + rule.to_upper()))
+		res.append(globals._report_text("MANSIONVIEW_SERVICELIMIT_RULES", [_name_list(names)]))
+	var allowed = ResourceScripts.game_world.service_allowed_races(code)
+	if !allowed.empty():
+		var names = []
+		for race in allowed:
+			names.append(globals.tr("RACE" + race.to_upper()))
+		res.append(globals._report_text("MANSIONVIEW_SERVICELIMIT_RACES", [_name_list(names)]))
+	return res
+
+
+#What this week's clients are after here, and what fitting them is worth.
+static func service_bonus_lines(code):
+	var res = []
+	var bonuses = ResourceScripts.game_world.get_service_bonuses(code)
+	var wanted = []
+	for bonus in bonuses:
+		wanted.append(service_bonus_text(bonus))
+	if wanted.empty():
+		return res
+	res.append(globals._report_text("MANSIONVIEW_SERVICEBONUS_DEMAND", [_name_list(wanted)]))
+	var one = int(round(float(variables.service_bonus_gold_mult[1]) * 100.0))
+	if bonuses.size() > 1:
+		res.append(globals._report_text("MANSIONVIEW_SERVICEBONUS_REWARD",
+			[one, int(round(float(variables.service_bonus_gold_mult[2]) * 100.0))]))
+	else:
+		res.append(globals._report_text("MANSIONVIEW_SERVICEBONUS_REWARD_ONE", [one]))
+	return res
+
+
+#The mark a settlement's service wears: what its clients are after and what it refuses, as one
+#tooltip, and the picture that stands for it - the first bonus's own icon, or the trade's own when
+#the week asks for nothing. null where there is nothing to say.
+static func service_mark_hint(code):
+	return PoolStringArray(service_bonus_lines(code) + service_limit_lines(code)).join("\n")
+
+
+#What one bonus asks for, named as it is named everywhere else.
+static func service_bonus_text(bonus):
+	var names = []
+	match bonus.type:
+		'race':
+			if bonus.get('monster', false):
+				return globals.tr("MANSIONVIEW_SERVICEBONUS_MONSTERS")
+			for race in bonus.values:
+				names.append(globals.tr("RACE" + str(race).to_upper()))
+			return _name_list(names)
+		'personality':
+			return globals.tr("PERSONALITYNAME" + str(bonus.values[0]).to_upper())
+		'rule':
+			for rule in bonus.values:
+				names.append(globals.tr("BROTHEL" + str(rule).to_upper()))
+			return _name_list(names)
+		'factor':
+			return globals._report_text("MANSIONVIEW_SERVICEBONUS_FACTOR",
+				[globals.tr("STAT" + str(bonus.values[0]).to_upper()), variables.service_bonus_factor_level])
+	return ""
+
+
+#What the bar means, read wherever it is drawn: the mark beside it on the service screen, and the
+#tooltip of the card on the tasks screen. The key is taken as it stands, with nothing put into it -
+#a line assembled out of figures and other keys is a line that can come out mangled in a locale that
+#has only some of them, and this one says what it has to say without any.
+static func service_pool_hint():
+	return globals.tr("MANSIONVIEW_SERVICEPOOL_HINT")
+
+
+#What this work can turn out, as [material code, chance] pairs. The table's branches carry
+#their own reqs and are asked at roll time (loot.is_record_restricted), so the same question
+#is asked here and a branch the estate has not unlocked is simply not listed - which is what
+#makes this worth showing at all: it says what buying the next upgrade would add.
+static func production_table(task_id):
+	var res = []
+	if !ResourceScripts.game_res.tasks_progresses.has(task_id):
+		return res
+	var data = ResourceScripts.game_res.tasks_progresses[task_id]
+	if !data.has('job'):
+		return res
+	var loot = Items.get_loot()
+	var table_name = tasks.find_production_loot(
+		tasks.find_task_for_res(data.job) if data.type == 'gather' else null, data.job)
+	if !loot.has_loot_table(table_name):
+		#no table of its own: the job hands out its own material and nothing else
+		return [[data.job, 1.0]]
+	var table = loot.loot_tables[table_name]
+	if !table.has('list'):
+		return [[table.material, 1.0]] if table.has('material') else res
+	for record in table.list:
+		if record.has('reqs') and !globals.checkreqs(record.reqs):
+			continue
+		if !record.has('material'):
+			continue
+		res.append([record.material, float(record.get('chance', 1.0))])
+	return res
+
+
+#What a quest gains in a turn from the people on it. Each worker adds one per tick by default
+#(ch_leveling.special_tick), and a tick is a turn - the same unit everything else on the card
+#is counted in. A task carrying its own 'function' computes its own figure, and calling that
+#to find out would hand out the experience it grants as a side effect - so those say nothing
+#rather than guess.
+static func quest_per_turn(task_id):
+	if !ResourceScripts.game_res.tasks_progresses.has(task_id):
+		return -1.0
+	var data = ResourceScripts.game_res.tasks_progresses[task_id]
+	if data.has('function'):
+		return -1.0
+	return float(data.workers.size())
+
+
+#One person's share of that: the flat point CharacterClass.special_tick() adds for every hand on
+#a quest. Nothing for anything else - work that makes something is measured in what it makes
+#(production_of), and a quest carrying a function of its own is worth whatever that function
+#says, which is not ours to guess.
+static func quest_share(task_id):
+	if !ResourceScripts.game_res.tasks_progresses.has(task_id):
+		return 0.0
+	var data = ResourceScripts.game_res.tasks_progresses[task_id]
+	if data.type != 'special' or data.has('function'):
+		return 0.0
+	return 1.0
+
+
+#### production ####
+
+#What this task yields per turn from the people actually on it. Same arithmetic the task
+#info panel uses (Mansion/Scripts/MansionTaskInfoModule.gd), so the two never disagree.
+#This counts finished batches of work, which is also what the task's production loot table
+#is rolled for (loot.roll_production). While a table hands out one unit of one material -
+#which is what all of them do to begin with - batches and units are the same number; give a
+#task a table that yields several things and this becomes "rolls", not "items of job".
+#What one person would make on this work in a turn, whether or not they are on it yet. The card
+#asks this about somebody it is offering the place to, and production_per_turn sums it over the
+#people already there, so the number the player is shown before choosing and the number they get
+#after cannot drift apart.
+static func production_of(task_id, person):
+	if person == null or !ResourceScripts.game_res.tasks_progresses.has(task_id):
+		return 0.0
+	var data = ResourceScripts.game_res.tasks_progresses[task_id]
+	if !data.has('job'):
+		return 0.0
+	var value = 0.0
+	if data.type in ['gather_limited', 'gather_simple']:
+		value = person.get_progress_resource(data.job)
+	else:
+		#find_task_for_res answers null for anything no job produces, and the value of a task
+		#nobody can be set to is nothing rather than an error
+		var job_task = tasks.find_task_for_res(data.job)
+		if job_task == null:
+			return 0.0
+		value = person.get_job_value(job_task)
+	#The work a task stores per finished item is often less than one - fishing keeps 0.73 -
+	#so this may only guard against a zero, never round the divisor up: clamping it to 1
+	#silently dropped the division and showed work units where the panel showed items.
+	var per_item = float(data.get('progress_limit', 1))
+	return value / per_item if per_item > 0 else 0.0
+
+
+static func production_per_turn(task_id):
+	if !ResourceScripts.game_res.tasks_progresses.has(task_id):
+		return 0.0
+	var data = ResourceScripts.game_res.tasks_progresses[task_id]
+	if !data.has('workers') or data.workers.empty():
+		return 0.0
+	#Not every piece of work makes something every turn. A quest is worked at until it is done
+	#and its record carries no job at all (game_res.add_special_job) - asking one what it yields
+	#brought the screen down the moment somebody was put on it.
+	if !data.has('job'):
+		return 0.0
+	var total = 0.0
+	for char_id in data.workers:
+		var person = ResourceScripts.game_party.characters.get(char_id, null)
+		if person == null:
+			continue
+		total += production_of(task_id, person)
+	return total
+
+
+#What this farm is actually making, by material and per turn - the same shape as
+#production_table(), so a plot draws both the same way. Several people each giving several
+#different things is not one figure: milk and dragon scales do not add up to anything.
+static func farm_yield_table(task_id):
+	var rows = []
+	if !ResourceScripts.game_res.tasks_progresses.has(task_id):
+		return rows
+	var seen = {}
+	for char_id in ResourceScripts.game_res.tasks_progresses[task_id].workers:
+		var person = ResourceScripts.game_party.characters.get(char_id, null)
+		if person == null:
+			continue
+		for res in person.get_farming_rules():
+			if seen.has(res):
+				rows[seen[res]][1] += person.get_progress_farm(res)
+				continue
+			seen[res] = rows.size()
+			rows.append([res, person.get_progress_farm(res)])
+	return rows
+
+
+static func production_text(task_id):
+	var value = production_per_turn(task_id)
+	if value <= 0:
+		return ""
+	return "+%.1f" % value

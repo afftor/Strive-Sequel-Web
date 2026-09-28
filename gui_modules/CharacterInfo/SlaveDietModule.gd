@@ -1,19 +1,27 @@
 extends Control
 
+export(bool) var register_tutorial_source = true
 var person
 
 func _ready():
 	if has_node("close"):
 		$close.connect("pressed", self, "close_diet_window")
-		input_handler.register_btn_source("food_preference_meat", self, "tut_get_food_preference_meat")
+		#two copies of this panel exist (character sheet and expanded card) - only the one
+		#the hard tutorial drives may register, see register_tutorial_source
+		if register_tutorial_source:
+			input_handler.register_btn_source("food_preference_meat", self, "tut_get_food_preference_meat")
+			input_handler.register_btn_source("food_filter_close", self, "tut_get_close_button")
 	 
 
-func open_diet_window():
+func open_diet_window(value = null):
 	#if !gui_controller.windows_opened.has(self):
 	#	gui_controller.windows_opened.append(self)
 	#self.raise()
 	self.show()
-	person = input_handler.interacted_character
+	person = value if value != null else input_handler.interacted_character
+	if person == null:
+		hide()
+		return
 	input_handler.ClearContainer($ScrollContainer/VBoxContainer)
 	build_demand_header()
 	var array = []
@@ -81,7 +89,7 @@ func toggle_food(foodcode):
 
 	#input_handler.GetItemTooltip().hide()
 	# input_handler.get_spec_node(input_handler.NODE_ITEMTOOLTIP).hide()
-	open_diet_window()
+	open_diet_window(person)
 
 
 func close_diet_window():
@@ -90,6 +98,10 @@ func close_diet_window():
 
 func tut_get_food_preference_meat():
 	return $ScrollContainer/VBoxContainer.get_node_or_null("meat")
+
+
+func tut_get_close_button():
+	return $close
 
 
 func sort_food(first, second):

@@ -109,6 +109,8 @@ func _calculate_target_value(app_obj, prop_target, skill):
 			else:
 				if act_targets.size() < skill.number_rnd_targets:
 					res *= 0.5
+	if app_obj.has_status('imperial_squad') and r_target.has_status('leaders_mark'):
+		res *= 3.0
 	#taunt
 	if app_obj.has_status('taunt_soft') and !skill.tags.has('ignore_taunt'):
 		if app_obj.get_stat('taunt') == r_target.id:
@@ -148,6 +150,14 @@ func _calculate_targets_for_skill(app_obj, s_id, hide_ignore = false):
 				'any': 
 					pos_targets = input_handler.combat_node.get_enemy_targets_all(app_obj, hide_ignore)
 			for target in pos_targets:
+				var target_dir = {target = target.position, quality = _calculate_target_value(app_obj, target.position, t_skill)}
+				target_array.push_back(target_dir)
+		'all':
+			var pos_targets = input_handler.combat_node.get_enemy_targets_all(app_obj, hide_ignore)
+			pos_targets = pos_targets + input_handler.combat_node.get_allied_targets(app_obj)
+			for target in pos_targets:
+				if t_skill.target_range == 'not_caster' and target.id == app_obj.id:
+					continue
 				var target_dir = {target = target.position, quality = _calculate_target_value(app_obj, target.position, t_skill)}
 				target_array.push_back(target_dir)
 	skill_targets[s_id] = target_array
@@ -217,7 +227,15 @@ func _get_action(hide_ignore = false):
 	#=== Skill rotation zone ===
 	if actions.size() == 0:
 #		print ('ERROR IN AI TEMPLATE')
-		return app_obj.get_skill_by_tag('basic')
+		#the basic attack is the last resort, but it can be blocked as well - disarm stops any
+		#ability_type 'skill' that is not tagged disable_immunity. Handing back a skill the
+		#fighter cannot use makes enemy_turn cast it anyway, straight past the disable.
+		var basic = app_obj.get_skill_by_tag('basic')
+		if basic == null:
+			return null
+		if !app_obj.can_use_skill(Skilldata.get_template(basic, app_obj)):
+			return null
+		return basic
 	var res = input_handler.weightedrandom(actions)
 	return res
 
@@ -226,6 +244,22 @@ func _get_target(s_name):#for chosen with _get_action() func
 	var targets = []
 	for t in skill_targets[s_name]:
 		targets.push_back([t.target, t.quality])
+	#a skill may ask for a fixed target policy instead of the weighted roll: ai_target = 'max_hp'
+	#picks the usable target with the most current HP. Read from the raw list - get_template
+	#converts legacy templates and drops keys it does not know.
+	var t_skill = Skilldata.Skilllist.get(s_name, {})
+	if t_skill.has('ai_target') and t_skill.ai_target == 'max_hp':
+		var best = null
+		var best_hp = -1
+		for t in targets:
+			if t[1] <= 0:
+				continue
+			var tchar = characters_pool.get_char_by_id(input_handler.combat_node.battlefield[t[0]])
+			if tchar != null and tchar.hp > best_hp:
+				best_hp = tchar.hp
+				best = t[0]
+		if best != null:
+			return best
 	return input_handler.weightedrandom(targets)
 
 func set_skill_rotation(rotation_array):
