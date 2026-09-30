@@ -104,7 +104,7 @@ var skills = {
 		number_rnd_targets = 3,
 		target_range = 'melee',
 		damage_type = 'weapon',
-		sfx = [{code = 'overgrowth', target = 'target_group', period = 'windup'}],
+		sfx = [{code = 'entangle', target = 'target_group', period = 'windup'}],
 		sounddata = {initiate = null, strike = 'blade', hit = null},
 		value = [['caster.matk', '*0.8']],
 		damagestat = 'no_stat'
@@ -578,7 +578,7 @@ var effects = {
 				type = 'oneshot',
 				target = 'target',
 				conditions = [],
-				atomic = [{type = 'sfx', value = 'blood_boil'},]
+				atomic = [{type = 'sfx', value = 'blood_explosion'},]
 			},
 		]
 	},

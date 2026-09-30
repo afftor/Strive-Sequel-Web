@@ -99,7 +99,7 @@ var skills = {
 		number_rnd_targets = 3,
 		target_range = 'melee',
 		damage_type = 'weapon',
-		sfx = [{code = 'overgrowth', target = 'target_group', period = 'windup'}],
+		sfx = [{code = 'entangle', target = 'target_group', period = 'windup'}],
 		sounddata = {initiate = null, strike = 'blade', hit = null},
 		value = [['caster.matk', '*1']],
 		damagestat = 'no_stat'
@@ -132,7 +132,7 @@ var skills = {
 		allowedtargets = ['enemy'],
 		value = ['caster.matk','*0.45'],
 		random_factor_p = 0.1,
-		sfx = [{code = 'black_tendrils', target = 'target_group', period = 'windup'},], 
+		sfx = [{code = 'darkness', target = 'target_group', period = 'windup'},], 
 		sounddata = {initiate = 'spell_lightning', strike = null, hit = null},
 	},
 	aphrodisiac_bombardment = {
@@ -342,7 +342,7 @@ var skills = {
 		target_number = 'all_allowed',
 		target_range = 'dead',
 		damage_type = 'dark',
-		sfx = [{code = 'black_tendrils', target = 'target_group', period = 'windup'},], 
+		sfx = [{code = 'darkness', target = 'target_group', period = 'windup'},], 
 		sounddata = {initiate = null, strike = null, hit = null},
 		value = [['100']],
 		damagestat = 'no_stat',

@@ -177,7 +177,7 @@ var skills = {
 		damage_type = 'light',
 		sfx = [
 			{code = 'command', target = 'caster', period = 'windup'},
-			{code = 'radiance', target = 'caster', period = 'predamage'}],
+			{code = 'blessing', target = 'caster', period = 'predamage'}],
 		sounddata = {initiate = null, strike = 'skill_scene', hit = null},
 		value = [['caster.hpmax', '*0.12']],
 		damagestat = ['-damage_hp'],
@@ -203,7 +203,7 @@ var skills = {
 		damage_type = 'earth',
 		follow_up = 'melchor_lockdown_sweep',
 		sfx = [
-			{code = 'earthquake', target = 'target_group', period = 'predamage'},
+			{code = 'earth_spike', target = 'target_group', period = 'predamage'},
 			{code = 'cast_earth', target = 'caster', period = 'windup', is_cast = true}],
 		sounddata = {initiate = 'spell_explosion', strike = null, hit = 'explosion', hittype = 'static'},
 		value = [['caster.matk', '*1.35']],
@@ -525,7 +525,7 @@ var skills = {
 		target_number = 'single',
 		target_range = 'any',
 		damage_type = 'weapon',
-		sfx = [{code = 'skill_void', target = 'caster', period = 'predamage'}],
+		sfx = [{code = 'dark_swril', target = 'caster', period = 'predamage'}],
 		sounddata = {initiate = null, strike = 'dodge', hit = null},
 		value = [['0']],
 		damagestat = 'no_stat',
@@ -772,7 +772,7 @@ var effects = {
 				target = 'target',
 				atomic = [
 					
-					{type = 'sfx', value = 'radiance'},
+					{type = 'sfx', value = 'blessing'},
 					{type = 'stat_set', stat = 'hp', value = 0},
 				],
 			},
@@ -810,7 +810,7 @@ var effects = {
 				target = 'target',
 				atomic = [
 					{type = 'add_combat_log', text = 'MELCHOR_LOG_SHOO_ROUGE'},
-					{type = 'sfx', value = 'radiance'},
+					{type = 'sfx', value = 'blessing'},
 					{type = 'damage_percent', value = 10},
 				],
 			},
@@ -856,7 +856,7 @@ var effects = {
 				target = 'owner',
 				atomic = [
 					{type = 'add_combat_log', text = 'MELCHOR_LOG_FULL_EXTENT'},
-					{type = 'sfx', value = 'radiance'},
+					{type = 'sfx', value = 'blessing'},
 					{type = 'effect', value = 'melchor_full_extent'},
 				],
 			},
@@ -878,7 +878,7 @@ var effects = {
 				target = 'owner',
 				atomic = [
 					{type = 'add_combat_log', text = 'MELCHOR_LOG_FULL_EXTENT_DESPERATE'},
-					{type = 'sfx', value = 'radiance'},
+					{type = 'sfx', value = 'blessing'},
 					{type = 'effect', value = 'melchor_full_extent'},
 				],
 			},
@@ -931,7 +931,7 @@ var effects = {
 						type = 'oneshot',
 						target = 'caster',
 						atomic = [
-							{type = 'sfx', value = 'radiance'},
+							{type = 'sfx', value = 'blessing'},
 							{type = 'damage', value = 75, source = 'light'},
 						],
 					},

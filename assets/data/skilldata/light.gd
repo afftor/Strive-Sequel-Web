@@ -224,7 +224,7 @@ var skills = {
 		value = 0.8,
 		random_factor_p = 0.1,
 		sfx = [
-			{code = 'radiance', target = 'target_group', period = 'windup'},
+			{code = 'blessing', target = 'target_group', period = 'windup'},
 			{code = 'cast_light', target = 'caster', period = 'windup', is_cast = true}], 
 		sounddata = {initiate = 'firehit', strike = null, hit = null},
 		hitfx = {type = 'sparks', size = 6.0, speed = 1.0},
@@ -256,7 +256,7 @@ var skills = {
 		target_range = 'any',
 		damage_type = 'light',
 		sfx = [
-			{code = 'mass_resurrection', target = 'target_group', period = 'windup'},
+			{code = 'resurrect', target = 'target_group', period = 'windup'},
 			{code = 'cast_light', target = 'caster', period = 'windup', is_cast = true}],
 		sounddata = {initiate = null, strike = 'skill_scene', hit = null},
 		value = [['target.hpmax','*0.80']],

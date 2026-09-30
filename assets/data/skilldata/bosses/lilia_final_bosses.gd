@@ -370,7 +370,7 @@ var skills = {
 		target_range = 'any',
 		damage_type = 'fire',
 		sfx = [
-			{code = 'skill_void', target = 'caster', period = 'windup'},
+			{code = 'dark_swril', target = 'caster', period = 'windup'},
 			{code = 'mind_shatter', target = 'caster', period = 'windup'},
 			{code = 'blessing', target = 'caster', period = 'windup'},
 			{code = 'flame', target = 'target', period = 'predamage'},

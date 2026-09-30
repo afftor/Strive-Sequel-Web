@@ -651,7 +651,7 @@ var skills = {
 		target_range = 'any',
 		damage_type = 'earth',
 		sfx = [
-			{code = 'earthquake', target = 'target_group', period = 'windup'},
+			{code = 'earth_spike', target = 'target_group', period = 'windup'},
 			{code = 'cast_earth', target = 'caster', period = 'windup', is_cast = true}], 
 		sounddata = {initiate = 'avalanche', strike = null, hit = null, hittype = 'dynamic'},
 		value = ['caster.matk','*1.2'],

@@ -132,7 +132,7 @@ var skills = {
 		target_range = 'any',
 		damage_type = 'mind',
 		sfx = [
-			{code = 'abyss_gaze', target = 'target_group', period = 'windup'},
+			{code = 'dark_swril', target = 'target_group', period = 'windup'},
 			{code = 'charge_abyss', target = 'caster', period = 'windup', is_cast = true}],
 		sounddata = {initiate = null, strike = 'blade', hit = null},
 		value = 1.25,

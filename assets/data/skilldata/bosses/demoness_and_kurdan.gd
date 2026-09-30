@@ -136,7 +136,7 @@ var skills = {
 		damage_type = 'dark',
 		keep_target = variables.TARGET_NOKEEP,
 		next_target = variables.NT_ANY,
-		sfx = [{code = 'magma_blast', target = 'target', period = 'predamage'},{code = 'blood_boil', target = 'caster', period = 'postdamage'}], 
+		sfx = [{code = 'magma_blast', target = 'target', period = 'predamage'},{code = 'blood_explosion', target = 'caster', period = 'postdamage'}], 
 		sounddata = {initiate = 'firebolt', strike = null, hit = 'spell_explosion', hittype = 'static'},
 		value = [['caster.atk','+','caster.matk','*1.5']],
 	},
@@ -162,7 +162,7 @@ var skills = {
 		target_number = 'single',
 		target_range = 'any',
 		damage_type = 'dark',
-		sfx = [{code = 'skill_void', target = 'caster', period = 'predamage'}], 
+		sfx = [{code = 'dark_swril', target = 'caster', period = 'predamage'}], 
 		sounddata = {initiate = null, strike = 'spell2', hit = null},
 		value = [['0']],
 		damagestat = 'no_stat'

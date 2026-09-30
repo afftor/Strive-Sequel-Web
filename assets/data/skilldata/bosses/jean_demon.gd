@@ -73,7 +73,7 @@ var skills = {
 		damage_type = 'dark',
 		random_factor_p = 0.1,
 		sfx = [
-			{code = 'skill_void', target = 'target_group', period = 'windup'},
+			{code = 'dark_swril', target = 'target_group', period = 'windup'},
 			{code = 'cast_dark', target = 'caster', period = 'windup', is_cast = true}],
 		sounddata = {initiate = 'spell_void', strike = null, hit = null, hittype = 'static'},
 		value = 0.9,
@@ -104,7 +104,7 @@ var skills = {
 		target_range = 'any',
 		damage_type = 'earth',
 		sfx = [
-			{code = 'overgrowth', target = 'target_group', period = 'windup'},
+			{code = 'entangle', target = 'target_group', period = 'windup'},
 			{code = 'cast_earth', target = 'caster', period = 'windup', is_cast = true}],
 		sounddata = {initiate = 'avalanche', strike = null, hit = null, hittype = 'dynamic'},
 		value = 0.5,
@@ -166,7 +166,7 @@ var skills = {
 		target_range = 'any',
 		damage_type = 'air',
 		sfx = [
-			{code = 'tempest', target = 'target_group', period = 'windup', duration = 0.85, queue_duration = 1.0},
+			{code = 'wind_blade', target = 'target_group', period = 'windup', duration = 0.85, queue_duration = 1.0},
 			{code = 'cast_air', target = 'caster', period = 'windup', is_cast = true}],
 		sounddata = {initiate = null, strike = 'spell_lightning', hit = 'combat_electric_charge_strike', hittype = 'static'},
 		value = 0.8,
@@ -420,7 +420,7 @@ var skills = {
 		chance = 999,
 		critchance = 0,
 		sfx = [
-			{code = 'black_tendrils', target = 'target_group', period = 'windup'},
+			{code = 'darkness', target = 'target_group', period = 'windup'},
 			{code = 'cast_mind', target = 'caster', period = 'windup', is_cast = true}],
 		sounddata = {initiate = 'spell_break', strike = 'blade', hit = null},
 		value = [['0']],
@@ -995,7 +995,7 @@ var effects = {
 		sub_effects = [{
 			type = 'oneshot',
 			target = 'owner',
-			atomic = [{type = 'sfx', value = 'blood_boil'}, {type = 'effect', value = 'jd_enrage'}],
+			atomic = [{type = 'sfx', value = 'blood_explosion'}, {type = 'effect', value = 'jd_enrage'}],
 		}],
 	},
 	#part two: the first time he is driven under half, he tears the gag off for good.
