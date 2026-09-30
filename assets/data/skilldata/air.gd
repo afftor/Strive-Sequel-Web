@@ -174,7 +174,7 @@ var skills = {
 		target_range = 'any',
 		damage_type = 'air',
 		sfx = [
-			{code = 'tempest', target = 'target_group', period = 'windup', duration = 0.85, queue_duration = 1.0},
+			{code = 'wind_blade', target = 'target_group', period = 'windup', duration = 0.85, queue_duration = 1.0},
 			{code = 'cast_air', target = 'caster', period = 'windup', is_cast = true}], 
 		sounddata = {initiate = null, strike = 'spell_lightning', hit = 'combat_electric_charge_strike', hittype = 'static'},
 		value = 1.2,

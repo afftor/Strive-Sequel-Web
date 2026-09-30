@@ -114,7 +114,7 @@ var skills = {
 		target_number = 'all',
 		target_range = 'any',
 		damage_type = 'light',
-		sfx = [{code = 'radiance', target = 'caster', period = 'windup'}],
+		sfx = [{code = 'blessing', target = 'caster', period = 'windup'}],
 		sounddata = {initiate = null, strike = null, hit = null},
 		value = [['0']],
 		damagestat = 'no_stat',
@@ -349,7 +349,7 @@ var skills = {
 		value = 2,
 		random_factor_p = 0.1,
 		sfx = [
-			{code = 'black_tendrils', target = 'target_group', period = 'windup'},
+			{code = 'darkness', target = 'target_group', period = 'windup'},
 			{code = 'shadow_spike', target = 'target', period = 'predamage'},
 			{code = 'cast_dark', target = 'caster', period = 'windup', is_cast = true}], 
 		sounddata = {initiate = 'spell_break', strike = 'blade', hit = null},

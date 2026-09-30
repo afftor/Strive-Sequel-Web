@@ -569,7 +569,7 @@ var skills = {
 		target_range = 'any',
 		damage_type = 'weapon',
 		damage = 0,
-		sfx = [{code = 'wind_wall', target = 'target_line', period = 'windup'}], 
+		sfx = [{code = 'air_shield', target = 'target_line', period = 'windup'}], 
 		sounddata = {initiate = 'spell_break', strike = null, hit = null},
 		value = ['0'],
 		damagestat = 'no_stat'

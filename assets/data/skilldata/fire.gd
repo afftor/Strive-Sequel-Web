@@ -63,7 +63,7 @@ var skills = {
 		target_range = 'any',
 		damage_type = 'fire',#not sure but not matters
 		sfx = [
-			{code = 'blood_boil', target = 'target', period = 'predamage'},
+			{code = 'blood_explosion', target = 'target', period = 'predamage'},
 			{code = 'cast_fire', target = 'caster', period = 'windup', is_cast = true}],
 		sounddata = {initiate = null, strike = 'spell_dark', hit = null},
 		value = [['0']],
@@ -174,7 +174,7 @@ var skills = {
 		target_range = 'any',
 		damage_type = 'fire',
 		sfx = [
-			{code = 'inferno', target = 'target_group', period = 'windup'},
+			{code = 'righteous_fire', target = 'target_group', period = 'windup'},
 			{code = 'charge_fire', target = 'caster', period = 'windup', is_cast = true}],
 		sounddata = {initiate = 'firebolt', strike = null, hit = 'spell_explosion', hittype = 'static'},
 		value = 1.6,
@@ -203,7 +203,7 @@ var skills = {
 		target_range = 'any',
 		damage_type = 'fire',
 		sfx = [
-			{code = 'meteor_strike', target = 'target', period = 'predamage'},
+			{code = 'meteor', target = 'target', period = 'predamage'},
 			{code = 'charge_fire', target = 'caster', period = 'windup', is_cast = true}],
 		sounddata = {initiate = 'firebolt', strike = null, hit = 'spell_explosion', hittype = 'static'},
 		value = 2.0,

@@ -125,7 +125,7 @@ var skills = {
 		target_range = 'any',
 		damage_type = 'earth',
 		sfx = [
-			{code = 'overgrowth', target = 'target_group', period = 'windup'},
+			{code = 'entangle', target = 'target_group', period = 'windup'},
 			{code = 'cast_earth', target = 'caster', period = 'windup', is_cast = true}], 
 		sounddata = {initiate = null, strike = 'blade', hit = null},
 		value = 0.5,
@@ -158,7 +158,7 @@ var skills = {
 		damage_type = 'earth',
 		sfx = [
 			{code = 'shake_target', target = 'target_group', period = 'windup', alt_slot = 'SFX_BG'},
-			{code = 'earthquake', target = 'target_group', period = 'windup'},
+			{code = 'earth_spike', target = 'target_group', period = 'windup'},
 			{code = 'cast_earth', target = 'caster', period = 'windup', is_cast = true}],
 		sounddata = {initiate = 'avalanche', strike = null, hit = null, hittype = 'dynamic'},
 		value = 0.4,

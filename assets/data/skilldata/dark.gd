@@ -59,7 +59,7 @@ var skills = {
 		value = 0.3,
 		random_factor_p = 0.1,
 		sfx = [
-			{code = 'black_tendrils', target = 'target_group', period = 'windup'},
+			{code = 'darkness', target = 'target_group', period = 'windup'},
 			{code = 'cast_dark', target = 'caster', period = 'windup', is_cast = true}], 
 		sounddata = {initiate = null, strike = 'spell_break', hit = null},
 		variations = [
@@ -186,7 +186,7 @@ var skills = {
 		value = 1.5,
 		random_factor_p = 0.1,
 		sfx = [
-			{code = 'skill_void', target = 'target_group', period = 'windup'},
+			{code = 'dark_swril', target = 'target_group', period = 'windup'},
 			{code = 'cast_dark', target = 'caster', period = 'windup', is_cast = true}], 
 		sounddata = {initiate = 'spell_void', strike = null, hit = null, hittype = 'static'},
 	},
