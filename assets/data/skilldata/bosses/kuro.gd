@@ -197,7 +197,7 @@ var skills = {
 		value = 0.1,
 		random_factor_p = 0.1,
 		sfx = [
-			{code = 'black_tendrils', target = 'target_group', period = 'windup'},
+			{code = 'darkness', target = 'target_group', period = 'windup'},
 			{code = 'dark_swril', target = 'target', period = 'predamage'},
 			{code = 'cast_dark', target = 'caster', period = 'windup', is_cast = true}], 
 		sounddata = {initiate = null, strike = 'spell_break', hit = null},
@@ -314,7 +314,7 @@ var skills = {
 		value = 0.7,
 		random_factor_p = 0.1,
 		sfx = [
-			{code = 'black_tendrils', target = 'target_group', period = 'windup'},
+			{code = 'darkness', target = 'target_group', period = 'windup'},
 			{code = 'cast_dark', target = 'caster', period = 'windup', is_cast = true}], 
 		sounddata = {initiate = 'spell_break', strike = 'blade', hit = null},
 	},

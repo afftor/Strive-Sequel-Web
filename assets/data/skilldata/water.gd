@@ -189,7 +189,7 @@ var skills = {
 		target_range = 'any',
 		damage_type = 'water',
 		sfx = [
-			{code = 'blizzard', target = 'target_group', period = 'windup'},
+			{code = 'eye_of_the_storm', target = 'target_group', period = 'windup'},
 			{code = 'charge_frost', target = 'caster', period = 'windup', is_cast = true}],
 		sound = [],
 		value = 0.9,
@@ -218,7 +218,7 @@ var skills = {
 		target_range = 'any',
 		damage_type = 'water',
 		sfx = [
-			{code = 'hailstorm', target = 'target_group', period = 'windup'},
+			{code = 'eye_of_the_storm', target = 'target_group', period = 'windup'},
 			{code = 'charge_frost', target = 'caster', period = 'windup', is_cast = true}],
 		sound = [],
 		value = 1.5,

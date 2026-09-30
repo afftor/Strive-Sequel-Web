@@ -113,7 +113,7 @@ var skills = {
 		target_range = 'melee',
 		damage_type = 'weapon',
 		sfx = [
-			{code = 'earthquake', target = 'target_line', period = 'predamage'},
+			{code = 'earth_spike', target = 'target_line', period = 'predamage'},
 			{code = 'tauntwave', target = 'caster', period = 'windup'}],
 		sounddata = {initiate = null, strike = 'explosion', hit = null, hittype = 'dynamic'},
 		value = [['caster.atk','*1.75', '+', 'caster.matk', '*0.5']],
@@ -201,7 +201,7 @@ var skills = {
 		keep_target = variables.TARGET_NOKEEP,
 		next_target = variables.NT_STRONG_MELEE,
 		sfx = [
-			{code = 'radiance', target = 'target', period = 'predamage', sync_to_hit = true, hit_motion = 'squash'},
+			{code = 'blessing', target = 'target', period = 'predamage', sync_to_hit = true, hit_motion = 'squash'},
 			{code = 'assassinate_step', target = 'caster', period = 'windup', is_cast = true}],
 		sounddata = {initiate = 'spell_explosion', strike = null, hit = 'explosion'},
 		value = [['caster.matk', '*2.4']],
@@ -364,7 +364,7 @@ var skills = {
 		target_number = 'all',
 		target_range = 'any',
 		damage_type = 'light',
-		sfx = [{code = 'radiance', target = 'target_group', period = 'predamage'}],
+		sfx = [{code = 'blessing', target = 'target_group', period = 'predamage'}],
 		sounddata = {initiate = 'spell_break', strike = null, hit = null, hittype = 'static'},
 		value = [['caster.matk', '*0.9']],
 	},
