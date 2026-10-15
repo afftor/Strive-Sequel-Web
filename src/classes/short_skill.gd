@@ -210,6 +210,7 @@ func convert_to_new_template():
 		res_res.evade = 0
 	if template.has('armor_p'): res_res.armor_p = template.armor_p
 	if template.has('critchance'): res_res.critchance = template.critchance
+	if template.has('resist_cap'): res_res.resist_cap = template.resist_cap
 	if template.has('process_no_stat'): res_res.process_no_stat = template.process_no_stat
 	if template.has('follow_up'): res_res.follow_up = template.follow_up
 	if template.has('social_skill_stats'): res_res.social_skill_stats = template.social_skill_stats
@@ -283,8 +284,7 @@ func convert_to_new_template_combat():
 	else: res_res.name = ""
 	if template.has('descript'): res_res.descript = template.descript
 	res_res.type = template.type
-	if template.has('ability_type'): res_res.ability_type = template.ability_type
-	else: res_res.ability_type = 'combat'
+	res_res.ability_type = template.ability_type
 	res_res.cost = cost.duplicate()
 #	if template.has('learn_cost'): res_res.learn_cost = template.learn_cost
 #	if template.has('learn_reqs'): res_res.learn_reqs = template.learn_reqs.duplicate()
@@ -310,6 +310,7 @@ func convert_to_new_template_combat():
 	if template.has('evade'): res_res.evade = template.evade
 	if template.has('armor_p'): res_res.armor_p = template.armor_p
 	if template.has('critchance'): res_res.critchance = template.critchance
+	if template.has('resist_cap'): res_res.resist_cap = template.resist_cap
 	if template.has('follow_up'): res_res.follow_up = template.follow_up
 	if template.has('number_rnd_targets'): 
 		if template.number_rnd_targets is Array:
@@ -317,6 +318,7 @@ func convert_to_new_template_combat():
 		else:
 			res_res.number_rnd_targets = template.number_rnd_targets
 	res_res.tags = tags.duplicate()
+	res_res.tags.push_back(res_res.ability_type)
 	if tags.has('damage') and !tags.has(damage_type) and damage_type != 'weapon':
 		res_res.tags.push_back(damage_type)
 	return res_res

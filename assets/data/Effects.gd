@@ -265,7 +265,8 @@ var effect_table = {
 		type = 'simple',
 		descript = '',
 		conditions = [{code = 'stat', stat = 'personality', operant = 'eq', value = 'shy'}],
-		statchanges = {manacost_mod_mul = 0.85}
+		statchanges = {},
+		tags = ['upkeep_cut'],
 	},
 	e_person_kind = {
 		type = 'simple',
@@ -780,7 +781,7 @@ var effect_table = {
 			{
 				type = 'oneshot',
 				target = 'target',
-				atomic = [{type = 'add_trait', trait = 'undead'}],
+				atomic = [{type = 'add_trait', trait = 'undead', mode = 'force'}],
 				buffs = [],
 				sub_effects = []
 			}
@@ -963,6 +964,7 @@ var effect_table = {
 			src = {obj = 'self', func = 'src', src = 'fire'}
 		},
 		sub_effects = [
+			rebuild_status_tick('burn'),
 			'e_dot_new',
 			{
 				type = 'oneshot',
@@ -985,7 +987,7 @@ var effect_table = {
 			mod_2 = {obj = 'target', func = 'stat', stat = 'poison_damage'},
 			src = {obj = 'self', func = 'src', src = 'true'}
 		},
-		sub_effects = ['e_dot_new'],
+		sub_effects = [rebuild_status_tick('poison'), 'e_dot_new'],
 	},
 	
 	e_s_bleed_new = {
@@ -1001,7 +1003,7 @@ var effect_table = {
 			mod_2 = {obj = 'target', func = 'stat', stat = 'bleed_damage'},
 			src = {obj = 'self', func = 'src', src = 'true'}
 		},
-		sub_effects = ['e_dot_new'],
+		sub_effects = [rebuild_status_tick('bleed'), 'e_dot_new'],
 	},
 	
 	e_s_darkflame = {
@@ -1656,6 +1658,22 @@ var effect_table = {
 			},
 		]
 	},
+	#Troll Blood III: a twentieth of the body grows back at the start of every turn
+	e_tr_troll_blood = {
+		type = 'trigger',
+		trigger = [variables.TR_TURN_GET],
+		req_skill = false,
+		sub_effects = [
+			{
+				type = 'oneshot',
+				target = 'owner',
+				args = {value = {obj = 'owner', func = 'stat', stat = 'hpmax'}},
+				atomic = [
+					{type = 'heal', value = [['parent_args', 'value'], '*', 0.05]},
+					],
+			},
+		]
+	},
 	mark_for_escape = {
 		type = 'temp_s',
 		target = 'target',
@@ -1682,6 +1700,9 @@ var atomic = {
 	a_sanctuary_heal = {type = 'heal', value = ['parent_args', 'value']},
 	a_res = {type = 'resurrect', value = ['parent_args', 'mod']},
 	a_manasiphon = {type = 'mana', value = ['parent_args', 'amount']},
+	a_status_tick_burn = {type = 'sfx', value = 'status_tick', params = {status = 'burn'}},
+	a_status_tick_poison = {type = 'sfx', value = 'status_tick', params = {status = 'poison'}},
+	a_status_tick_bleed = {type = 'sfx', value = 'status_tick', params = {status = 'bleed'}},
 };
 
 
@@ -2357,6 +2378,18 @@ func rebuild_remove_effect(eff, target = 'target'):
 	return template
 
 
+#a DoT's tick as its card shows it (CombatAnimations.status_tick); listed before e_dot_new, so it reaches the queue
+#ahead of the damage it goes with
+func rebuild_status_tick(status):
+	return {
+		type = 'trigger',
+		trigger = [variables.TR_TURN_F],
+		req_skill = false,
+		conditions = [],
+		sub_effects = [{type = 'oneshot', target = 'owner', conditions = [], atomic = ['a_status_tick_' + status]}],
+	}
+
+
 func rebuild_autocast(args):
 	var template = {
 		type = 'trigger',
@@ -2420,6 +2453,8 @@ func get_effect_for_status(status):
 			return 'e_s_shred'
 		'shatter':
 			return 'e_s_shatter'
+		'ensnare':
+			return 'e_s_ensnare'
 		_:
 			return status
 

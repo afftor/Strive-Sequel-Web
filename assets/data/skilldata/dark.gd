@@ -58,10 +58,9 @@ var skills = {
 		allowedtargets = ['enemy'],
 		value = 0.3,
 		random_factor_p = 0.1,
-		sfx = [
-			{code = 'darkness', target = 'target_group', period = 'windup'},
-			{code = 'cast_dark', target = 'caster', period = 'windup', is_cast = true}], 
+		sfx = [{code = 'darkness', target = 'target_group', period = 'predamage', sync_to_hit = true}],
 		sounddata = {initiate = null, strike = 'spell_break', hit = null},
+		hitfx = [],
 		variations = [
 			{
 				reqs = [{code = 'stat', stat = 'combatgroup', value = 'enemy', operant = 'eq'}],
@@ -185,10 +184,9 @@ var skills = {
 		allowedtargets = ['enemy'],
 		value = 1.5,
 		random_factor_p = 0.1,
-		sfx = [
-			{code = 'dark_swril', target = 'target_group', period = 'windup'},
-			{code = 'cast_dark', target = 'caster', period = 'windup', is_cast = true}], 
+		sfx = [{code = 'dark_swril', target = 'target_group', period = 'predamage', sync_to_hit = true}],
 		sounddata = {initiate = 'spell_void', strike = null, hit = null, hittype = 'static'},
+		hitfx = [],
 	},
 }
 var effects = {

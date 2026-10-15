@@ -1367,6 +1367,104 @@ func get_short_race_name(race_code):
 	return translated_name.to_lower() if translated_name != short_name else short_name
 
 
+#a Beastkin and its Halfkin counterpart count as one race wherever a requirement names one
+func kin_counterpart(race_code):
+	var other = ''
+	if race_code.begins_with('Beastkin'):
+		other = race_code.replace('Beastkin', 'Halfkin')
+	elif race_code.begins_with('Halfkin'):
+		other = race_code.replace('Halfkin', 'Beastkin')
+	return other if racelist.has(other) else ''
+
+
+func kin_races(race_code):
+	var other = kin_counterpart(race_code)
+	if other == '' or !input_handler.globalsettings.furry:
+		return [race_code]
+	return [race_code, other] if race_code.begins_with('Beastkin') else [other, race_code]
+
+
+func with_kin(race_list):
+	var res = []
+	for race_code in race_list:
+		for kin in kin_races(race_code):
+			if !res.has(kin):
+				res.append(kin)
+	return res
+
+
+#one entry per kin pair, so a list naming both halves does not roll the pair twice
+func kin_dedupe(race_list):
+	var res = []
+	for race_code in race_list:
+		var other = kin_counterpart(race_code)
+		if other != '' and !input_handler.globalsettings.furry and race_code.begins_with('Beastkin'):
+			race_code = other
+		if res.has(race_code) or res.has(other):
+			continue
+		res.append(race_code)
+	return res
+
+
+#what only this race gets - shown in character creation and in the race tooltip
+func get_exclusive_skills(race_id):
+	var race = racelist[race_id]
+	var skill_list = []
+	for group in ['social_skills', 'combat_skills', 'explore_skills']:
+		if !race.has(group):
+			continue
+		for skill_id in race[group]:
+			if !skill_list.has(skill_id):
+				skill_list.append(skill_id)
+	return skill_list
+
+
+#cached: the mansion list builds the race tooltip for every card
+var exclusive_classes_cache = {}
+
+func get_exclusive_classes(race_id):
+	if exclusive_classes_cache.has(race_id):
+		return exclusive_classes_cache[race_id]
+	var class_list = []
+	var race_is_beast = racelist[race_id].tags.has('beast')
+	for class_id in classesdata.professions:
+		var classdata = classesdata.professions[class_id]
+		if _is_disabled_class(classdata):
+			continue
+		if class_id == 'pet':
+			continue
+		if _has_matching_race_requirement(classdata.showupreqs, race_id, race_is_beast) or _has_matching_race_requirement(classdata.reqs, race_id, race_is_beast):
+			class_list.append(class_id)
+	class_list.sort()
+	exclusive_classes_cache[race_id] = class_list
+	return class_list
+
+
+func _has_matching_race_requirement(reqs, race_id, race_is_beast):
+	for req in reqs:
+		match req.code:
+			'race':
+				if req.check and req.race == race_id:
+					return true
+			'one_of_races':
+				if req.value.has(race_id):
+					return true
+			'race_is_beast':
+				if req.check == race_is_beast:
+					return true
+	return false
+
+
+func _is_disabled_class(classdata):
+	if classdata.tags.has('obsolete'):
+		return true
+	for req_group in ['showupreqs', 'reqs']:
+		for req in classdata[req_group]:
+			if req.code == 'disabled' and req.check:
+				return true
+	return false
+
+
 func get_random_race():
 	var array = []
 	for i in racelist.values():

@@ -22,7 +22,9 @@ var encounters = {
 
 
 	rebel_group = {unittype = 'randomgroup', unitcode = 'rebel_group_mines', bg = 'default', bgm = 'default', win_effects = [{code = 'start_event', data = 'rebel_group_win', args = []}], lose_effects = [{code = 'start_event', data = 'generic_lose_scene', args = []}]},
-	demon_kurdan = {unittype = 'randomgroup', unitcode = 'demon_kurdan', bg = 'default', bgm = 'default', win_effects = [{code = 'start_event', data = 'demon_kurdan_win', args = []}], lose_effects = [{code = 'start_event', data = 'generic_lose_scene', args = []}]},
+	demon_grasha = {unittype = 'randomgroup', unitcode = 'demon_grasha', bg = 'default', bgm = 'default', win_effects = [{code = 'start_event', data = 'demon_grasha_win', args = []}], lose_effects = [{code = 'start_event', data = 'generic_lose_scene', args = []}]},
+	grasha_old_crew_street = {unittype = 'randomgroup', unitcode = 'grasha_old_crew', bg = 'default', bgm = 'default', win_effects = [{code = 'decision', value = 'GrashaCrewBeaten'}, {code = 'start_event', data = 'grasha_old_crew_after_fight', args = []}], lose_effects = [{code = 'start_event', data = 'generic_lose_scene', args = []}]},
+	grasha_old_crew_mansion = {unittype = 'randomgroup', unitcode = 'grasha_old_crew', bg = 'default', bgm = 'default', win_effects = [{code = 'decision', value = 'GrashaCrewBeaten'}, {code = 'start_event', data = 'grasha_old_crew_beaten_home', args = []}], lose_effects = [{code = 'start_event', data = 'generic_lose_scene', args = []}]},
 	demon = {unittype = 'randomgroup', unitcode = 'demon', bg = 'default', bgm = 'default', win_effects = [{code = 'start_event', data = 'demon_win', args = []}], lose_effects = [{code = 'start_event', data = 'generic_lose_scene', args = []}]},
 	rebel_convoy = {unittype = 'randomgroup', unitcode = 'rebel_convoy', bg = 'default', bgm = 'default', win_effects = [{code = 'start_event', data = 'rebel_convoy_win', args = []}], lose_effects = [{code = 'start_event', data = 'generic_lose_scene', args = []}]},
 	event_rebels_1 = {unittype = 'randomgroup', unitcode = 'event_rebels_1', bg = 'default', bgm = 'default', win_effects = [{code = 'start_event', data = 'betrayal_confirmed_rebels_1_win', args = []}], lose_effects = [{code = 'start_event', data = 'generic_lose_scene', args = []}]},
@@ -204,7 +206,8 @@ var enemygroups = {
 	act4_road_grotus_phase2_group = {maxunits = 6, reqs = [], units = {grotus_king_boss = [1,1]}},
 
 	rebel_group_mines = {reqs = [], units = {rebel_recruit = [3,3], rebel_mage = [1,1]}, challenges = [['event_enemy_dexterity_sneak', 1],['event_enemy_charm_avoid',0.8]], challenge_chance = 0.4},
-	demon_kurdan = {reqs = [], units = {demoness = [1,1],kurdan = [1,1], rebel_recruit = [2,2]}},
+	demon_grasha = {reqs = [], units = {demoness = [1,1],grasha = [1,1], rebel_recruit = [2,2]}},
+	grasha_old_crew = {reqs = [], units = {bandit_melee = [3,3]}},
 	demon = {reqs = [], units = {demoness = [1,1], rebel_recruit = [2,2], rebel_mage = [1,1]}},
 	rebel_convoy = {reqs = [], units = {rebel_recruit = [2,2], rebel_knight = [1,1], rebel_healer = [1,1], rebel_mage = [1,1]}, challenges = [['event_enemy_dexterity_sneak', 1],['event_enemy_charm_avoid',0.8]], challenge_chance = 0.4},
 	event_rebels_1 = {reqs = [], units = {rebel_recruit = [3,3], rebel_healer = [2,2], rebel_mage = [1,1]}, challenges = [['event_enemy_dexterity_sneak', 1],['event_enemy_charm_avoid',0.8]], challenge_chance = 0.4},
@@ -408,7 +411,7 @@ var enemygroups = {
 		reqs = [], units = {jarl_boss = [1,1], castellan_boss = [1,1], bounty_hunter_boss = [1,1], warlock_boss = [1,1]}
 		},
 
-		_test_boss = {reqs = [], units = {coal_moab = [1,1],}}, #test
+		_test_boss = {reqs = [], units = {test_boss = [1,1],}}, #test
 	}
 
 #Ai patterns: basic - basic attack/ranged attack or pass (if exist), ads - advanced single target skill, aoe - aoe skill, buff - buffing skill
@@ -436,6 +439,7 @@ var enemies = {
 		race = 'humanoid',
 		loot = 'bandit_loot',
 		icon = "res://assets/images/enemies/bandit.png",
+		cast_weapon = "at_dagger",
 		skills = ['attack', 'draw_blood'],
 		traits = [],
 		tags = ['human','bandit'],
@@ -462,6 +466,7 @@ var enemies = {
 		race = 'humanoid',
 		loot = 'bandit_loot',
 		icon = "res://assets/images/enemies/bandit_archer.png",
+		cast_weapon = "at_arch",
 		skills = ['wind_atk','ranged_attack'],
 		traits = [],
 		tags = ['human','bandit'],
@@ -487,6 +492,7 @@ var enemies = {
 		race = 'humanoid',
 		loot = 'assassin_loot',
 		icon = "res://assets/images/enemies/assassin.png",
+		cast_weapon = 'at_dagger',
 		skills = ['ranged_attack', 'assassinate_en'],
 		traits = [],
 		tags = ['human','bandit'],
@@ -513,6 +519,7 @@ var enemies = {
 		race = 'humanoid',
 		loot = 'bandit_boss_loot',
 		icon = "res://assets/images/enemies/bandit_boss.png",
+		cast_weapon = 'at_axe',
 		skills = ['attack', 'enemy_slash'],
 		traits = ['boss_resists'],
 		tags = ['human','bandit'],
@@ -540,6 +547,7 @@ var enemies = {
 		race = 'humanoid',
 		loot = 'bandit_boss_loot',
 		icon = "res://assets/images/enemies/bandit_archer.png",
+		cast_weapon = "at_arch",
 		skills = ['attack', 'arrowrain', 'wind_atk'],
 		traits = ['boss_resists'],
 		tags = ['human','bandit'],
@@ -567,6 +575,7 @@ var enemies = {
 		race = 'humanoid',
 		loot = 'bandit_boss_loot',
 		icon = "res://assets/images/enemies/rebel_mage.png",
+		cast_weapon = 'at_stuff',
 		skills = ['attack', 'firearr','lightning', 'light_spell_aoe'],
 		traits = ['boss_resists'],
 		tags = ['human','bandit'],
@@ -594,6 +603,7 @@ var enemies = {
 		race = 'humanoid',
 		loot = 'bandit_loot',
 		icon = "res://assets/images/enemies/rebel_recruit.png",
+		cast_weapon = 'at_sword',
 		skills = ['attack'],
 		traits = [],
 		tags = ['human'],
@@ -621,6 +631,7 @@ var enemies = {
 		race = 'humanoid',
 		loot = 'bandit_loot',
 		icon = "res://assets/images/enemies/rebel_knight.png",
+		cast_weapon = 'at_dualsword',
 		skills = ['attack','fire_cleave'],
 		traits = [],
 		tags = ['human'],
@@ -647,6 +658,7 @@ var enemies = {
 		race = 'humanoid',
 		loot = 'bandit_loot',
 		icon = "res://assets/images/enemies/rebel_mage.png",
+		cast_weapon = 'at_stuff',
 		skills = ['firearr','ranged_attack','blizzard'],
 		traits = [],
 		tags = ['human'],
@@ -672,6 +684,7 @@ var enemies = {
 		race = 'humanoid',
 		loot = 'bandit_loot',
 		icon = "res://assets/images/enemies/rebel_healer.png",
+		cast_weapon = 'at_stuff',
 		skills = ['lesser_heal','attack'],
 		traits = [],
 		tags = ['human'],
@@ -781,6 +794,7 @@ var enemies = {
 		race = 'golem',
 		loot = 'guardian_golem_loot',
 		icon = "res://assets/images/enemies/guardian_golem.png",
+		#cast_weapon = 'at_punch',
 		skills = [],
 		traits = [],
 		tags = ['golem'],
@@ -808,6 +822,7 @@ var enemies = {
 		race = 'mech',
 		loot = 'ballista_loot',
 		icon = "res://assets/images/enemies/ballista.png",
+		cast_weapon = 'at_arbalester',
 		skills = ['ranged_attack'],
 		traits = [],
 		tags = ['mech'],
@@ -834,6 +849,7 @@ var enemies = {
 		race = 'humanoid',
 		loot = 'bandit_loot',
 		icon = "res://assets/images/enemies/bandit_mage.png",
+		cast_weapon = 'at_stuff',
 		skills = ['firearr', 'mindblast','wind_blade'],
 		traits = [],
 		tags = ['human','bandit'],
@@ -860,6 +876,7 @@ var enemies = {
 		race = 'humanoid',
 		loot = 'goblin_loot',
 		icon = "res://assets/images/enemies/goblin.png",
+		cast_weapon = 'at_lance',
 		skills = [],
 		traits = [],
 		tags = ['goblin'],
@@ -886,6 +903,7 @@ var enemies = {
 		race = 'humanoid',
 		loot = 'goblin_loot',
 		icon = "res://assets/images/enemies/goblin_archer.png",
+		cast_weapon = "at_arch",
 		skills = ['ranged_attack'],
 		traits = [],
 		tags = ['goblin'],
@@ -913,6 +931,7 @@ var enemies = {
 		race = 'humanoid',
 		loot = 'goblin_loot',
 		icon = "res://assets/images/enemies/goblin_mage.png",
+		cast_weapon = 'at_stuff',
 		skills = ['firearr'],
 		tags = ['goblin'],
 #		ai = [['ads', 100]],
@@ -938,6 +957,7 @@ var enemies = {
 		race = 'humanoid',
 		loot = 'goblin_loot',
 		icon = "res://assets/images/enemies/goblin_boss.png",
+		cast_weapon = 'at_mace',
 		skills = [],
 		traits = ['boss_resists'],
 		tags = ['goblin'],
@@ -964,6 +984,7 @@ var enemies = {
 		race = 'humanoid',
 		loot = 'goblin_loot',
 		icon = "res://assets/images/enemies/goblin_mage.png",
+		cast_weapon = 'at_stuff',
 		skills = ['attack','firearr'],
 		traits = ['boss_resists'],
 		tags = ['goblin'],
@@ -991,6 +1012,7 @@ var enemies = {
 		race = 'humanoid',
 		loot = 'goblin_loot',
 		icon = "res://assets/images/enemies/goblin_boss.png",
+		cast_weapon = 'at_mace',
 		skills = [],
 		traits = ['boss_resists'],
 		tags = ['goblin'],
@@ -1017,6 +1039,7 @@ var enemies = {
 		race = 'humanoid',
 		loot = 'goblin_loot',
 		icon = "res://assets/images/enemies/goblin_mage.png",
+		cast_weapon = 'at_stuff',
 		skills = ['attack','firearr'],
 		traits = ['boss_resists'],
 		tags = ['goblin'],
@@ -1045,6 +1068,7 @@ var enemies = {
 		race = 'giant',
 		loot = 'ogre_loot',
 		icon = "res://assets/images/enemies/ogre.png",
+		cast_weapon = 'at_mace',
 		skills = [],
 		traits = [],
 		tags = ['ogre'],
@@ -1072,6 +1096,7 @@ var enemies = {
 		race = 'giant',
 		loot = 'ogre_loot',
 		icon = "res://assets/images/enemies/ogre_mage.png",
+		cast_weapon = 'at_stuff',
 		skills = ['magicward'],
 		traits = [],
 		tags = ['ogre'],
@@ -1098,6 +1123,7 @@ var enemies = {
 		race = 'giant',
 		loot = 'troll_loot',
 		icon = "res://assets/images/enemies/troll.png",
+		#caster_weapon = 'at_punch',
 		skills = [],
 		traits = [],
 		tags = ['troll'],
@@ -1125,6 +1151,7 @@ var enemies = {
 		race = 'undead',
 		loot = 'skeleton_melee_loot',
 		icon = "res://assets/images/enemies/skeleton_warrior.png",
+		cast_weapon = 'at_dualsword',
 		skills = [],
 		traits = [],
 		tags = ['undead'],
@@ -1152,6 +1179,7 @@ var enemies = {
 		race = 'undead',
 		loot = 'skeleton_melee_loot',
 		icon = "res://assets/images/enemies/skeleton_warrior.png",
+		cast_weapon = 'at_dualsword',
 		skills = [],
 		traits = ['enemy_defender'],
 		tags = ['undead'],
@@ -1179,6 +1207,7 @@ var enemies = {
 		race = 'undead',
 		loot = 'skeleton_archer_loot',
 		icon = "res://assets/images/enemies/skeleton_archer.png",
+		cast_weapon = "at_arch",
 		skills = ['ranged_attack'],
 		traits = [],
 		tags = ['undead'],
@@ -1206,6 +1235,7 @@ var enemies = {
 		race = 'undead',
 		loot = 'skeleton_archer_loot',
 		icon = "res://assets/images/enemies/skeleton_archer.png",
+		cast_weapon = "at_arch",
 		skills = ['ranged_attack'],
 		traits = [],
 		tags = ['undead'],
@@ -1233,6 +1263,7 @@ var enemies = {
 		race = 'undead',
 		loot = 'zombie_loot',
 		icon = "res://assets/images/enemies/zombie.png",
+		#cast_weapon = "at_claw",
 		skills = [],
 		traits = [],
 		tags = ['undead'],
@@ -1260,6 +1291,7 @@ var enemies = {
 		race = 'undead',
 		loot = 'lich_loot',
 		icon = "res://assets/images/enemies/lich.png",
+		cast_weapon = 'at_stuff',
 		skills = ['decay'],
 		traits = ['boss_resists'],
 		tags = ['undead'],
@@ -1290,6 +1322,7 @@ var enemies = {
 		race = 'undead',
 		loot = 'quest_lich_loot',
 		icon = "res://assets/images/enemies/lich.png",
+		cast_weapon = 'at_stuff',
 		skills = ['decay'],
 		traits = ['boss_resists'],
 		tags = ['undead'],
@@ -1399,6 +1432,7 @@ var enemies = {
 		race = 'demon',
 		loot = 'willowisp_loot',
 		icon = "res://assets/images/enemies/willowisp.png",
+		cast_weapon = 'cast_fire',
 		skills = ['firearr','malediction'],
 		traits = [],
 		tags = ['demon'],
@@ -1627,6 +1661,7 @@ var enemies = {
 		race = 'golem',
 		loot = 'bandit_loot',
 		icon = "res://assets/images/iconsskills/windwall.png",
+		caster_weapon = 'cast_air',
 		skills = ['storm_path'],
 		traits = ['turbulence_air',],
 		tags = ['golem','air'],
@@ -1654,6 +1689,7 @@ var enemies = {
 		race = 'monster',
 		loot = 'mimic_loot',
 		icon = 'res://assets/images/enemies/mimic.png',
+		cast_weapon = "bite",
 		skills = ['mimic_attack'],
 		traits = ['boss_resists'],
 		tags = ['monster'],
@@ -1710,6 +1746,7 @@ var enemies = {
 		race = 'golem',
 		loot = 'rockthrower_loot',
 		icon = "res://assets/images/enemies/golem_1.png",
+		#caster_weapon = 'at_punch',
 		skills = [],
 		traits = [],
 		tags = ['golem'],
@@ -1736,6 +1773,7 @@ var enemies = {
 		race = 'plant',
 		loot = 'maneater_loot',
 		icon = "res://assets/images/enemies/maneater_plant.png",
+		cast_weapon = "bite",
 		skills = ['entangle_enemy','poison_spray'],
 		traits = [],
 		tags = ['plant'],
@@ -1790,6 +1828,7 @@ var enemies = {
 		race = 'beast',
 		loot = 'raptor_loot',
 		icon = "res://assets/images/enemies/raptor.png",
+		cast_weapon = "bite",
 		skills = [],
 		traits = [],
 		tags = ['beast'],
@@ -1872,6 +1911,7 @@ var enemies = {
 		race = 'giant',
 		loot = 'ogre_alpha_loot',
 		icon = "res://assets/images/enemies/ogre_alpha.png",
+		cast_weapon = "at_mace",
 		skills = ['shred'],
 		traits = ['boss_resists'],
 		tags = ['ogre'],
@@ -1927,6 +1967,7 @@ var enemies = {
 		race = 'golem',
 		loot = 'anthropoid_loot',
 		icon = "res://assets/images/enemies/GolemIcon.png",
+		#caster_weapon = 'at_punch',
 		skills = [],
 		traits = [],
 		tags = ['golem'],
@@ -1954,6 +1995,7 @@ var enemies = {
 		race = 'demon',
 		loot = 'ifrit_loot',
 		icon = "res://assets/images/enemies/ifrit.png",
+		#caster_weapon = 'at_claw',
 		skills = ['firearr'],
 		traits = ['fireshield_trait'],
 		tags = ['demon'],
@@ -2009,6 +2051,7 @@ var enemies = {
 		race = 'mech',
 		loot = 'erebus_stone_loot',
 		icon = "res://assets/images/enemies/erebus_stone.png",
+		cast_weapon = 'cast_earth',
 		skills = ['voidslam','hammerfall'],
 		traits = ['atkpass_trait','boss_resists'],
 		tags = ['mech'],
@@ -2037,6 +2080,7 @@ var enemies = {
 		race = 'humanoid',
 		loot = 'bandit_loot',
 		icon = "res://assets/images/enemies/dwarf fighter.png",
+		cast_weapon = "at_axe",
 		skills = ['attack','sunder'],
 		traits = [],
 		tags = ['human'],
@@ -2066,6 +2110,7 @@ var enemies = {
 		race = 'humanoid',
 		loot = 'bandit_loot',
 		icon = "res://assets/images/enemies/dwarf fighter.png",
+		cast_weapon = "at_axe",
 		skills = ['attack','sunder','fire_cleave'],
 		traits = [],
 		tags = ['human'],
@@ -2094,6 +2139,7 @@ var enemies = {
 		race = 'humanoid',
 		loot = 'bandit_loot',
 		icon = "res://assets/images/enemies/dwarf crossbow.png",
+		cast_weapon = "at_arbalester",
 		skills = ['ranged_attack','arrow_hail'],
 		traits = [],
 		tags = ['human'],
@@ -2121,6 +2167,7 @@ var enemies = {
 		race = 'humanoid',
 		loot = 'assassin_loot',
 		icon = "res://assets/images/enemies/mutant1.png",
+		#caster_weapon = 'at_punch',
 		skills = ['attack','sunder'],
 		traits = [],
 		tags = ['human'],
@@ -2150,6 +2197,7 @@ var enemies = {
 		race = 'humanoid',
 		loot = 'assassin_loot',
 		icon = "res://assets/images/enemies/mutant2.png",
+		#caster_weapon = 'at_claw',
 		skills = ['attack','ensnare'],
 		traits = [],
 		tags = ['human'],
@@ -2206,6 +2254,7 @@ var enemies = {
 		race = 'humanoid',
 		loot = 'bandit_loot',
 		icon = "res://assets/images/enemies/sergant.png",
+		cast_weapon = "at_sword",
 		skills = ['leadersmark', 'fire_lung', 'blinding_heat'],
 		traits = ['boss_resists'],
 		tags = ['human'],
@@ -2232,6 +2281,7 @@ var enemies = {
 		race = 'humanoid',
 		loot = 'bandit_loot',
 		icon = "res://assets/images/enemies/castellan.png",
+		cast_weapon = "at_mace",
 		skills = ['purification_by_fire', 'hot_metal', 'scorched_earth'],
 		traits = ['boss_resists'],
 		tags = ['human'],
@@ -2258,6 +2308,7 @@ var enemies = {
 		race = 'humanoid',
 		loot = 'bandit_loot',
 		icon = "res://assets/images/enemies/bandit boss.png",
+		cast_weapon = "at_axe",
 		skills = ['north_wind', 'glaciation', 'cruelty'],
 		traits = ['boss_resists'],
 		tags = ['human', 'bandit'],
@@ -2284,6 +2335,7 @@ var enemies = {
 		race = 'humanoid',
 		loot = 'bandit_loot',
 		icon = "res://assets/images/enemies/bounty hunter.png",
+		cast_weapon = "at_axe",
 		skills = ['hunters_mark', 'shrill_whistle',  'hunting'],
 		traits = ['boss_resists'],
 		tags = ['human', 'bandit'],
@@ -2310,6 +2362,7 @@ var enemies = {
 		race = 'humanoid',
 		loot = 'bandit_loot',
 		icon = "res://assets/images/enemies/warlock.png",
+		cast_weapon = 'at_stuff',
 		skills = ['enchanting_whisper', 'inferno_en', 'curse_of_despair'],
 		traits = ['boss_resists'],
 		tags = ['demon','bandit'],
@@ -2336,6 +2389,7 @@ var enemies = {
 		race = 'goblin',
 		loot = 'bandit_loot',
 		icon = "res://assets/images/enemies/hobgoblin thug.png",
+		cast_weapon = "at_axe",
 		skills = [],
 		traits = [],
 		tags = ['goblin'],
@@ -2362,6 +2416,7 @@ var enemies = {
 		race = 'goblin',
 		loot = 'bandit_loot',
 		icon = "res://assets/images/enemies/hobgoblin arbalester.png",
+		cast_weapon = "at_arbalester",
 		skills = ['sneak_shot'],
 		traits = [],
 		tags = ['goblin'],
@@ -2388,6 +2443,7 @@ var enemies = {
 		race = 'goblin',
 		loot = 'bandit_loot',
 		icon = "res://assets/images/enemies/hobgoblin torturer.png",
+		cast_weapon = "at_mace",
 		skills = ['crack_of_the_whip', 'torture'],
 		traits = [],
 		tags = ['goblin'],
@@ -2468,6 +2524,7 @@ var enemies = {
 		race = 'goblin',
 		loot = 'bandit_loot',
 		icon = "res://assets/images/enemies/hobgoblin warlord.png",
+		cast_weapon = "at_axe",
 		skills = ['rusty_trap', 'sneaky_trick', 'herokiller'],
 		traits = ['boss_resists'],
 		tags = ['goblin'],
@@ -2494,8 +2551,9 @@ var enemies = {
 		race = 'goblin',
 		loot = 'bandit_loot',
 		icon = "res://assets/images/enemies/hobgoblin alchemist.png",
+		cast_weapon = "at_axe",
 		skills = ['flash_stone', 'spiked_bomb', 'shock_charge'],
-		traits = ['boss_resists'],
+		traits = ['at_stuff'],
 		tags = ['goblin'],
 		ai = [['damage_spread', 10], ['damage_spot', 40], ['ads', 40], ['support', 20], ['aoe', 40], ['heal', 20], ['resurrect', 20]],
 #		ai = [['aoe', 40], ['aoe', 40], ['debuff', 20]],
@@ -2520,6 +2578,7 @@ var enemies = {
 		race = 'giant',
 		loot = 'troll_loot',
 		icon = "res://assets/images/enemies/battle troll.png",
+		#caster_weapon = 'at_claw',
 		skills = ['monstrous_swing', 'monstrous_grip', 'bile_corrosive'],
 		traits = ['boss_resists'],
 		tags = ['troll'],
@@ -2550,6 +2609,7 @@ var enemies = {
 		race = 'humanoid',
 		loot = 'bandit_loot',
 		icon = "res://assets/images/enemies/greg_enemy.png",
+		cast_weapon = "at_dualsword",
 		skills = ['glint_of_the_sword','lacerating_dance','isolate','disengage','disposal'],
 		traits = ['boss_resists','black_knight_greg','lonesome_rage_bygone_glory','demonness_gift_null_cloak',],
 		tags = ['human','boss'],
@@ -2582,6 +2642,7 @@ var enemies = {
 		race = 'humanoid',
 		loot = 'ayneris_rapier_reward',
 		icon = "res://assets/images/enemies/greg_enemy.png",
+		cast_weapon = "at_dualsword",
 		skills = ['glint_of_the_sword','lacerating_dance','isolate','disengage','disposal','wake_of_blackened_blade','greg_last_bark'],
 		traits = ['boss_resists','black_knight_greg','lonesome_rage_bygone_glory','demonness_gift_null_cloak','trinket_smokebomb','greg_final_stand','greg_relation'],
 		tags = ['human','boss'],
@@ -2614,6 +2675,7 @@ var enemies = {
 		race = 'humanoid',
 		loot = 'hard_boss_chest',
 		icon = "res://assets/images/enemies/dragongirl.png",
+		cast_weapon = "at_dagger",
 		skills = [],
 		traits = ['boss_resists'],
 		tags = ['human','boss'],
@@ -2641,6 +2703,7 @@ var enemies = {
 		race = 'demon',
 		loot = 'nixx_reward',
 		icon = "res://assets/images/enemies/nix.png",
+		#caster_weapon = 'at_claw',
 		skills = ['attack','umbral_reign','shadow_made_manifest','stygian_wailing','tenebrous_rake','void_deluge','caliginous_undulation','nixx_ult'],
 		traits = ['boss_resists','nixx_trait','snuffing_out_the_candle'],
 		tags = ['boss','deity'],
@@ -2721,6 +2784,7 @@ var enemies = {
 		race = 'demon',
 		loot = 'willowisp_loot',
 		icon = "res://assets/images/enemies/darkboss.png",
+		#caster_weapon = 'at_claw',
 		skills = ['attack','darkness','smother_the_flame','bump_in_the_midnight','malediction'],
 		traits = ['intangible_shadow','nixx_malleable_creation'],
 		tags = ['demon'],
@@ -2748,6 +2812,7 @@ var enemies = {
 		race = 'humanoid',
 		loot = 'bandit_loot',
 		icon = "res://assets/images/enemies/aire_enemy.png",
+		cast_weapon = "at_arch",
 		skills = ['ranged_attack', 'arrowrain','for_the_princess', 'ricochet_shot', 'trap', 'leadersmark', 'first_aid'],
 		traits = ['boss_resists','aire_overwatch_assignment','aire_behind_cover','aire_aim_adjustment'],
 		tags = ['human','boss'],
@@ -2780,6 +2845,7 @@ var enemies = {
 		race = 'humanoid',
 		loot = 'bandit_loot',
 		icon = "res://assets/images/enemies/demon_enemy.png",
+		cast_weapon = "cast_dark",
 		skills = ['shadowstrike','voidslam','dark_gift','puppet_on_a_string','force_martyrdom'],
 		traits = ['boss_resists','demoness_what_a_pain'],
 		tags = ['human','demon','boss'],
@@ -2815,6 +2881,7 @@ var enemies = {
 		race = 'humanoid',
 		loot = 'erebus_stone_loot',
 		icon = "res://assets/images/enemies/sylas.png",
+		cast_weapon = "at_dagger",
 		skills = [],
 		traits = ['boss_resists'],
 		tags = ['human','boss'],
@@ -2842,6 +2909,7 @@ var enemies = {
 		race = 'humanoid',
 		loot = 'erebus_stone_loot',
 		icon = "res://assets/images/enemies/sylas.png",
+		cast_weapon = "at_dagger",
 		skills = [],
 		traits = ['boss_resists'],
 		tags = ['human','boss'],
@@ -2872,6 +2940,7 @@ var enemies = {
 		race = 'humanoid',
 		loot = 'erebus_stone_loot',
 		icon = "res://assets/images/enemies/jean evil.png",
+		cast_weapon = "at_stuff",
 		skills = ['jd_abyss', 'jd_soil_liquefaction', 'jd_winterfall', 'jd_perfect_storm', 'jd_catch_breath', 'jd_volcanic_eruption', 'jd_demonic_struggle'],
 		traits = ['boss_resists', 'jd_jean_trait'],
 		tags = ['human','demon','boss'],
@@ -2910,6 +2979,7 @@ var enemies = {
 		race = 'humanoid',
 		loot = 'erebus_stone_loot',
 		icon = "res://assets/images/enemies/demon.png",
+		#caster_weapon = 'at_punch',
 		skills = ['jd_engulfing_dream', 'jd_oneiric_feeding', 'jd_sapid_unreality', 'jd_eternal_slumber', 'jd_show_body', 'jd_vision_indulgence', 'jd_mass_illusion', 'jd_faustian_deliverance'],
 		traits = ['boss_resists', 'jd_demon_trait'],
 		tags = ['human','demon','boss'],
@@ -2945,6 +3015,7 @@ var enemies = {
 		status_resists = {},
 		race = 'humanoid',
 		loot = 'bandit_loot',
+		cast_weapon = 'at_axe',
 		icon = "res://assets/images/enemies/bandit_big.png",
 		skills = ['attack','howling_rising_axe','clumsy_log_splitter','brutal_axe_swing','fat_bandit_charge'],
 		traits = ['self_preservation','moderately_fearsome_stature',],
@@ -2979,6 +3050,7 @@ var enemies = {
 		race = 'humanoid',
 		loot = 'bandit_loot',
 		icon = "res://assets/images/enemies/bandit_redhead.png",
+		cast_weapon = 'at_sword',
 		skills = ['attack','confusing_order','redhead_masterful_swordmanship','beat_em_up','redhead_magic'],
 		traits = ['self_preservation','redhead_boss_trait'],
 		tags = ['human','bandit'],
@@ -3011,6 +3083,7 @@ var enemies = {
 		race = 'humanoid',
 		loot = 'bandit_loot',
 		icon = "res://assets/images/enemies/bandit_small.png",
+		cast_weapon = 'at_sword',
 		skills = ['attack','straight_forward_slash','god_this_is_embarrassing','flimsy_dagger_toss','dont_mind_me'],
 		traits = ['self_preservation','swifty_guy_trait'],
 		tags = ['human','bandit'],
@@ -3044,6 +3117,7 @@ var enemies = {
 		race = 'demon',
 		loot = 'erebus_stone_loot',
 		icon = "res://assets/images/enemies/lilith_boss.png",
+		cast_weapon = "bite",
 		skills = ['bad_touch','ambushing_tendrils','vile_pheromone','aphrodisiac_bombardment','tide_of_tentacles','ashmedai_wwbop','ashmedai_regen_appendage','burst_forth_my_pulsing_flesh'],
 		traits = ['boss_resists','tantalising_tentacle', 'demon_god_mastery_lust'],
 		tags = ['demon', 'deity','boss'],
@@ -3077,6 +3151,7 @@ var enemies = {
 		race = 'demon',
 		loot = 'erebus_stone_loot',
 		icon = "res://assets/images/enemies/lilith_boss.png",
+		cast_weapon = "bite",
 		skills = ['bad_touch','ambushing_tendrils','vile_pheromone','aphrodisiac_bombardment','tide_of_tentacles','ashmedai_wwbop','ashmedai_regen_appendage','burst_forth_my_pulsing_flesh'],
 		traits = ['boss_resists','tantalising_tentacle', 'demon_god_mastery_lust'],
 		tags = ['demon', 'deity','boss'],
@@ -3109,6 +3184,7 @@ var enemies = {
 		race = 'demon',
 		loot = 'bandit_loot',
 		icon = "res://assets/images/enemies/ashmedai_tentacle.png",
+		cast_weapon = "targetattack",
 		skills = ['tentacle_lasso', 'sticky_fluids', 'constricting_bind'],
 		traits = ['slippery_thick_skin'],
 		tags = ['demon','tentacle'],
@@ -3118,8 +3194,8 @@ var enemies = {
 		allowed_mastery = [],
 	},
 	
-	kurdan = {
-		code = 'kurdan',
+	grasha = {
+		code = 'grasha',
 		name = '',
 		descript = '',
 		hpmax = 400,
@@ -3135,9 +3211,10 @@ var enemies = {
 		status_resists = {stun = 50, freeze = 50},
 		race = 'humanoid',
 		loot = 'bandit_loot',
-		icon = "res://assets/images/enemies/kurdan_enemy.png",
+		icon = "res://assets/images/portraits/Orc_female_prt.png",
+		cast_weapon = 'at_stuff',
 		skills = ['entangle','firearr','overwhelming_flame','i_must_resist'],
-		traits = ['boss_resists','kurdan_mind_controlled'],
+		traits = ['boss_resists','grasha_mind_controlled'],
 		tags = ['human','boss',],
 #		ai = [['ads', 66],['basic', 33]],
 		ai = [['basic', 33], ['damage',10], ['damage_spot', 66], ['ads', 66], ['support', 10]],
@@ -3170,6 +3247,7 @@ var enemies = {
 		race = 'humanoid',
 		loot = 'bandit_loot',
 		icon = "res://assets/images/enemies/enemy_leon.png",
+		cast_weapon = 'at_dagger',
 		skills = ['lion_swipe','bramble_trap','jaw_of_life','primal_roar','mad_dash','regression_curse_run_amok'],
 		traits = ['boss_resists','leon_ambush_predator','leon_sanguine_instinct','leon_cornered_beast'],
 		tags = ['human','boss'],
@@ -3202,6 +3280,7 @@ var enemies = {
 		race = 'humanoid',
 		loot = 'bandit_loot',
 		icon = "res://assets/images/enemies/kuro.png",
+		cast_weapon = 'cast_dark',
 		skills = ['void_barrage', 'encroaching_dusk', 'night_night', 'silent_night', 'raze_the_light', 'bump_in_the_night', 'skewing_shadow', 'attack', 'veil'],
 		traits = ['boss_resists', 'nixx_blessing_nyctophobia', 'snuffing_out_the_candle'],
 		tags = ['human','boss'],
@@ -3235,6 +3314,7 @@ var enemies = {
 		race = 'beast',
 		loot = 'white_stag_loot',
 		icon = "res://assets/images/enemies/white_stag.png",
+		cast_weapon = 'at_lance',
 		skills = ['manchineel_apple','wild_trampling','goring_rush','curse_primeval_regression','graze_the_grass_priority','graze_the_grass','how_dissapointing','attack'],
 		traits = ['boss_resists','the_ever_adapting_nature','cycle_of_life','test_of_the_forest_spirit'],
 		tags = ['boss'],
@@ -3267,6 +3347,7 @@ var enemies = {
 		race = 'beast',
 		loot = 'bandit_loot',
 		icon = "res://assets/images/enemies/white_stag_human.png",
+		cast_weapon = 'cast_earth',
 		skills = ['manchineel_apple','smothering_kudzu','grass_graze_back','curse_primeval_regression','liana_flogging','imposing_pressure'],
 		traits = ['boss_resists', 'the_ever_adapting_nature','white_stag_white_fog','cycle_of_life'],
 		tags = ['boss'],
@@ -3298,6 +3379,7 @@ var enemies = {
 		race = 'plant',
 		loot = 'bandit_loot',
 		icon = "res://assets/images/enemies/maneater_plant.png",
+		cast_weapon = 'targetattack',
 		skills = ['suffocating_greenery','engulf_by_evergreen','sensing_nutrient','attack'],
 		traits = ['kudzu_first_strike','cycle_of_life_subject'],
 		tags = ['plant',],
@@ -3321,6 +3403,7 @@ var enemies = {
 		speed = 100,
 		resists = {fire = -50, air = 50},
 		race = 'beast',
+		cast_weapon = 'at_dagger',
 		loot = 'bandit_loot',
 		icon = "res://assets/images/iconsskills/icon_hare.png",
 		skills = ['disarm_enemy','backkick','graze_the_grass','graze_the_grass_priority','attack'],
@@ -3346,6 +3429,7 @@ var enemies = {
 		speed = 35,
 		resists = {fire = 50, air = -50, water = 50, earth = -50},
 		race = 'beast',
+		cast_weapon = 'bite',
 		loot = 'bandit_loot',
 		icon = "res://assets/images/iconsskills/icon_turtle.png",
 		skills = ['provocation','muddy_water','attack'],
@@ -3373,6 +3457,7 @@ var enemies = {
 		race = 'beast',
 		loot = 'bandit_loot',
 		icon = "res://assets/images/iconsskills/icon_eagle.png",
+		cast_weapon = 'cast_air',
 		skills = ['air_cutter','tempest','attack'],
 		traits = ['cycle_of_life_subject','entrance_animation_eagle'],
 		tags = ['beast','spirit'],
@@ -3399,6 +3484,7 @@ var enemies = {
 		race = 'humanoid',
 		loot = 'bandit_loot',
 		icon = "res://assets/images/enemies/elf_specter.png",
+		cast_weapon = 'at_lance',
 		skills = ['attack','fire_cleave'],
 		traits = [],
 		tags = ['undead'],
@@ -3428,6 +3514,7 @@ var enemies = {
 		race = 'humanoid',
 		loot = 'bandit_loot',
 		icon = "res://assets/images/enemies/elf_warrior.png",
+		cast_weapon = 'at_sword',
 		skills = ['attack','fire_cleave'],
 		traits = [],
 		tags = [],
@@ -3457,6 +3544,7 @@ var enemies = {
 		race = 'humanoid',
 		loot = 'bandit_loot',
 		icon = "res://assets/images/enemies/rebel_recruit.png",
+		cast_weapon = 'at_sword',
 		skills = ['attack', 'draw_blood','stonewall'],
 		traits = [],
 		tags = ['human',],
@@ -3483,6 +3571,7 @@ var enemies = {
 		race = 'humanoid',
 		loot = 'bandit_loot',
 		icon = "res://assets/images/enemies/bandit_archer.png",
+		cast_weapon = "at_arch",
 		skills = ['ranged_attack','suppresive_fire'],
 		traits = [],
 		tags = ['human','bandit'],
@@ -3508,7 +3597,8 @@ var enemies = {
 		status_resists = {stun = 100, freeze = 90, disarm = 50},
 		race = 'humanoid',
 		loot = 'bandit_loot',
-		icon = "res://assets/images/enemies/bandit_boss.png",
+		icon = "res://assets/images/enemies/ramont.png",
+		cast_weapon = 'at_axe',
 		skills = ['attack','disarm_enemy','command_embargo','ramont_eviction_notice','ramont_piercing_obsidian'],
 		traits = ['boss_resists','ramont_riposte_stance'],
 		tags = ['human','boss'],
@@ -3543,6 +3633,7 @@ var enemies = {
 		race = 'humanoid',
 		loot = 'bandit_loot',
 		icon = "res://assets/images/enemies/bandit_boss.png",
+		cast_weapon = 'at_axe',
 		skills = ['attack','protect_me','enraging_belittlement','enraging_belittlement_cali','out_of_my_way','you_ungratful_mutt','sunder','draw_blood','cleave'],
 		traits = ['boss_resists','hector_blood_of_mother','hector_vain_pride',],
 		skill_rotation = [
@@ -3577,6 +3668,7 @@ var enemies = {
 		race = 'humanoid',
 		loot = 'bandit_loot',
 		icon = "res://assets/images/enemies/ana_merc.png",
+		cast_weapon = 'at_sword',
 		skills = ['split_armor_spill_blood','dusty_whirlwind','blurring_flurry_of_blade','blinding_cross_slash','disposal','attack'],
 		traits = ['boss_resists','reyan_antagonism','second_wind','dual_blade_mastery'],
 		tags = ['human','boss'],
@@ -3612,6 +3704,7 @@ var enemies = {
 		race = 'humanoid',
 		loot = 'bandit_loot',
 		icon = "res://assets/images/enemies/grotus_king.png",
+		#caster_weapon = 'at_punch',
 		skills = ['grotus_haymaker','grotus_stomping','grotus_thunderous_slam','grotus_power_surge','grotus_energy_discharge','grotus_present_thyself','grotus_obliteration'],
 		traits = ['boss_resists','grotus_divine_barrier','grotus_no_humiliation','grotus_apotheosis'],
 		tags = ['human','boss'],
@@ -3648,6 +3741,7 @@ var enemies = {
 		race = 'humanoid',
 		loot = 'hard_boss_chest',
 		icon = "res://assets/images/enemies/grotus_king.png",
+		#caster_weapon = 'at_punch',
 		skills = ['grotus_haymaker','grotus_stomping','grotus_thunderous_slam','grotus_power_surge','grotus_energy_discharge','grotus_present_thyself','grotus_obliteration'],
 		traits = ['boss_resists','grotus_tyrant_insecurity','grotus_no_humiliation','grotus_apotheosis'],
 		tags = ['human','boss'],
@@ -3680,7 +3774,8 @@ var enemies = {
 		status_resists = {},
 		race = 'humanoid',
 		loot = 'bandit_loot',
-		icon = "res://assets/images/enemies/king.png",
+		icon = "res://assets/images/enemies/at_mace.png",
+		caster_weapon = 'at_punch',
 		skills = ['attack','sunder', 'summon_random_dk_guard', 'kill_them_now', 'dk_buff_ally', 'crossbowmen_on_my_command', 'dk_blow_em_up', 'emperor_hammerfall', 'open_the_magma_chamber'],
 		traits = ['boss_resists','dwarf_king_trait'],
 		tags = ['human','dwarf','royalty'],
@@ -3714,6 +3809,7 @@ var enemies = {
 		race = 'humanoid',
 		loot = 'bandit_loot',
 		icon = "res://assets/images/enemies/dwarf fighter.png",
+		cast_weapon = "at_axe",
 		skills = ['double_bitted_axe','cleave','execution'],
 		traits = ['dwarf_skirmisher_trait'],
 		tags = ['human',],
@@ -3739,6 +3835,7 @@ var enemies = {
 		race = 'humanoid',
 		loot = 'bandit_loot',
 		icon = "res://assets/images/iconsskills/icon_endure.png",
+		cast_weapon = 'at_sword',
 		skills = ['attack','disarm_enemy','stonewall','strike_through'],
 		traits = ['dwarf_shielder_trait'],
 		tags = ['human'],
@@ -3764,6 +3861,7 @@ var enemies = {
 		race = 'golem',
 		loot = 'guardian_golem_loot',
 		icon = "res://assets/images/enemies/guardian_golem.png",
+		#cast_weapon = 'at_punch',
 		skills = ['prismatic_beam','tremor_wave','rock_slide'],
 		traits = ['obsidian_golem_trait'],
 		tags = ['golem'],
@@ -3797,6 +3895,7 @@ var enemies = {
 		race = 'humanoid',
 		loot = 'bandit_loot',
 		icon = "res://assets/images/enemies/gnome.png",
+		#caster_weapon = 'at_punch',
 		skills = ['attack', 'coal_pebble_fist', 'coal_iron_mountain_lean', 'coal_nerve_point', 'coal_mighty_step', 'coal_rock_sling', 'coal_five_stones'],
 		traits = ['boss_resists', 'coal_bolthar_trait'],
 		tags = ['human', 'gnome', 'boss'],
@@ -3831,6 +3930,7 @@ var enemies = {
 		race = 'humanoid',
 		loot = 'bandit_loot',
 		icon = "res://assets/images/enemies/kobold mage.png",
+		cast_weapon = 'at_stuff',
 		skills = ['attack', 'coal_magma_pendant', 'coal_cursed_flint', 'coal_fan_o_flame', 'coal_lava_spill', 'coal_throat_spray', 'coal_dragon_tonic'],
 		traits = ['boss_resists', 'coal_kobold_trait'],
 		tags = ['kobold', 'boss'],
@@ -3862,6 +3962,7 @@ var enemies = {
 		race = 'humanoid',
 		loot = 'bandit_loot',
 		icon = "res://assets/images/enemies/RatIcon2.png",
+		cast_weapon = 'at_dagger',
 		skills = ['attack', 'dip_poison', 'coal_poison_vapors', 'coal_paralytic_reaction', 'coal_rodent_agility', 'coal_hazardous_outburst', 'coal_epidemic_begin'],
 		traits = ['boss_resists', 'ratkin_hide', 'coal_ratkin_trait'],
 		tags = ['ratkin', 'boss'],
@@ -3894,6 +3995,7 @@ var enemies = {
 		race = 'humanoid',
 		loot = 'bandit_loot',
 		icon = "res://assets/images/enemies/hobgoblin alchemist.png",
+		cast_weapon = 'at_stuff',
 		skills = ['attack', 'coal_frag_grenade', 'coal_flash_grenade', 'coal_incendiary_grenade', 'coal_land_mine', 'coal_reloading', 'coal_big_red_button'],
 		traits = ['boss_resists', 'coal_goblin_trait'],
 		tags = ['goblin', 'boss'],
@@ -3923,6 +4025,7 @@ var enemies = {
 		race = 'humanoid',
 		loot = 'bandit_loot',
 		icon = "res://assets/images/enemies/dwarf fighter.png",
+		cast_weapon = "at_axe",
 		skills = ['attack', 'double_bitted_axe', 'stonewall', 'coal_chop_off', 'hammerfall', 'coal_yield_my_flesh', 'coal_mountain_crumble'],
 		traits = ['boss_resists', 'coal_dwarf_trait'],
 		tags = ['human', 'dwarf', 'boss'],
@@ -3987,6 +4090,7 @@ var enemies = {
 		race = 'undead',
 		loot = 'skeleton_melee_loot',
 		icon = "res://assets/images/enemies/skeleton_warrior.png",
+		cast_weapon = "at_dualsword",
 		skills = [],
 		traits = [],
 		tags = ['undead'],
@@ -4012,6 +4116,7 @@ var enemies = {
 		race = 'undead',
 		loot = 'skeleton_archer_loot',
 		icon = "res://assets/images/enemies/skeleton_archer.png",
+		cast_weapon = 'at_arch',
 		skills = ['ranged_attack'],
 		traits = [],
 		tags = ['undead'],
@@ -4056,16 +4161,17 @@ var enemies = {
 		evasion = 70,
 		armorpenetration = 20,
 		atk = 30,
-		matk = 60,
+		matk = 40,
 		speed = 90,
 		resists = {dark = 25, mind = 25, light = -50},
 		race = 'humanoid',
 		loot = 'bandit_loot',
 		icon = "res://assets/images/enemies/demon_enemy.png",
+		cast_weapon = 'targetattack',
 		skills = [],
 		traits = ['boss_resists',],
 		tags = ['demon','bandit'],
-		ai = [['damage', 66],['debuff',1999],['ultimate',999]],
+		ai = [['damage', 66],['debuff',1999],['basic',999]],
 		ai_position = ['ranged'],
 		xpreward = 30,
 	},
@@ -4111,6 +4217,7 @@ var enemies = {
 		race = 'humanoid',
 		loot = 'lich_loot',
 		icon = "res://assets/images/enemies/rilu.png",
+		#caster_weapon = 'at_claw',
 		skills = ['attack', 'ominous_whispers', 'hexed_coffin_nail', 'crazed_spirit_possession', 'forced_exorcism','forced_exorcism_prio','undying_spirit',],
 		traits = ['boss_resists','cursed_girl','guardian_spirit_protection_frenzied'],
 		tags = ['human','boss'],
@@ -4142,6 +4249,7 @@ var enemies = {
 		race = 'undead',
 		loot = 'lich_loot',
 		icon = "res://assets/images/enemies/lich.png",
+		cast_weapon = 'at_stuff',
 		skills = ['attack', 'arrival_of_the_departed', 'ticket_please', 'afterlife_amenities', 'dead_running','end_of_the_line','no_light_tunnel_end',],
 		traits = ['boss_resists','fbr_ceaseless_harvest','first_class_service','death_and_taxes','rilu_payback'],
 		tags = ['boss','undead'],
@@ -4173,6 +4281,7 @@ var enemies = {
 		race = 'undead',
 		loot = 'lich_loot',
 		icon = "res://assets/images/enemies/cultist.png",
+		cast_weapon = 'at_stuff',
 		skills = ['talisman_disguised_as_ticket','cumulating_curse'],
 		traits = ['you_want_ticket'],
 		tags = ['undead'],
@@ -4202,6 +4311,7 @@ var enemies = {
 		race = 'undead',
 		loot = 'skeleton_melee_loot',
 		icon = "res://assets/images/enemies/bone golem.png",
+		#caster_weapon = 'at_punch',
 		skills = ['talisman_guided_punch','bonemeal_spray'],
 		traits = ['giant_ribcage'],
 		tags = ['undead'],
@@ -4227,6 +4337,7 @@ var enemies = {
 		race = 'undead',
 		loot = 'zombie_loot',
 		icon = "res://assets/images/enemies/mutant2.png",
+		#caster_weapon = 'at_claw',
 		skills = ['weighty_colision','waste_discharge'],
 		traits = ['bloated_with_noxious_gas'],
 		tags = ['undead'],
@@ -4252,6 +4363,7 @@ var enemies = {
 		race = 'undead',
 		loot = 'zombie_loot',
 		icon = "res://assets/images/enemies/zombie.png",
+		#caster_weapon = 'at_claw',
 		skills = ['quick_death'],
 		traits = ['adrenal_glands_overdrive'],
 		tags = ['undead'],
@@ -4278,6 +4390,7 @@ var enemies = {
 		race = 'undead',
 		loot = 'zombie_loot',
 		icon = "res://assets/images/enemies/mutant1.png",
+		#caster_weapon = 'at_punch',
 		skills = ['swelling_muscle','hysterical_strength'],
 		traits = ['go_postal'],
 		tags = ['undead'],
@@ -4306,6 +4419,7 @@ var enemies = {
 		race = 'humanoid',
 		loot = 'hard_boss_chest',
 		icon = "res://assets/images/sprites/advisor.png",
+		cast_weapon = 'at_stuff',
 		skills = ['melchor_word_of_laws','melchor_restraining_order','melchor_obstruction','melchor_emergency_lockdown','melchor_summary_judgment','melchor_buster_call'],
 		traits = ['boss_resists','melchor_chancellor_of_palatine','melchor_regulation_clause','melchor_clear_the_field'],
 		tags = ['human','boss','imperial'],
@@ -4340,6 +4454,7 @@ var enemies = {
 		race = 'humanoid',
 		loot = 'hard_boss_chest',
 		icon = "res://assets/images/portraits/rouge_prt.png",
+		#caster_weapon = 'at_claw',
 		skills = ['rouge_puncture_artery','rouge_feasting_frenzy','rouge_adamant_pursuit','rouge_nail_stiletto','rouge_eat_your_heart_out'],
 		traits = ['boss_resists','rouge','rouge_refracted_image','rouge_third_party','rouge_appetizer'],
 		tags = ['human','boss'],
@@ -4372,6 +4487,7 @@ var enemies = {
 		race = 'humanoid',
 		loot = 'bandit_loot',
 		icon = "res://assets/images/enemies/humanguard.png",
+		cast_weapon = 'at_sword',
 		skills = ['attack','imperial_coordinate_attack','imperial_threat_suppression','imperial_bastion','imperial_noble_protection','imperial_weed_out'],
 		traits = ['imperial_soldier_training'],
 		tags = ['human','imperial'],
@@ -4398,6 +4514,7 @@ var enemies = {
 		race = 'humanoid',
 		loot = 'bandit_loot',
 		icon = "res://assets/images/enemies/cultist.png",
+		cast_weapon = 'at_stuff',
 		skills = ['attack','mindblast'],
 		traits = ['imperial_purge_target'],
 		tags = ['human','cultist'],
@@ -4433,7 +4550,7 @@ var shrines = {
 	erebus = {
 		options = {
 			"material" : {input = 'material', output = 'erebus_item'},
-			#"character" : {input = 'character', output = 'erebus_character'},
+			"character" : {input = 'character', output = 'erebus_character'},
 			"destroy" : {input = 'destroy', output = 'erebus_destroy'},
 			"item" : {input = "item", output = 'erebus_disenchant'},
 		},
@@ -4453,11 +4570,29 @@ var shrines = {
 		options = {
 			"material" : {input = 'material', output = 'hybris_item'},
 			"character" : {input = 'character', output = 'hybris_character'},
+			"enslave" : {input = 'enslave', output = 'hybris_enslave', reqs = [{type = 'active_character_checks', value = [{code = 'is_master', check = false}, {code = 'stat', stat = 'slave_class', operant = 'eq', value = 'servant'}]}]},
 			"destroy" : {input = 'destroy', output = 'hybris_destroy'}
 		},
 		bless = 'hybris_bless',
 		curse = 'hybris_curse',
 
+	},
+	meditation = {
+		options = {
+			"rest" : {input = 'action', output = 'meditation_rest', text = 'MEDITATION_REST_OPTION'},
+			"meditate" : {input = 'action', output = 'meditation_faith', text = 'MEDITATION_FAITH_OPTION', reqs = [{type = 'active_character_checks', value = [{code = 'faith_open', check = true}]}]},
+			"convert" : {input = 'action', output = 'meditation_convert', text = 'MEDITATION_CONVERT_OPTION', reqs = [{type = 'active_character_checks', value = [{code = 'faith_open', check = true}]}]},
+		},
+		bless = '',
+		curse = '',
+	},
+	power_place = {
+		options = {
+			"fight" : {input = 'action', output = 'power_place_fight', text = 'POWER_PLACE_FIGHT'},
+			"flee" : {input = 'action', output = 'power_place_flee', text = 'POWER_PLACE_FLEE'},
+		},
+		bless = '',
+		curse = '',
 	},
 }
 
@@ -4533,16 +4668,186 @@ func celena_item(code):
 		dict.options.append({code = 'close', reqs = [], text = "DIALOGUELEAVE", bonus_effects = [{code = 'advance_location'}]})
 	input_handler.interactive_message_follow(dict, 'direct', [])
 
+#Praying at a god's altar: the god's believer climbs a tier up to Adept, a free religious slot takes the
+#faith up (a second one with Split Mind), a full one asks which trait gives way. Believers are always blessed.
+
+#Meditation spot. Rest gives the group back half its mana. Meditating raises a believer's faith a tier;
+#someone without a faith hears whichever of these gods suits them and may follow it. A companion of any
+#tier can bring the one meditating into their own faith.
+var meditation_calls = {
+	alios = [{code = 'stat', stat = 'mastery_air', operant = 'gte', value = 2}],
+	nixx = [{code = 'stat', stat = 'mastery_dark', operant = 'gte', value = 2}],
+	erebus = [{code = 'stat', stat = 'mastery_earth', operant = 'gte', value = 2}],
+	spirits = [{code = 'has_profession', profession = 'shaman', check = true}, {orflag = true, code = 'race_is_beast', check = true}],
+}
+
+func meditation_scene(text):
+	return {text = text, image = '', options = [], tags = ['active_character_translate', 'dialogue_scene'], common_effects = []}
+
+#nothing happened, so the spot is still there to use
+func meditation_way_back(dict):
+	dict.options.append({code = 'meditation_shrine_approach', reqs = [], text = 'BACK'})
+	dict.options.append({code = 'close', reqs = [], text = 'DIALOGUELEAVE'})
+
+func meditation_rest(person):
+	var dict = meditation_scene(tr('MEDITATION_REST'))
+	dict.common_effects = [{code = 'affect_active_party', type = 'damage_mana_percent', value = -0.5}, {code = 'clear_subroom'}]
+	dict.options.append({code = 'close', reqs = [], text = 'DIALOGUELEAVE'})
+	input_handler.interactive_message_follow(dict, 'direct', [])
+
+func meditation_faith(person):
+	var dict
+	var rising = []
+	for code in person.dyn_stats.get_faiths():
+		if person.dyn_stats.next_faith_tier(code) != '':
+			rising.append(code)
+	if rising.size() == 1:
+		dict = meditation_scene(tr('MEDITATION_DEEPEN'))
+		dict.common_effects = [{code = 'affect_active_character', type = 'deepen_faith', trait = rising[0]}, {code = 'clear_subroom'}]
+		dict.options.append({code = 'close', reqs = [], text = 'DIALOGUELEAVE'})
+	elif rising.size() > 1:
+		#Split Mind with two faiths that can still grow: the player picks one
+		dict = meditation_scene(tr('MEDITATION_DEEPEN_PICK'))
+		for code in rising:
+			dict.options.append({code = 'meditation_deepened', reqs = [], text = Traitdata.traits[code].name, bonus_effects = [{code = 'affect_active_character', type = 'deepen_faith', trait = code}]})
+		meditation_way_back(dict)
+	elif !person.dyn_stats.get_faiths().empty() and person.dyn_stats.get_free_trait_slots('religious') <= 0:
+		dict = meditation_scene(tr('MEDITATION_PEAK'))
+		meditation_way_back(dict)
+	else:
+		#no faith yet, or Split Mind with a slot to spare: a god not followed already may call
+		var calls = []
+		for god in meditation_calls:
+			if person.dyn_stats.get_god_faith(god) == '' and person.checkreqs(meditation_calls[god]):
+				calls.append(god)
+		if calls.empty() or person.check_trait('airhead'):
+			dict = meditation_scene(tr('MEDITATION_NOTHING'))
+			meditation_way_back(dict)
+		else:
+			var god = calls[randi() % calls.size()]
+			dict = meditation_scene(tr('MEDITATION_CALL_' + god.to_upper()) + tr('MEDITATION_CALL_QUESTION'))
+			dict.options.append({code = 'meditation_faith_accept', reqs = [], text = 'MEDITATION_ACCEPT_OPTION', bonus_effects = [{code = 'affect_active_character', type = 'add_trait', trait = 'faith_%s_1' % god}]})
+			dict.options.append({code = 'meditation_faith_decline', reqs = [], text = 'MEDITATION_DECLINE_OPTION'})
+	input_handler.interactive_message_follow(dict, 'direct', [])
+
+func meditation_convert(person):
+	var dict = meditation_scene(tr('MEDITATION_CONVERT_PICK'))
+	var here = [{code = 'is_at_location', value = input_handler.active_location.id, check = true}, {code = 'in_combat_party', value = true}]
+	for guide in ResourceScripts.game_party.characters.values():
+		if guide == person or !guide.checkreqs(here):
+			continue
+		for faith in guide.dyn_stats.get_faiths():
+			var god = Traitdata.traits[faith].faith
+			if person.dyn_stats.get_god_faith(god) != '':
+				continue
+			var line = tr('MEDITATION_CONVERT_BY').replace('{guide}', guide.get_short_name()).replace('{faith}', tr(Traitdata.traits[faith].name))
+			dict.options.append({code = 'meditation_converted', reqs = [], text = line, bonus_effects = [{code = 'affect_active_character', type = 'add_trait', trait = 'faith_%s_1' % god}]})
+	if dict.options.empty():
+		dict.text = tr('MEDITATION_CONVERT_NOBODY')
+	meditation_way_back(dict)
+	input_handler.interactive_message_follow(dict, 'direct', [])
+
+#Place of power, the strange spot's other half: stepping in calls an elite pack of this dungeon - one of its
+#own groups turned minibosses, as in the room before the stairs. The one who stepped in takes a trait from
+#the catalogue's power_place_traits after the win, or 300 experience when none of them fits - or, when they
+#have a negative physical or magic trait, the player may burn one of those out instead. Running away
+#closes the room for good.
+func power_place_fight(person):
+	var dungeon = gui_controller.exploration_dungeon
+	globals.reset_roll_data()
+	var group = input_handler.weightedrandom(dungeon.active_location.enemies)
+	var data = {enemy_code = group, enemies = globals.makerandomgroup(enemygroups[group]), rare = false, miniboss = true}
+	data.win_effects = [{code = 'start_event', data = power_place_reward(person), args = {set_active_character = person.id}}]
+	dungeon.StartCombat(data)
+	gui_controller.dialogue.close()
+
+func power_place_reward(person):
+	var open = []
+	for code in Traitdata.catalogue.power_place_traits:
+		if person.can_add_trait(code) and person.preview_trait_offer(code) != 'skip':
+			open.append(code)
+	var gift = {code = 'affect_active_character', type = 'stat', stat = 'base_exp', value = 300}
+	if !open.empty():
+		gift = {code = 'affect_active_character', type = 'add_trait', trait = input_handler.random_from_array(open)}
+	var flaws = power_place_flaws(person)
+	var dict
+	if flaws.empty():
+		dict = meditation_scene(tr('POWER_PLACE_WON' if !open.empty() else 'POWER_PLACE_WON_EXP'))
+		dict.image = 'energy_control'
+		dict.common_effects += [gift, {code = 'clear_subroom'}, {code = 'update_party'}]
+		dict.options.append({code = 'close', reqs = [], text = 'DIALOGUELEAVE'})
+		return dict
+	#a flaw to burn out: the power waits for the player's word, and the room is spent either way
+	dict = meditation_scene(tr('POWER_PLACE_WON_CHOICE'))
+	dict.image = 'energy_control'
+	dict.common_effects += [{code = 'clear_subroom'}, {code = 'update_party'}]
+	if !open.empty():
+		dict.options.append({code = 'power_place_gift', reqs = [], text = 'POWER_PLACE_GIFT_OPTION', bonus_effects = [gift]})
+	else:
+		dict.options.append({code = 'power_place_exp', reqs = [], text = 'POWER_PLACE_EXP_OPTION', bonus_effects = [gift]})
+	for code in flaws:
+		var line = tr('POWER_PLACE_PURGE_OPTION').replace('{trait}', tr(Traitdata.traits[code].name))
+		dict.options.append({code = 'power_place_purged', reqs = [], text = line, bonus_effects = [{code = 'affect_active_character', type = 'remove_trait', trait = code}]})
+	return dict
+
+#the negative physical and magic traits the place of power can burn out: the character's own, neither locked nor hidden
+func power_place_flaws(person):
+	var res = []
+	for category in ['physical', 'magic']:
+		for code in person.get_category_traits(category):
+			if Traitdata.traits[code].tags.has('negative') and !person.is_trait_locked(code) and !person.is_trait_hidden(code):
+				res.append(code)
+	return res
+
+func power_place_flee(person):
+	var dict = meditation_scene(tr('POWER_PLACE_FLED'))
+	dict.common_effects.append({code = 'clear_subroom'})
+	dict.options.append({code = 'close', reqs = [], text = 'DIALOGUELEAVE'})
+	input_handler.interactive_message_follow(dict, 'direct', [])
+
+func shrine_faith(person, god):
+	var res = {effects = [], text = '', believer = false}
+	var current = person.dyn_stats.get_god_faith(god)
+	if current != '':
+		res.believer = true
+		if person.dyn_stats.next_faith_tier(current) != '':
+			res.effects.append({code = 'affect_active_character', type = 'deepen_faith', trait = current})
+			res.text = tr('ALTAR_FAITH_DEEPEN')
+		return res
+	var code = 'faith_%s_1' % god
+	match person.preview_trait_offer(code, 'ask'):
+		'add':
+			res.effects.append({code = 'affect_active_character', type = 'add_trait', trait = code})
+			res.text = tr('ALTAR_FAITH_JOIN')
+			res.believer = true
+		'ask':
+			res.effects.append({code = 'affect_active_character', type = 'add_trait', trait = code})
+			#another god's believer, or someone proud of needing none (Mortal Pride)
+			res.text = tr('ALTAR_FAITH_OTHER' if !person.dyn_stats.get_faiths().empty() else 'ALTAR_FAITH_PRIDE')
+	return res
+
+#a growing trait that waits on this god's altar takes its next stage from the prayer
+func shrine_growth(person, god):
+	var res = {effects = [], text = ''}
+	for code in person.dyn_stats.traits_growing_by('shrine'):
+		if Traitdata.traits[code].grow.god == god:
+			res.effects.append({code = 'affect_active_character', type = 'grow_trait', trait = code})
+			res.text += tr('ALTAR_GROW_' + code.to_upper())
+	return res
+
 func celena_character(person):
 
 	var dict = {text = tr('ALTAR_CHAR_1'), image = '', options = [], tags = ['active_character_translate'], common_effects = []}
+	var faith = shrine_faith(person, 'celena')
 
-	if randf() <= 0.5:
+	if faith.believer or randf() <= 0.5:
 		dict.text += tr('ALTAR_CHAR_GOOD')
 
 		dict.common_effects.append({code = 'affect_active_character', type = 'effect', value = 'celena_bless'})
 	else:
 		dict.text += tr('ALTAR_CHAR_BAD')
+	dict.text += faith.text
+	dict.common_effects += faith.effects
 
 	dict.options.append({code = 'close', reqs = [], text = "DIALOGUELEAVE", bonus_effects = [{code = 'advance_location'}]})
 	input_handler.interactive_message_follow(dict, 'direct', [])
@@ -4610,12 +4915,15 @@ func freya_character(person):
 			dict.text += tr('FREYA_CHAR_WOODEN')
 			dict.common_effects.append({code = 'affect_active_character', type = 'effect', value = 'freya_curse'})
 		else:
-			if randf() >= 0.5 || person.get_stat('race') in ['Elf','DarkElf','TribalElf','Fairy','Dryad']:
+			var faith = shrine_faith(person, 'freya')
+			if faith.believer || randf() >= 0.5 || person.get_stat('race') in ['Elf','DarkElf','TribalElf','Fairy','Dryad']:
 				dict.text += tr('FREYA_CHAR_RACE_GOOD')
 
 				dict.common_effects.append({code = 'affect_active_character', type = 'effect', value = 'freya_bless'})
 			else:
 				dict.text += tr('FREYA_CHAR_RACE_BAD')
+			dict.text += faith.text
+			dict.common_effects += faith.effects
 
 	dict.options.append({code = 'close', reqs = [], text = "DIALOGUELEAVE", bonus_effects = [{code = 'advance_location'}]})
 
@@ -4667,30 +4975,38 @@ func erebus_item(code):
 	input_handler.interactive_message_follow(dict, 'direct', [])
 	
 
+#Erebus has no blessing to give: the prayer only speaks to the faith.
 func erebus_character(person):
 
 	var dict = {text = tr('ALTAR_CHAR_1'), image = '', options = [], tags = ['active_character_translate'], common_effects = []}
-
-	if randf() <= 0.5:
-		dict.text += tr('ALTAR_CHAR_GOOD')
-
-		dict.common_effects.append({code = 'affect_active_character', type = 'effect', value = 'celena_bless'})
-	else:
-		dict.text += tr('ALTAR_CHAR_BAD')
+	var faith = shrine_faith(person, 'erebus')
+	dict.text += faith.text if faith.text != '' else tr('ALTAR_CHAR_BAD')
+	dict.common_effects += faith.effects
 
 	dict.options.append({code = 'close', reqs = [], text = "DIALOGUELEAVE", bonus_effects = [{code = 'advance_location'}]})
 	input_handler.interactive_message_follow(dict, 'direct', [])
 
 func hybris_character(person):
-	var dict = {}
-	if person.get_stat('unique') != null || person.is_master():
-		dict = {text = tr('HYBRIS_ALTAR_CHAR_FAIL'), image = '', options = [], tags = ['active_character_translate','dialogue_scene'], common_effects = []}
+	var dict = {text = tr('ALTAR_CHAR_1'), image = '', options = [], tags = ['active_character_translate'], common_effects = []}
+	var faith = shrine_faith(person, 'hybris')
+	var growth = shrine_growth(person, 'hybris')
+	var answer = faith.text + growth.text
+	dict.text += answer if answer != '' else tr('ALTAR_CHAR_BAD')
+	dict.common_effects += faith.effects + growth.effects
+	dict.options.append({code = 'close', reqs = [], text = "DIALOGUELEAVE", bonus_effects = [{code = 'advance_location'}]})
+	input_handler.interactive_message_follow(dict, 'direct', [])
+
+#Bending a servant into slavery. A unique character's will is too strong for the altar.
+func hybris_enslave(person):
+	var dict
+	if person.get_stat('unique') != null:
+		dict = {text = tr('HYBRIS_ALTAR_WILL'), image = '', options = [], tags = ['active_character_translate'], common_effects = []}
 	else:
 		dict = {text = tr('HYBRIS_ALTAR_CHAR'), image = '', options = [], tags = ['active_character_translate','dialogue_scene'], common_effects = []}
-		if person.get_stat('slave_class') == 'servant':
-			dict.options.append({code = 'hybris_character_convert', reqs = [], text = "HYBRIS_ALTAR_CHAR_OPTION1", dialogue_argument = 1})
-#		dict.options.append({code = 'hybris_character_loyalty', reqs = [], text = "HYBRIS_ALTAR_CHAR_OPTION2", dialogue_argument = 1})
-	
+		var nobles = globals.noble_class_names(person)
+		if nobles != '':
+			dict.text += "\n\n" + tr('HYBRIS_NOBLE_LOSS').replace("{classes}", nobles)
+		dict.options.append({code = 'hybris_character_convert', reqs = [], text = "HYBRIS_ALTAR_CHAR_OPTION1", dialogue_argument = 1})
 	dict.options.append({code = 'close', reqs = [], text = "DIALOGUELEAVE", bonus_effects = [{code = 'advance_location'}]})
 	input_handler.interactive_message_follow(dict, 'direct', [])
 

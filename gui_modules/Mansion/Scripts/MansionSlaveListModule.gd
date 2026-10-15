@@ -270,6 +270,7 @@ func _ready():
 	_select_slave_container()
 	input_handler.slave_list_node = self
 	input_handler.connect('PortraitUpdate', self, 'refresh_portraits')
+	input_handler.connect('update_ragdoll', self, '_drop_expanded_paperdoll_cache')
 	globals.connect("slave_added", self, "queue_rebuild")
 	globals.connect("task_removed", self, "queue_task_refresh")
 	#The upkeep badges are answered from the larder and the floorplan, neither of which this
@@ -762,6 +763,11 @@ func _clear_expanded_body_preview():
 	#	viewport.render_target_update_mode = Viewport.UPDATE_DISABLED
 
 
+#the doll is hidden while the card is shut and skips update_ragdoll, so its cache would reopen it stale
+func _drop_expanded_paperdoll_cache():
+	expanded_paperdoll_cache_person_id = ""
+
+
 func _set_expanded_body_preview_width(desired_width):
 	var viewport_right = get_viewport().get_visible_rect().end.x
 	var available_width = viewport_right - ExpandedBodyPreview.rect_global_position.x \
@@ -1126,7 +1132,7 @@ func _refresh_expanded_rule_button(button):
 func _expanded_rule_is_visible(person, code):
 	if person.is_master() and code == "relationship":
 		return false
-	if person.check_trait("undead") and code in ["contraceptive", "ration"]:
+	if person.check_trait("undead") and code == "contraceptive":
 		return false
 	return true
 
@@ -1135,7 +1141,7 @@ func _expanded_rule_is_disabled(person, code):
 	match code:
 		"relationship":
 			return person.is_master()
-		"contraceptive", "ration":
+		"contraceptive":
 			return person.check_trait("undead")
 	return false
 
@@ -1750,7 +1756,7 @@ func _can_buy_class(person):
 			continue
 		if ResourceScripts.game_globals.unlock_all_classes:
 			return true
-		if !person.checkreqs(prof.showupreqs, true) or !person.checkreqs(prof.reqs, true):
+		if !person.checkreqs(prof.showupreqs, true) or !person.checkreqs(prof.reqs, true) or person.is_noble_blocked(prof.code):
 			continue
 		var blocked = false
 		for conflict in prof.conflict_classes:
@@ -1978,13 +1984,14 @@ func _update_card_action_states(newbutton, person):
 	var training_button = newbutton.get_node(CARD_ACTIONS + "/Training")
 	_set_card_action_available(training_button, training_availability[0])
 	var training_tooltip = _get_training_title(person)
-	if !training_availability[0]:
+	#an available button can still carry a note, like a slave waiting for a trainer; "can be
+	#trained today" is only true of a slave mid-course with nothing in the way
+	if training_availability[1] != "":
 		training_tooltip += "\n" + training_availability[1]
-	else:
+	elif person.training.is_slave() and !person.training.enable:
+		training_tooltip += "\n" + (tr("TRAININGCOMPLETEDANNOUNCE") % person.get_short_name()).strip_edges()
+	elif person.training.is_slave() and person.training.is_in_training():
 		training_tooltip += "\n" + tr("TRAINTOOLTIP")
-		#an available button can still carry a note, like a slave waiting for a trainer
-		if training_availability[1] != "":
-			training_tooltip += "\n" + training_availability[1]
 	_set_card_text_tooltip(training_button, training_tooltip)
 	var date_availability = _get_date_availability(person)
 	var date_button = newbutton.get_node(CARD_ACTIONS + "/Date")
@@ -2982,7 +2989,6 @@ func update_button(newbutton, t_mode = mode):
 	newbutton.get_node('rule_relationship').disabled = person.is_master()
 	newbutton.get_node('rule_nudity').disabled = !person.has_status('sexservice')
 	newbutton.get_node('rule_contraceptive').disabled = person.check_trait('undead')
-	newbutton.get_node('rule_ration').disabled = person.check_trait('undead')
 	#services
 	for rl in ['petting', 'oral', 'anal', 'pussy', 'group', 'sextoy']:
 		newbutton.get_node('rule_' + rl).pressed = person.check_brothel_rule(rl)
@@ -3013,7 +3019,6 @@ func update_button(newbutton, t_mode = mode):
 		newbutton.get_node('rule_constrain').visible = false
 	if person.check_trait('undead'):
 		newbutton.get_node('rule_contraceptive').visible = false
-		newbutton.get_node('rule_ration').visible = false
 	update_food_icon(newbutton, person)
 	_update_card_work_type(newbutton, person, job_label.text)
 	newbutton.get_node(CARD_WORK_LABEL).set("custom_colors/font_color", job_label.get("custom_colors/font_color"))
@@ -3124,7 +3129,7 @@ func update_food_icon(newbutton, person):
 		icon.visible = true
 		icon.modulate = Color(1, 1, 1)
 		match state.state:
-			'undead', 'none':
+			'none':
 				icon.visible = false
 			'starving':
 				icon.texture = TEX_FOOD_STARVING

@@ -98,33 +98,44 @@ var faction_dynamic_data_template = {
 }
 
 #Lowest first. xp and sales are what it takes to leave a rank; *_slots are the open quests per kind;
-#factor_upgrade_cap is the highest factor level the Upgrades tab sells (0 = none).
+#factor_upgrade_cap is the highest factor level the Upgrades tab sells (0 = none);
+#deadline_bonus: extra days a new quest stays open at that rank.
 var ranks = [
-	{code = 'D', basic_slots = 2, advanced_slots = 1, weights = {easy = 100, medium = 0, hard = 0}, sales = 5, xp = 300, factor_upgrade_cap = 0},
-	{code = 'C', basic_slots = 2, advanced_slots = 2, weights = {easy = 70, medium = 30, hard = 0}, sales = 10, xp = 400, factor_upgrade_cap = 3},
-	{code = 'B', basic_slots = 2, advanced_slots = 3, weights = {easy = 40, medium = 40, hard = 20}, sales = 15, xp = 600, factor_upgrade_cap = 4},
-	{code = 'A', basic_slots = 2, advanced_slots = 3, weights = {easy = 10, medium = 60, hard = 30}, sales = 25, xp = 800, factor_upgrade_cap = 5},
-	{code = 'S', basic_slots = 2, advanced_slots = 4, weights = {easy = 0, medium = 25, hard = 75}, sales = 0, xp = 0, factor_upgrade_cap = 6},
+	{code = 'D', basic_slots = 2, advanced_slots = 1, weights = {easy = 100, medium = 0, hard = 0}, sales = 5, xp = 300, factor_upgrade_cap = 0, deadline_bonus = 0},
+	{code = 'C', basic_slots = 2, advanced_slots = 2, weights = {easy = 70, medium = 30, hard = 0}, sales = 10, xp = 400, factor_upgrade_cap = 3, deadline_bonus = 1},
+	{code = 'B', basic_slots = 2, advanced_slots = 3, weights = {easy = 40, medium = 40, hard = 20}, sales = 15, xp = 600, factor_upgrade_cap = 4, deadline_bonus = 2},
+	{code = 'A', basic_slots = 2, advanced_slots = 3, weights = {easy = 10, medium = 60, hard = 30}, sales = 25, xp = 800, factor_upgrade_cap = 5, deadline_bonus = 3},
+	{code = 'S', basic_slots = 2, advanced_slots = 4, weights = {easy = 0, medium = 25, hard = 75}, sales = 0, xp = 0, factor_upgrade_cap = 6, deadline_bonus = 4},
 ]
 
-#days a new quest stays open, rolled per quest
+#days a new quest stays open, rolled per quest; the rank's deadline_bonus is added to both ends
 var deadline = [5, 9]
 
 #Tokens of Recognition: paid for quests, rank-ups and the sales target; spent on factor upgrades.
+#per_slave: for each slave handed over to a quest that wants more than one, on top of the quest's own.
 var tokens = {
-	quest = {basic = 1, advanced = 2},
-	per_difficulty = 1,
+	quest = {
+		basic = {easy = 2, medium = 2, hard = 3},
+		advanced = {easy = 3, medium = 4, hard = 5},
+	},
+	per_slave = 1,
 	rank_up = {first = 5, step = 5},
 	sales_target = 10,
 	top_sales = {every = 10, tokens = 10},
 }
 
-#A step to level L costs L tokens and gold_step gold; the top level costs top_tokens and top_gold.
+#Guild orders: the slave-delivery quests of the guilds' quest pools, posted here instead of on the notice board.
+#per_guild open orders for each guild; a difficulty opens at the guild's total reputation in unlock.
+var guild_orders = {
+	per_guild = 1,
+	unlock = {easy = 0, medium = 500, hard = 1000},
+}
+
+#A step to level L costs L tokens (top_tokens at the top level) and gold[L] gold.
 var factor_upgrade = {
-	gold_step = 250,
+	gold = {2: 500, 3: 750, 4: 1000, 5: 1500, 6: 2500},
 	top_level = 6,
 	top_tokens = 10,
-	top_gold = 1000,
 	factors = ['growth_factor', 'physics_factor', 'magic_factor', 'wits_factor', 'charm_factor',
 		'sexuals_factor', 'tame_factor', 'authority_factor'],
 }
@@ -202,8 +213,8 @@ var base_stats = ['physics', 'wits', 'charm']
 
 #Advanced classes a quest may ask for; one still locked is skipped until the player unlocks it.
 var advanced_classes = [
-	'shieldbearer', 'knight', 'deathknight', 'paladin', 'spellsword', 'ranger', 'sniper',
-	'assassin', 'monk', 'priest', 'bishop',
+	'shieldbearer', 'deathknight', 'spellsword', 'ranger', 'sniper',
+	'assassin', 'monk', 'priest',
 ]
 
 var namepool = {
@@ -224,7 +235,9 @@ var descpool = {
 #	tables above, a deadline from `deadline` and gold from its table (base +- spread, rounded to 10).
 #	The master's charm bonus is added at payout, like for every other quest.
 #* A quest with count > 1 pays per delivered slave (the total split evenly, the remainder on the
-#	last one) and gives its experience when the last slave is handed over.
+#	last one, plus tokens.per_slave) and gives its experience when the last slave is handed over.
 #* Completed and expired quests leave the pool at the daily tick, which then refills it.
 #* Rank-up needs the rank's xp and its sales (slaves sold at the market or quick-sold from a
 #	location's captives). Both reset on rank-up and the new rank's extra slots are filled at once.
+#* Guild orders (kind 'guild') come from the guild's own template and also pay per slave, but give the
+#	guild's reputation on the last slave instead of experience and tokens. Captives cannot fill them.
