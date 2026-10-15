@@ -1,5 +1,6 @@
 extends Control
-#The captives panel: a portrait gallery; a captive who fits a slave market quest gets a Hand Over strip.
+#The captives panel: a portrait gallery; a captive who fits a slave market quest gets a Hand Over strip, one who fits
+#it after training a yellow star by the name.
 
 const CAPTIVE = 'Captive'
 const CHOOSER_ROW = 'ChooserRow'
@@ -9,6 +10,7 @@ const FLIGHT_TIME = 0.75
 const FLIGHT_TRAIL = [0.3, 0.18, 0.1]
 const FLIGHT_LAG = 0.06
 const TRAVELERS = "PresentedSlavesPanel/ScrollContainer"
+const TOGGLE = "MapPanel/slaves"
 const DISMISS_ICON = "res://assets/images/gui/explore/Captured Characters/icons/icon_dismiss.png"
 
 var found = {}
@@ -102,7 +104,8 @@ func update():
 	if location.captured_characters.empty():
 		input_handler.get_spec_node(input_handler.NODE_TEXTTOOLTIP).hide()
 		hide()
-	elif location.type != 'dungeon':
+	#the dungeon screen opens the panel with its map button; a type test missed the Tower of Dreams, typed 'capital'
+	elif !get_parent().has_node(TOGGLE):
 		show()
 	var list = _node("Captives")
 	if !(list is Container) or !list.has_node(CAPTIVE):
@@ -153,16 +156,19 @@ func _on_visibility_changed():
 func sorted_captives(location):
 	var sq = ResourceScripts.slave_quests
 	var ready = []
+	var trainable = []
 	var rest = []
 	for id in location.captured_characters:
 		var tchar = characters_pool.get_char_by_id(id)
 		if tchar == null:
 			continue
-		if sq.captive_quests(tchar, location).empty():
-			rest.append(tchar)
-		else:
+		if !sq.captive_quests(tchar, location).empty():
 			ready.append(tchar)
-	return ready + rest
+		elif !sq.captive_quests(tchar, location, 'yellow').empty():
+			trainable.append(tchar)
+		else:
+			rest.append(tchar)
+	return ready + trainable + rest
 
 
 func fill_tile(tile, tchar, location, base_height):
@@ -185,6 +191,7 @@ func fill_tile(tile, tchar, location, base_height):
 	if name_label is Label:
 		name_label.text = tchar.get_short_name()
 		name_label.set("custom_colors/font_color", variables.hexcolordict['factor' + str(int(tchar.get_stat('growth_factor')))])
+	fill_star(tile, tchar, location)
 	var take = _part(tile, 'TakeButton')
 	var sell = _part(tile, 'SellButton')
 	var enslave = _part(tile, 'EnslaveButton')
@@ -265,6 +272,32 @@ func strip_tooltip(quests):
 	var text = globals._report_text("CAPTURE_HANDOVER_CHOOSE", [quests.size()])
 	for quest in quests:
 		text += "\n" + globals._report_text("CAPTURE_HANDOVER_LINE", [tr(quest.name), sq.next_payment(quest)])
+	return text
+
+
+#a captive with no Hand Over who fits a quest once trained
+func fill_star(tile, tchar, location):
+	var star = _part(tile, 'QuestStar')
+	if !(star is Control):
+		return
+	var sq = ResourceScripts.slave_quests
+	var quests = []
+	if sq.captive_quests(tchar, location).empty():
+		quests = sq.captive_quests(tchar, location, 'yellow')
+	star.visible = !quests.empty()
+	if star.visible:
+		globals.connecttexttooltip(star, star_tooltip(tchar, quests))
+
+
+func star_tooltip(tchar, quests):
+	var sq = ResourceScripts.slave_quests
+	var text = tr("SQ_STAR_YELLOW")
+	for quest in quests:
+		text += "\n" + globals._report_text("CAPTURE_HANDOVER_LINE", [tr(quest.name), sq.next_payment(quest)])
+		for req in sq.quest_match(quest, tchar).failed_advanced:
+			if req.get('silent', false):
+				continue
+			text += "\n    [color=%s]%s[/color]" % [variables.hexcolordict.yellow, ResourceScripts.descriptions.make_slave_statreq_text(req)]
 	return text
 
 
@@ -434,7 +467,30 @@ func sell_char(ch_id):
 	input_handler.emit_signal("LocationSlavesUpdate")
 
 
+var pending_enslave = null
+
 func enslave_char(ch_id):
+	var question = globals.noble_loss_question(characters_pool.get_char_by_id(ch_id))
+	if question != '':
+		pending_enslave = ch_id
+		hide_slave_tooltip()
+		input_handler.get_spec_node(input_handler.NODE_YESORNOPANEL, [self, 'confirm_enslave', 'cancel_enslave', question])
+		return
+	do_enslave_char(ch_id)
+
+
+func confirm_enslave():
+	var ch_id = pending_enslave
+	pending_enslave = null
+	if ch_id != null:
+		do_enslave_char(ch_id)
+
+
+func cancel_enslave():
+	pending_enslave = null
+
+
+func do_enslave_char(ch_id):
 	var location = get_location()
 	var enslaved = false
 	if location.captured_characters.has(ch_id):
@@ -610,7 +666,9 @@ func place_copy(flight, copy, t):
 func land(ch_id):
 	var row = flights[ch_id].get("row")
 	drop_flight(ch_id)
-	if !(row is Control) or !is_instance_valid(row):
+	#validity first: `is` on a freed object is an error, and the list can rebuild itself
+	#while the copies are still in the air
+	if !is_instance_valid(row) or !(row is Control):
 		return
 	row.rect_pivot_offset = row.rect_size / 2
 	var tween = input_handler.GetTweenNode(row)

@@ -315,6 +315,8 @@ func start_combat(newplayergroup, newenemygroup, background, music = 'combatthem
 		music = temparray[randi()%temparray.size()]
 	input_handler.SetMusic(music)
 	fightover = false
+	defeat_seq_run = false
+	drop_orphan_panels() #whatever a teardown of an earlier fight failed to release
 	$Rewards.visible = false
 	allowaction = false
 	$Button.disabled = true
@@ -593,6 +595,19 @@ func stop_floating():
 	for slot in battlefieldpositions.values():
 		if slot.has_node('Character'):
 			slot.get_node('Character').set_floating(false)
+
+
+#The combat screen is a singleton that every fight reuses, so a panel left in a slot is there for
+#the rest of the session - and the next fight's panel lands beside it rather than replacing it.
+func drop_orphan_panels():
+	for slot in battlefieldpositions.values():
+		for node in slot.get_children():
+			if node.name.find('Character') == -1: #a second panel in a slot is named @Character@N
+				continue
+			var owner_fighter = node.get('fighter')
+			if owner_fighter != null and owner_fighter.displaynode == node:
+				owner_fighter.displaynode = null
+			node.queue_free()
 
 
 func checkdeaths():
@@ -1892,6 +1907,9 @@ func setup_skill_button(newbutton, skill_id):
 	if activecharacter.has_status('no_combat_support') and skill.tags.has('support'):
 		newbutton.disabled = true
 		newbutton.get_node("Icon").material = load("res://assets/sfx/bw_shader.tres")
+	if activecharacter.has_status('no_combat_attack') and skill.tags.has('damage'):
+		newbutton.disabled = true
+		newbutton.get_node("Icon").material = load("res://assets/sfx/bw_shader.tres")
 #			if !activecharacter.check_cost(skill.cost):
 #				newbutton.disabled = true
 #				newbutton.get_node("Icon").material = load("res://assets/sfx/bw_shader.tres")
@@ -2235,12 +2253,18 @@ func FinishCombat(victory = true):
 	if is_instance_valid(gui_controller.dialogue) && gui_controller.dialogue.is_visible():
 		gui_controller.dialogue.close() #for test
 	autoskill_dummy.is_active = false
+	#a null anywhere below used to abort the whole teardown, leaving the fight's panels and its
+	#enemies behind for the rest of the session - and in the next save
 	for i in playergroup.values() + enemygroup.values():
 		var tchar = characters_pool.get_char_by_id(i)
+		if tchar == null:
+			continue
 		tchar.skills.combat_cooldowns.clear()
-	
+
 	for p in playergroup.values():
 		var ch = characters_pool.get_char_by_id(p)
+		if ch == null:
+			continue
 		var alive = true
 		if ch.hp <=0:
 			alive = false
@@ -2271,13 +2295,17 @@ func FinishCombat(victory = true):
 	for i in range(battlefield.size()):
 		if battlefield[i] != null:
 			var tchar = get_char_by_pos(i)
-			tchar.displaynode.queue_free()
-			tchar.displaynode = null
+			if tchar != null and tchar.displaynode != null:
+				tchar.displaynode.queue_free()
+				tchar.displaynode = null
 			battlefield[i] = null
+	drop_orphan_panels() #a panel whose fighter the pool can no longer name would stay for good
 	for i in enemygroup.values():
 		#mark enemy characters for clearing
 		#mb to change this part when dealing with captured enemies
 		var tchar = characters_pool.get_char_by_id(i)
+		if tchar == null:
+			continue
 		if tchar.displaynode != null:
 			tchar.displaynode.check_active()
 		tchar.is_active = false
@@ -2337,6 +2365,22 @@ func finish_instant_combat():
 	emit_signal("combat_cleaned_up")
 
 
+#traits that grow with won fights: how many fought (summons aside), and whether the master was one
+func grow_traits_on_victory():
+	var fighters = []
+	var master_fought = false
+	for p in range(1, 7):
+		var ch = get_char_by_pos(p)
+		if ch == null or summons.has(p):
+			continue
+		fighters.push_back(ch)
+		if ch.is_master():
+			master_fought = true
+	for ch in fighters:
+		if !ch.is_koed():
+			ch.dyn_stats.grow_by_victory(fighters.size() == 1, master_fought)
+
+
 #to check next functions
 var victory_seq_run = false
 func victory():
@@ -2357,6 +2401,7 @@ func victory():
 	yield(get_tree().create_timer(0.5), 'timeout')
 	fightover = true
 	input_handler.StopMusic()
+	grow_traits_on_victory()
 	#on combat ends triggers
 	for p in range(1, 7):
 		if battlefield[p] == null:
@@ -2486,7 +2531,10 @@ func give_rewards():
 	var array = []
 	for i in playergroup.values():
 		array.append(i)
-	if global_turn < 3:
+	#instawin = sneaked/talked/scared past the enemies; the skip_combat cheat keeps the win lines
+	if combat_data.instawin:
+		input_handler.get_person_for_chat(array, 'combat_avoided')
+	elif global_turn < 3:
 		input_handler.get_person_for_chat(array, 'combat_won_fast')
 	else:
 		input_handler.get_person_for_chat(array, 'combat_won_slow')
@@ -2532,16 +2580,24 @@ func update_defeated_enemy_icons():
 		globals.connecttexttooltip(icon_panel, enemy.get_short_name())
 
 
+var defeat_seq_run = false
 func defeat(runaway = false): #runaway is a temporary variable until run() method not fully implemented
+	#FinishCombat(false) is the last line of this function, so anything that throws on the way
+	#there skips the entire teardown - and victory() guards the same two spots already
+	if defeat_seq_run:
+		return
+	defeat_seq_run = true
 	emit_signal("combat_finished")
 	for p in range(1, 7):
 		if battlefield[p] == null:
 			continue
+		if !summons.has(p):
+			continue
 		var t_p = get_char_by_pos(p)
-		if summons.has(p):
+		if t_p != null:
 			t_p.is_active = false
-			playergroup.erase(p)
-			summons.erase(p)
+		playergroup.erase(p)
+		summons.erase(p)
 	screen_block.show()
 	if runaway:
 		input_handler.play_animation_noq("runaway")
@@ -2558,7 +2614,8 @@ func defeat(runaway = false): #runaway is a temporary variable until run() metho
 	CombatAnimations.force_end()
 	Input.set_custom_mouse_cursor(images.cursors.default)
 	fightover = true
-	ActionQueue.force_clean()
+	if ActionQueue != null:
+		ActionQueue.force_clean()
 	ActionQueue = null
 	FinishCombat(false)
 	input_handler.SetMusic(input_handler.explore_sound, true)

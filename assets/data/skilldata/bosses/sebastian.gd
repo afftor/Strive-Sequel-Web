@@ -571,7 +571,7 @@ var skills = {
 		target_range = 'any',
 		damage_type = 'dark',#not sure but not matters
 		sfx = [
-			{code = 'wind_blade', target = 'target_group', period = 'windup'},
+			{code = 'smokescreen', target = 'target_group', period = 'windup'},
 			{code = 'cast_dark', target = 'caster', period = 'windup', is_cast = true}],
 		sounddata = {initiate = 'spell_void', strike = null, hit = null},
 		value = ['0'],
@@ -599,7 +599,7 @@ var skills = {
 		target_number = 'single',
 		target_range = 'any',
 		damage_type = 'weapon',
-		sfx = [{code = 'wind_blade', target = 'target_group', period = 'windup'}], 
+		sfx = [{code = 'smokescreen', target = 'target_group', period = 'windup'}], 
 		sounddata = {initiate = null, strike = null, hit = null, hittype = null},
 		value = [['0']],
 		damagestat = ['no_stat'],
@@ -764,7 +764,10 @@ var skills = {
 		damage_type = 'water',
 		value = 0.45,
 		random_factor_p = 0.1,
-		sfx = [{code = 'acid_bomb', target = 'target', period = 'predamage'}], 
+		sfx = [
+			{code = 'projectile_fireball', target = 'target', period = 'predamage', duration = 0.32, hit_motion = 'push', arc = 1050.0, color = 'befe5b'},
+			{code = 'acid_bomb', target = 'target', period = 'predamage'},
+			{code = 'at_bite', target = 'caster', period = 'windup', is_cast = true},], 
 		sounddata = {initiate = null, strike = 'blade', hit = null},
 	},
 	quick_death = {

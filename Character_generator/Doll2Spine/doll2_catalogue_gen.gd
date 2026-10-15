@@ -9,12 +9,12 @@ const SCHEMA_VERSION = 2
 
 const SOURCE = {
 	"atlas": "Doll2_spine4.2_female.atlas",
-	"attachment_count": 722,
+	"attachment_count": 724,
 	"bone_count": 275,
 	"contract": "doll2_v1",
 	"skeleton": "Doll2_spine4.2_female.json",
-	"skeleton_hash": "fvRSVuxxofo",
-	"slot_count": 81,
+	"skeleton_hash": "d/5hjWUIeVg",
+	"slot_count": 82,
 	"spine_version": "4.2.43",
 }
 
@@ -95,6 +95,7 @@ const SLOT_ORDER = [
 	"lips_say",
 	"eyebrows",
 	"noses",
+	"freckles",
 	"blush",
 	"hairs_fringe",
 	"equip_masks",
@@ -179,6 +180,7 @@ const DRAW_ORDER = [
 	"lips_say",
 	"eyebrows",
 	"noses",
+	"freckles",
 	"blush",
 	"hairs_fringe",
 	"equip_masks",
@@ -237,6 +239,7 @@ const GROUP_ORDER = [
 	"animal_body",
 	"race_overlay",
 	"face_markings",
+	"freckles",
 	"genitals",
 	"tattoo",
 	"piercing_belly",
@@ -301,6 +304,7 @@ const COLOR_CHANNELS = {
 	"animal": {
 		"anchor": "animal_body",
 		"coverage": false,
+		"coverage_alternate": false,
 		"flat": false,
 		"gear": false,
 		"slots": ["animal_body", "animal_frontbody"],
@@ -311,6 +315,7 @@ const COLOR_CHANNELS = {
 	"collar": {
 		"anchor": "collar",
 		"coverage": false,
+		"coverage_alternate": false,
 		"flat": false,
 		"gear": true,
 		"slots": ["equip_collar"],
@@ -321,6 +326,7 @@ const COLOR_CHANNELS = {
 	"ears": {
 		"anchor": "ears",
 		"coverage": false,
+		"coverage_alternate": false,
 		"flat": false,
 		"gear": false,
 		"slots": ["ears"],
@@ -331,6 +337,7 @@ const COLOR_CHANNELS = {
 	"eyebrows": {
 		"anchor": "eyebrows",
 		"coverage": false,
+		"coverage_alternate": false,
 		"flat": false,
 		"gear": false,
 		"slots": ["eyebrows"],
@@ -341,6 +348,7 @@ const COLOR_CHANNELS = {
 	"eyes": {
 		"anchor": "eyes",
 		"coverage": false,
+		"coverage_alternate": false,
 		"flat": false,
 		"gear": false,
 		"slots": ["eyes", "eyes_hearts"],
@@ -351,6 +359,7 @@ const COLOR_CHANNELS = {
 	"face_markings": {
 		"anchor": "face_markings",
 		"coverage": false,
+		"coverage_alternate": false,
 		"flat": false,
 		"gear": false,
 		"slots": ["race_head"],
@@ -361,6 +370,7 @@ const COLOR_CHANNELS = {
 	"hair": {
 		"anchor": "hair",
 		"coverage": false,
+		"coverage_alternate": false,
 		"flat": false,
 		"gear": false,
 		"slots": ["hairs_base", "hairs_fringe"],
@@ -371,6 +381,7 @@ const COLOR_CHANNELS = {
 	"hair_assist": {
 		"anchor": "hair_assist",
 		"coverage": false,
+		"coverage_alternate": false,
 		"flat": false,
 		"gear": false,
 		"slots": ["hairs_assist"],
@@ -381,6 +392,7 @@ const COLOR_CHANNELS = {
 	"hair_back": {
 		"anchor": "hair_back",
 		"coverage": false,
+		"coverage_alternate": false,
 		"flat": false,
 		"gear": false,
 		"slots": ["hairs_back"],
@@ -391,6 +403,7 @@ const COLOR_CHANNELS = {
 	"headgear": {
 		"anchor": "headgear",
 		"coverage": false,
+		"coverage_alternate": false,
 		"flat": false,
 		"gear": true,
 		"slots": ["equip_head"],
@@ -401,6 +414,7 @@ const COLOR_CHANNELS = {
 	"horns": {
 		"anchor": "horns",
 		"coverage": false,
+		"coverage_alternate": false,
 		"flat": false,
 		"gear": false,
 		"slots": ["horns"],
@@ -411,6 +425,7 @@ const COLOR_CHANNELS = {
 	"lips": {
 		"anchor": "lips",
 		"coverage": false,
+		"coverage_alternate": false,
 		"flat": false,
 		"gear": false,
 		"slots": ["lips", "lips_say"],
@@ -421,6 +436,7 @@ const COLOR_CHANNELS = {
 	"mask": {
 		"anchor": "mask",
 		"coverage": false,
+		"coverage_alternate": false,
 		"flat": false,
 		"gear": true,
 		"slots": ["equip_masks"],
@@ -431,12 +447,14 @@ const COLOR_CHANNELS = {
 	"nipples": {
 		"anchor": "body",
 		"coverage": false,
+		"coverage_alternate": false,
 		"flat": false,
 		"gear": false,
 		"slots": [
 			"beastkin_pregnancy_nipple",
 			"beastkin_torso_many_nipples",
 			"breast_nipples",
+			"freckles",
 			"torso_nipples_mask",
 		],
 		"two_tone": false,
@@ -446,6 +464,7 @@ const COLOR_CHANNELS = {
 	"outfit": {
 		"anchor": "outfit",
 		"coverage": false,
+		"coverage_alternate": false,
 		"flat": false,
 		"gear": true,
 		"slots": [
@@ -468,6 +487,7 @@ const COLOR_CHANNELS = {
 	"outfit_lower": {
 		"anchor": "outfit",
 		"coverage": false,
+		"coverage_alternate": false,
 		"flat": false,
 		"gear": true,
 		"slots": ["equip_leg_left", "equip_leg_right", "equip_pelvis", "equip_pregnancy_low"],
@@ -478,6 +498,7 @@ const COLOR_CHANNELS = {
 	"piercing_belly": {
 		"anchor": "piercing_belly",
 		"coverage": false,
+		"coverage_alternate": false,
 		"flat": false,
 		"gear": false,
 		"slots": ["piercing_belly"],
@@ -488,6 +509,7 @@ const COLOR_CHANNELS = {
 	"piercing_nipple": {
 		"anchor": "piercing_nipple",
 		"coverage": false,
+		"coverage_alternate": false,
 		"flat": false,
 		"gear": false,
 		"slots": ["piercing_nipple_1_0"],
@@ -498,6 +520,7 @@ const COLOR_CHANNELS = {
 	"race": {
 		"anchor": "race_overlay",
 		"coverage": false,
+		"coverage_alternate": false,
 		"flat": false,
 		"gear": false,
 		"slots": [
@@ -518,28 +541,26 @@ const COLOR_CHANNELS = {
 	"skin": {
 		"anchor": "body",
 		"coverage": true,
+		"coverage_alternate": false,
 		"flat": false,
 		"gear": false,
 		"slots": [
 			"belly",
 			"belly_muscle",
 			"breasts",
-			"breasts_beastkin",
-			"breasts_beastkin_many",
-			"breasts_beastkin_pregnancy",
 			"dick",
 			"face",
 			"head",
 			"head_skull",
+			"leg_left",
+			"leg_right",
+			"legl_muscle",
+			"legr_muscle",
 			"noses",
 			"pelvis",
 			"pregnancy_belly",
 			"testicle",
 			"torso",
-			"leg_left",
-			"leg_right",
-			"legl_muscle",
-			"legr_muscle",
 		],
 		"two_tone": false,
 		"zone_defaults": [],
@@ -565,9 +586,25 @@ const COLOR_CHANNELS = {
 		"zone_defaults": [],
 		"zones": false,
 	},
+	"skin_alternate_2": {
+		"anchor": "body",
+		"coverage": true,
+		"coverage_alternate_2": true,
+		"flat": false,
+		"gear": false,
+		"slots": [
+			"breasts_beastkin",
+			"breasts_beastkin_many",
+			"breasts_beastkin_pregnancy",
+		],
+		"two_tone": false,
+		"zone_defaults": [],
+		"zones": false,
+	},
 	"tail": {
 		"anchor": "tails",
 		"coverage": false,
+		"coverage_alternate": false,
 		"flat": false,
 		"gear": false,
 		"slots": ["tails"],
@@ -578,6 +615,7 @@ const COLOR_CHANNELS = {
 	"tattoo": {
 		"anchor": "tattoo",
 		"coverage": false,
+		"coverage_alternate": false,
 		"flat": true,
 		"gear": false,
 		"slots": ["tatoos"],
@@ -588,6 +626,7 @@ const COLOR_CHANNELS = {
 	"weapon": {
 		"anchor": "weapon_belt",
 		"coverage": false,
+		"coverage_alternate": false,
 		"flat": false,
 		"gear": true,
 		"slots": ["weapon_back", "weapon_belt"],
@@ -598,6 +637,7 @@ const COLOR_CHANNELS = {
 	"wings": {
 		"anchor": "wings",
 		"coverage": false,
+		"coverage_alternate": false,
 		"flat": false,
 		"gear": false,
 		"slots": ["wings"],
@@ -618,9 +658,9 @@ const SLOT_COLORS = {
 	"belly_muscle": "skin",
 	"breast_nipples": "nipples",
 	"breasts": "skin",
-	"breasts_beastkin": "skin",
-	"breasts_beastkin_many": "skin",
-	"breasts_beastkin_pregnancy": "skin",
+	"breasts_beastkin": "skin_alternate_2",
+	"breasts_beastkin_many": "skin_alternate_2",
+	"breasts_beastkin_pregnancy": "skin_alternate_2",
 	"dick": "skin",
 	"ears": "ears",
 	"equip_arm_left": "outfit",
@@ -645,6 +685,7 @@ const SLOT_COLORS = {
 	"eyes": "eyes",
 	"eyes_hearts": "eyes",
 	"face": "skin",
+	"freckles": "nipples",
 	"hairs_assist": "hair_assist",
 	"hairs_back": "hair_back",
 	"hairs_base": "hair",
@@ -872,6 +913,15 @@ const GROUPS = {
 		"parts": ["head_dragon_mask", "head_dragon_mask_2", "kobold_head_kobold", "kobold_head_mask1"],
 		"slots": ["race_head"],
 	},
+	"freckles": {
+		"default": "",
+		"kind": "options",
+		"label": "Freckles",
+		"optional": true,
+		"order": 17.5,
+		"parts": ["f2"],
+		"slots": ["freckles"],
+	},
 	"genitals": {
 		"default": "",
 		"kind": "options",
@@ -940,6 +990,7 @@ const GROUPS = {
 			"hair_back_ponytail_long",
 			"hair_back_straight",
 			"hair_back_verylong1",
+			"hair_back_verylong_wave",
 			"hair_back_wawe",
 		],
 		"slots": ["hairs_back"],
@@ -2065,6 +2116,13 @@ const PARTS = {
 		},
 		"slots": {},
 	},
+	"f2": {
+		"folders": ["11_freckles"],
+		"group": "freckles",
+		"slots": {
+			"freckles": "11_freckles/f2",
+		},
+	},
 	"face10": {
 		"folders": ["02_faces"],
 		"group": "face",
@@ -2225,6 +2283,14 @@ const PARTS = {
 		"group": "hair_back",
 		"slots": {
 			"hairs_back": "hair_back_verylong1",
+		},
+		"zones": [0],
+	},
+	"hair_back_verylong_wave": {
+		"folders": ["06_hairs_back"],
+		"group": "hair_back",
+		"slots": {
+			"hairs_back": "06_hairs_back/hair_back_verylong_wave",
 		},
 		"zones": [0],
 	},

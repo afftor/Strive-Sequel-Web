@@ -6,5 +6,5 @@
 margin_right = 1920.0
 margin_bottom = 1088.0
 autoplay = true
-bus = "Sound"
+bus = "Ambient"
 script = ExtResource( 3 )

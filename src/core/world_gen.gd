@@ -279,7 +279,7 @@ func rebuild_guild_slaves(guilddata):
 		for i in range(type.slavenumber[0]):
 			if num <= 0: return
 			num -= 1
-			guilddata.slaves.push_back(make_slave_for_guild(type, race_upgrade).id)
+			guilddata.slaves.push_back(stock_market_slave(guilddata, make_slave_for_guild(type, race_upgrade)).id)
 	
 	var rand_types_array = []
 	for t in range(guilddata.hireable_characters.size()):
@@ -291,7 +291,15 @@ func rebuild_guild_slaves(guilddata):
 		var rtype = input_handler.random_from_array(rand_types_array)
 		num -= 1
 		rand_types_array.erase(rtype)
-		guilddata.slaves.push_back(make_slave_for_guild(guilddata.hireable_characters[rtype], race_upgrade).id)
+		guilddata.slaves.push_back(stock_market_slave(guilddata, make_slave_for_guild(guilddata.hireable_characters[rtype], race_upgrade)).id)
+
+
+#a slave put up for sale comes with a bondage status - see trait_catalogue.bondage
+func stock_market_slave(guilddata, newslave):
+	if newslave.get_stat('slave_class') in ['slave', 'slave_trained']:
+		newslave.dyn_stats.market_status(guilddata.code)
+		newslave.forget_noble_classes()
+	return newslave
 
 
 
@@ -299,8 +307,13 @@ func make_quest_for_guild(guilddatatemplate, difficulty):
 	
 	var array = []
 	for i in guilddatatemplate.questpool[difficulty]:
+		#slave deliveries are posted at the slave market as guild orders
+		if ResourceScripts.slave_quests.is_slave_order_template(i):
+			continue
 		if globals.checkreqs(worlddata.questdata[i].unlockreqs) == true:
 			array.append(i)
+	if array.empty():
+		return
 	var input_info = {
 		source = guilddatatemplate.code,
 		area = guilddatatemplate.area,
@@ -571,13 +584,15 @@ func make_quest(questcode, input_info):
 						tempdata.statreqs.append({code = 'has_profession', profession = i, check = true})
 				elif statdata.code == 'race':
 					var number = round(rand_range(statdata.range[0],statdata.range[1]))
+					var racepool = races.kin_dedupe(statdata.type)
 					var racearray = []
-					while number > 0:
-						var newrace = statdata.type[randi()%statdata.type.size()]
+					while number > 0 and !racepool.empty():
+						var newrace = racepool[randi()%racepool.size()]
 						racearray.append(newrace)
+						racepool.erase(newrace)
 						statdata.type.erase(newrace)
 						number -= 1
-					tempdata.statreqs.append({code = 'one_of_races', value = racearray, check = true})
+					tempdata.statreqs.append({code = 'one_of_races', value = races.with_kin(racearray), check = true})
 				
 				
 				if statdata.use_once == true:
