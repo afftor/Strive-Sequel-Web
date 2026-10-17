@@ -34,6 +34,10 @@ const DEFAULT_CARD_WIDTH = 460
 #Three catalogue rows side by side leave enough width for the full room prose while keeping
 #all thirteen indoor choices (five rows of three) comfortably inside the screen.
 const BUILD_CARD_WIDTH = 1332
+#rows of the Market Restock stock grid shown before it scrolls
+const AUTOBUY_CHOICE_ROWS = 3
+#the ritual room's bench is the enchanting panel on this screen, not a category of the craft screen
+const ENCHANTING_BENCH = 'enchant'
 
 var view = null
 var slot_code = ''
@@ -579,8 +583,8 @@ func craft_screen():
 
 func craft_category_of(current):
 	var job = RoomTypes.get_craft_menu(current.type)
-	if job == null:
-		return null
+	if job == null or job == ENCHANTING_BENCH:
+		return job
 	var screen = craft_screen()
 	if screen == null or !('craftcategories' in screen):
 		return null
@@ -592,6 +596,8 @@ func craft_category_of(current):
 #craft screen's own category button, so the two cannot end up calling it different things -
 #their keys are not built to a pattern (BLACKSMITH, TASKCOOKING, CRAFTTAILORING...).
 func craft_category_name(job):
+	if job == ENCHANTING_BENCH:
+		return tr("CRAFTENCHANT")
 	var screen = craft_screen()
 	var path = "categories/%s/Label" % str(job)
 	if screen == null or !screen.has_node(path):
@@ -797,7 +803,9 @@ func close_autosell_panel():
 
 func build_autobuy_panel():
 	var panel = autobuy_panel()
-	panel.get_node("Body/Title").text = tr("MANSIONVIEW_AUTOBUY_TITLE")
+	panel.get_node("Body/TitleRow/Title").text = tr("MANSIONVIEW_AUTOBUY_TITLE")
+	globals.connecttexttooltip(panel.get_node("Body/TitleRow/HelpButton"), tr("MANSIONVIEW_AUTOBUY_HELP"),
+		true, view.get_node("Overlay/TextTooltip"))
 	panel.get_node("Body/Explanation").text = tr("MANSIONVIEW_AUTOBUY_EXPLAIN")
 	panel.get_node("Body/RuleHeader/Item").text = tr("MANSIONVIEW_AUTOBUY_ITEM")
 	panel.get_node("Body/RuleHeader/Held").text = tr("MANSIONVIEW_AUTOBUY_HELD")
@@ -987,13 +995,13 @@ func build_autobuy_choices():
 	if !selected_available:
 		selected_autobuy_code = '' if choices.empty() else str(choices[0][1])
 	for entry in choices:
-		var row = input_handler.DuplicateContainerTemplate(list, 'Choice')
+		var cell = input_handler.DuplicateContainerTemplate(list, 'Choice')
 		var code = str(entry[1])
-		row.set_meta('code', code)
-		row.get_node("Icon").texture = autobuy_icon(code)
-		row.get_node("Name").text = entry[0]
-		row.get_node("Held").text = str(ResourceScripts.game_res.autobuy_held(code))
-		row.connect("pressed", self, "select_autobuy_choice", [code])
+		cell.set_meta('code', code)
+		cell.get_node("Icon").texture = autobuy_icon(code)
+		cell.get_node("Held").text = str(ResourceScripts.game_res.autobuy_held(code))
+		connect_autobuy_tooltip(cell, code)
+		cell.connect("pressed", self, "select_autobuy_choice", [code])
 	var has_choice = !choices.empty()
 	panel.get_node("Body/ChoiceField").visible = has_choice
 	panel.get_node("Body/ChoiceEmpty").visible = !has_choice
@@ -1003,10 +1011,21 @@ func build_autobuy_choices():
 		select_autobuy_choice(selected_autobuy_code)
 
 
+func connect_autobuy_tooltip(node, code):
+	var tooltip = view.get_node("Overlay/ItemTooltip")
+	if Items.materiallist.has(code):
+		globals.connectmaterialtooltip(node, Items.materiallist[code], '', null, tooltip)
+	elif Items.itemlist.has(code):
+		globals.connecttempitemtooltip(node, Items.itemlist[code], 'geartemplate', tooltip)
+
+
 func select_autobuy_choice(code):
 	if code == '':
 		return
 	selected_autobuy_code = str(code)
+	for cell in autobuy_panel().get_node("ChoicePopup/ListPanel/ChoiceScroll/ChoiceList").get_children():
+		if cell.has_meta('code'):
+			cell.pressed = cell.get_meta('code') == selected_autobuy_code
 	var field = autobuy_panel().get_node("Body/ChoiceField")
 	field.get_node("Icon").texture = autobuy_icon(selected_autobuy_code)
 	field.get_node("Name").text = ResourceScripts.game_res.autobuy_name(selected_autobuy_code)
@@ -1030,8 +1049,17 @@ func place_autobuy_choice_list():
 	var panel = autobuy_panel()
 	var field = panel.get_node("Body/ChoiceField")
 	var list_panel = panel.get_node("ChoicePopup/ListPanel")
+	var scroll = list_panel.get_node("ChoiceScroll")
+	var grid = scroll.get_node("ChoiceList")
+	var cells = 0
+	for cell in grid.get_children():
+		if cell.visible:
+			cells += 1
+	var rows = clamp(ceil(float(cells) / grid.columns), 1, AUTOBUY_CHOICE_ROWS)
+	var gap = grid.get_constant("vseparation")
+	var list_height = rows * (grid.get_node("Choice").get_combined_minimum_size().y + gap) - gap \
+		+ scroll.margin_top - scroll.margin_bottom
 	var field_position = field.rect_global_position - panel.rect_global_position
-	var list_height = 148.0
 	var list_y = field_position.y + field.rect_size.y + 2.0
 	if list_y + list_height > panel.rect_size.y - 8.0:
 		list_y = field_position.y - list_height - 2.0
@@ -1221,8 +1249,9 @@ func setup_upgrade_row(row, current, code, build):
 		#an improvement with nothing left to add says nothing rather than opening an empty panel
 		var hint = upgrade_hint(code, level, next_level, current.type)
 		if hint != "":
+			#the row stands in the details panel, and beside the card is where that panel is
 			globals.connecttexttooltip(row, hint, true,
-				view.get_node("Overlay/TextTooltip"), self)
+				view.get_node("Overlay/TextTooltip"), details())
 
 
 #Room choices and improvements both carry prose and a separate mechanical summary. Measure
@@ -1358,6 +1387,7 @@ func build_people(current):
 		fill_people_group($Body/Columns/LeftScroll/LeftColumn/PeopleColumn/Occupants,
 			tr("MANSIONVIEW_WORKPLACES"), students, max(0, capacity - tutor_places), true, false,
 			false, false, null if gather == null else gather.id)
+		append_work_hint(work_task(current, gather))
 		fill_people_group($Body/Columns/LeftScroll/LeftColumn/PeopleColumn/Companions, tr("MANSIONVIEW_TUTORSLOT"),
 			[] if tutor == null else [tutor], tutor_places, false, false, true)
 		return
@@ -1379,6 +1409,8 @@ func build_people(current):
 		tr("MANSIONVIEW_BEDS") if sleeping else tr("MANSIONVIEW_WORKPLACES"),
 		occupants.size(), capacity]
 	var job_id = null if gather == null else gather.id
+	if !sleeping:
+		append_work_hint(work_task(current, gather))
 	input_handler.ClearContainer($Body/Columns/LeftScroll/LeftColumn/PeopleColumn/Occupants/List)
 	#On a farm a click picks the person whose produce is being set rather than turning them
 	#out; the list itself carries the button that sends them away, so nobody loses their
@@ -1417,6 +1449,21 @@ func build_people(current):
 
 #One titled group of bed slots, drawn the way the single list is: a face for everyone in a bed,
 #a free slot for every bed still empty, and both clickable - out of the room, or into it.
+func work_task(current, gather):
+	return gather.id if gather != null else LocationTasks.room_work_task(current, slot_code)
+
+
+#What the work here goes by, beside the count of its places.
+func append_work_hint(task_id):
+	var line = LocationTasks.work_hint_line(task_id)
+	if line == "":
+		return
+	var header = $Body/Columns/LeftScroll/LeftColumn/PeopleColumn/Occupants.get_node('Header')
+	#its own line under the count: with the stat and the tool spelled out the three together run past
+	#the card's width
+	header.text += "\n" + line
+
+
 func fill_people_group(section, title, char_ids, places, count_in_title, sleeping,
 		tutor_slot = false, builder = false, job_id = null):
 	section.get_node('Header').text = title
@@ -1968,6 +2015,9 @@ func on_craft():
 	if current == null:
 		return
 	var job = craft_category_of(current)
+	if job == ENCHANTING_BENCH:
+		view.open_enchanting()
+		return
 	var mansion = view.get_parent()
 	#the plan is also used on its own, with no mansion above it - there the button does nothing
 	if job == null or mansion == null or !mansion.has_method("mansion_state_set"):

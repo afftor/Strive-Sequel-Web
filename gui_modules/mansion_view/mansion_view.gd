@@ -53,6 +53,7 @@ onready var rest_panel = $RestPanel
 onready var location_panel = $LocationPanel
 onready var service_panel = $Overlay/ServicePanel
 onready var body_rites_panel = $Overlay/BodyRitesPanel
+onready var enchant_panel = $Overlay/EnchantPanel
 
 
 const EMBEDDED_MARGIN = 16
@@ -85,6 +86,7 @@ func _ready():
 	location_panel.visible = false
 	service_panel.setup(self)
 	body_rites_panel.setup(self)
+	enchant_panel.setup(self)
 	$ExpelZone.setup(self)
 	connect("resized", self, "layout_view")
 	connect("visibility_changed", self, "on_visibility_changed")
@@ -93,6 +95,7 @@ func _ready():
 	#changes the house says so through this signal - without it the plan went on drawing the
 	#house as it was when it was last looked at.
 	globals.connect("rooms_changed", self, "on_rooms_changed")
+	input_handler.connect("PortraitUpdate", self, "on_portrait_update")
 	layout_view()
 	if embedded:
 		globals.connect("slave_added", self, "queue_refresh")
@@ -247,6 +250,7 @@ func on_visibility_changed():
 			queue_refresh()
 		return
 	body_rites_panel.close()
+	enchant_panel.close()
 	close_card()
 	clear_char_pick()
 
@@ -975,6 +979,10 @@ func assign_worker(slot_code, char_id, as_tutor = false):
 		input_handler.SystemMessage(person.translate(tr("MANSIONVIEW_ERR_NOTWORKER")))
 		return false
 	ResourceScripts.game_res.sync_room_tasks()
+	var vow_ban = person.get_vow_ban('task', room.task_id)
+	if vow_ban != '':
+		input_handler.SystemMessage(vow_ban)
+		return false
 	var task = tasks()[room.task_id]
 	#Already at this work. Putting somebody where they already stand is not a refusal, and
 	#promoting a pupil to teacher comes through here with the room at its limit.
@@ -1040,6 +1048,10 @@ func assign_location_worker(task_id, char_id):
 	if ResourceScripts.game_res.is_service_task(task_id) \
 			and !ResourceScripts.game_world.service_takes_race(task.get('location', ''), person):
 		input_handler.SystemMessage(person.translate(tr("MANSIONVIEW_ERR_SERVICERACE")))
+		return false
+	var vow_ban = person.get_vow_ban('task', task_id)
+	if vow_ban != '':
+		input_handler.SystemMessage(vow_ban)
 		return false
 	person.assign_to_task(task_id)
 	refresh_people()
@@ -1544,6 +1556,16 @@ func close_body_rites():
 		card.rebuild()
 
 
+func open_enchanting():
+	set_card_aside(true)
+	enchant_panel.open()
+
+
+func close_enchanting():
+	enchant_panel.close()
+	set_card_aside(false)
+
+
 func refresh_marks():
 	if showing_plan():
 		grid.refresh_marks()
@@ -1566,6 +1588,13 @@ func queue_refresh():
 		return
 	refresh_queued = true
 	call_deferred("flush_queued_refresh")
+
+
+#a shot lands frames after the cells read the old one; the end of a drag repaints them anyway
+func on_portrait_update():
+	if get_viewport().gui_is_dragging():
+		return
+	queue_refresh()
 
 
 func flush_queued_refresh():

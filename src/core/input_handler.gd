@@ -144,7 +144,6 @@ enum {
 	NODE_SEX,
 	NODE_DATE,
 	NODE_TUTORIAL_PANEL,
-	NODE_TRAIREM_PANEL,
 	NODE_ARENA,
 	NODE_HARD_TUTORIAL_PANEL,
 	NODE_HARD_TUTORIAL_LIST,
@@ -164,6 +163,9 @@ enum {
 	ANIM_ITEM_FLIGHT,
 	ANIM_FACTOR_UPGRADE,
 	NODE_RACETOOLTIP,
+	NODE_TRAIT_REPLACE,
+	NODE_TRAIT_TRANSFER,
+	NODE_STARTING_TRAITS,
 } #, NODE_TWEEN, NODE_REPEATTWEEN}
 
 
@@ -176,6 +178,8 @@ var globalsettings = {
 	musicmute = false,
 	soundvol = -15,
 	soundmute = false,
+	ambientvol = -16, #60% of the -40..0 slider
+	ambientmute = false,
 
 	#Window settings
 	fullscreen = true,
@@ -248,6 +252,7 @@ var progress_data = {
 	achi_bonuses = [],
 	achi_points = 0,
 	seen_skills = [],
+	seen_trait_stages = [], # growing trait stages some character has reached; the rest show as ???
 	cheat_password = "", # password entered by the player, unlocks cheats on every save
 	supporter_prompt_dismissed = false, # player pressed "Don't show again" on the main menu notice
 	ngplus_unlocked = false, # cheat menu opened New Game+ without the act1 achievement
@@ -283,9 +288,13 @@ func settings_load():
 	var settings = config.get_section_keys("settings")
 	for i in settings:
 		globalsettings[i] = config.get_value("settings", i, null)
+	#ambience used to play through the sound bus, so an older file hands it the sound slider's level
+	if !config.has_section_key("settings", "ambientvol"):
+		globalsettings.ambientvol = globalsettings.soundvol
+		globalsettings.ambientmute = globalsettings.soundmute
 	#updatevolume
 	var counter = 0
-	for i in ['master','music','sound']:
+	for i in ['master','music','sound','ambient']:
 		AudioServer.set_bus_mute(counter, globalsettings[i+'mute'])
 		AudioServer.set_bus_volume_db(counter, globalsettings[i+'vol'])
 		counter += 1
@@ -1893,7 +1902,7 @@ func play_animation_noq(animation, args = {}):
 				anim_scene.get_node("TextureRect").texture = load(tdata.icon)
 			else:
 				anim_scene.get_node("TextureRect").texture = tdata.icon
-			anim_scene.get_node("Label").text = "Training"
+			anim_scene.get_node("Label").text = tr("TRAIT_ACQUIRED_TITLE")
 			anim_scene.get_node("Label2").text = tdata.name
 			anim_scene.get_node("Label3").text = args.person.get_full_name()
 			anim_scene.play("class_achieved")
@@ -1933,6 +1942,16 @@ func play_animation_noq(animation, args = {}):
 			anim_scene.get_node("Label").text = tr(args.get('title', "BODYRITE_ANIM_TITLE"))
 			anim_scene.get_node("Label2").text = tr(rite_name)
 			anim_scene.get_node("Label3").text = args.person.get_full_name()
+			anim_scene.play("class_achieved")
+		"enchanted": #(item, subtitle) - gear enchanted in the ritual room
+			anim_scene = get_spec_node(ANIM_CLASS_ACHIEVED)
+			args.item.set_icon(anim_scene.get_node("TextureRect"))
+			anim_scene.get_node("Label").text = tr("ENCHANTING_ANIM_TITLE")
+			anim_scene.get_node("Label2").text = tr(args.item.name)
+			anim_scene.get_node("Label3").text = args.get('subtitle', "")
+			#gear names and enchantment lists run longer than class names
+			font_size_adjust(anim_scene.get_node("Label2"), 0)
+			font_size_adjust(anim_scene.get_node("Label3"), 0)
 			anim_scene.play("class_achieved")
 		"quest_completed":
 			anim_scene = get_spec_node(ANIM_TASK_COMPLETED)

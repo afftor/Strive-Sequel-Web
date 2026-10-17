@@ -132,7 +132,7 @@ var tattoo_text = {
 
 
 var breakdown_images = {
-	0: load("res://assets/images/scenes/abuse.png"),
+	0: images.get_background('abuse'),
 }
 
 var breakdown_text = {

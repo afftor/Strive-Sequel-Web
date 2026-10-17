@@ -2911,34 +2911,26 @@ func _apply_coverage(material, channel_id, slot_name = ""):
 		return
 	material.set_shader_param("coverage_solid_on", 0.0)
 	var channel = CATALOGUE.color_channels().get(channel_id, {})
-	var alternate = channel.get("coverage_alternate", false)
+	var alternate = 0
+	if channel.get("coverage_alternate", false):
+		alternate = 1
+	if channel.get("coverage_alternate_2", false):
+		alternate = 2
 	var layers = COVERAGE.layers(coverage_id, alternate)
 	if coverage_id.empty() or layers.empty() or !channel.get("coverage", false) or !_coverage_available():
 		material.set_shader_param("coverage_count", 0)
 		return
-	# The raised female chest belongs entirely to the white fur zone; the
-	# torso masks cannot follow its silhouette. Colour 3 remains user-editable.
-	if coverage_id == "fur_orange_white" and str(selections.get("body", "")) == "body_female_beastkin" and slot_name == "breasts_beastkin" and !chest_is_flat():
-		var colours = coverage_colors if coverage_colors.size() > 2 else COVERAGE.default_colors(coverage_id)
-		material.set_shader_param("coverage_count", 0)
-		material.set_shader_param("coverage_solid_on", 1.0)
-		material.set_shader_param("coverage_solid_color", colours[2])
-		material.set_shader_param("coverage_base", colours[0])
-		material.set_shader_param("coverage_base_on", 0.0 if _is_neutral(colours[0]) else 1.0)
-		return
 	material.set_shader_param("coverage_count", min(layers.size(), COVERAGE.MAX_LAYERS))
 	# The base, when the pattern has one, is the first colour of the row.
-	var offset = 0
 	if COVERAGE.has_base(coverage_id):
 		var base = coverage_colors[0] if coverage_colors.size() > 0 else Color(1, 1, 1)
 		material.set_shader_param("coverage_base", base)
 		material.set_shader_param("coverage_base_on", 0.0 if _is_neutral(base) else 1.0)
-		offset = 1
 	else:
 		material.set_shader_param("coverage_base_on", 0.0)
 	for i in range(min(layers.size(), COVERAGE.MAX_LAYERS)):
 		material.set_shader_param("coverage_mask%d" % (i + 1), _coverage_texture(COVERAGE.mask_path(coverage_id, i, alternate)))
-		var index = i + offset
+		var index = COVERAGE.colour_index(coverage_id, i, alternate)
 		material.set_shader_param("coverage_color%d" % (i + 1), coverage_colors[index] if index < coverage_colors.size() else Color(1, 1, 1))
 
 
@@ -3104,6 +3096,9 @@ func _on_proportion_changed(value, key):
 	_update_proportion_label(key)
 	if key == "muscle_alpha":
 		_apply_muscle_alpha()
+		return
+	if key == "freckles_alpha":
+		_apply_freckles_alpha()
 		return
 	# Bone scales feed the solver, so the pose has to be worked out again.
 	_update_animated_pose()
@@ -3407,6 +3402,12 @@ func _draw_ordered_slots():
 # the nipples are under, and clear of the sheer one they are seen through.
 const FLAT_CHEST_DRAW_ORDER_FIXES = [{"slot": "piercing_nipple_1_0", "before": "equip_torso"}]
 
+# A belly that size pushes what hangs under it forward instead of hiding it.
+const PREGNANT_DRAW_ORDER_FIXES = [
+	{"slot": "dick", "after": "pregnancy_belly"},
+	{"slot": "testicle", "after": "pregnancy_belly"},
+]
+
 
 # The order to draw in: the catalogue's, unless a running animation reorders the
 # slots itself.  An authored pose does that - the doll folds its arms in front of
@@ -3419,6 +3420,8 @@ func _current_draw_order():
 	if chest_is_flat():
 		# on a copy: the catalogue's order is the one every doll on the rig reads
 		order = _apply_draw_order_fixes(order.duplicate(), FLAT_CHEST_DRAW_ORDER_FIXES)
+	if composed.has("pregnancy_belly"):
+		order = _apply_draw_order_fixes(order.duplicate(), PREGNANT_DRAW_ORDER_FIXES)
 	return order
 
 
@@ -4041,6 +4044,8 @@ func _attachment_colour(slot, _attachment, active = null):
 	colour.a *= _emotion_setup_slot_alpha(slot_name)
 	if slot_name.ends_with("_muscle"):
 		colour.a *= clamp(float(proportions.get("muscle_alpha", 30.0)) / 100.0, 0.0, 1.0)
+	if slot_name == "freckles":
+		colour.a *= clamp(float(proportions.get("freckles_alpha", 100.0)) / 100.0, 0.0, 1.0)
 	return colour
 
 
@@ -4111,6 +4116,15 @@ func _apply_muscle_alpha():
 		if !is_instance_valid(record.polygon):
 			continue
 		if !str(record.slot.get("name", "")).ends_with("_muscle"):
+			continue
+		record.polygon.color = _attachment_colour(record.slot, record.attachment)
+
+
+func _apply_freckles_alpha():
+	for record in mesh_records:
+		if !is_instance_valid(record.polygon):
+			continue
+		if str(record.slot.get("name", "")) != "freckles":
 			continue
 		record.polygon.color = _attachment_colour(record.slot, record.attachment)
 

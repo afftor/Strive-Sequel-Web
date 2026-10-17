@@ -208,7 +208,37 @@ var skills = {
 		sounddata = {initiate = 'firebolt', strike = null, hit = 'spell_explosion', hittype = 'static'},
 		value = 2.0,
 	},
-	
+
+	#granted by skillbook_forbidden_sun (hard boss chests)
+	forbidden_sun = {
+		code = 'forbidden_sun',
+		descript = '',
+		icon = "res://assets/images/iconsskills/FireBomb.png",
+		type = 'combat',
+		ability_type = 'spell',
+		tags = ['damage','ads','fire', 'aoe', 'ultimate'],
+		reqs = [],
+		targetreqs = [],
+		effects = [
+			Effectdata.rebuild_skillvalue_template({target_status = 'burn', value = 1.75}),
+			Effectdata.rebuild_template({effect = 'blind', duration = 1}),
+		],
+		cost = {mp = 25},
+		charges = 1,
+		combatcooldown = 0,
+		cooldown = 2,
+		catalysts = {},
+		target = 'enemy',
+		target_number = 'all',
+		target_range = 'any',
+		damage_type = 'fire',
+		resist_cap = 50,
+		sfx = [{code = 'supernova', target = 'target_group', period = 'predamage', sync_to_hit = true}],
+		sounddata = {initiate = 'firebolt', strike = null, hit = 'spell_explosion', hittype = 'static'},
+		hitfx = [],
+		value = 1.5,
+	},
+
 	dark_flame = {
 		code = 'dark_flame',
 		descript = '',

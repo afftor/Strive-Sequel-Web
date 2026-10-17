@@ -10,6 +10,7 @@ var combat_skill_charges = {}
 var combat_cooldowns = {}
 var daily_cooldowns = {}
 var social_skill_panel = {}
+var spent_race_skills = []
 var combat_skill_panel = {}
 var combat_skill_panel_row = 1
 var active_panel = variables.PANEL_SOC
@@ -158,6 +159,9 @@ func fix_skillpanels(list_soc_add, list_combat_add, list_soc_remove, list_combat
 
 func learn_skill(skill):
 	var skilldata = Skilldata.Skilllist[skill]
+	if spent_race_skills.has(skill):
+		spent_race_skills.erase(skill)
+		parent.get_ref().reset_rebuild()
 	if !social_skills.has(skill):
 		social_skills.append(skill)
 		parent.get_ref().reset_rebuild()
@@ -179,6 +183,9 @@ func learn_e_skill(skill, free = false):
 
 func unlearn_skill(skill):
 	social_skills.erase(skill)
+	var race_data = races.racelist.get(parent.get_ref().get_stat('race'))
+	if race_data != null and race_data.get('social_skills', []).has(skill) and !spent_race_skills.has(skill):
+		spent_race_skills.append(skill)
 	social_cooldowns.erase(skill)
 	daily_cooldowns.erase(skill)
 	social_skills_charges.erase(skill)
@@ -268,6 +275,20 @@ func restore_skill_charge(code):
 		if ResourceScripts.game_party.global_skills_used[code] <= 0:
 			ResourceScripts.game_party.global_skills_used.erase(code)
 	gui_controller.mansion.SkillModule.build_skill_panel()
+
+
+#a skill with a `special` handler leaves use_social_skill before anything is paid, so a handler
+#that runs a menu pays through here once the choice is made - a cancelled menu costs nothing
+func spend_special_skill(s_code):
+	var template = Skilldata.get_template(s_code, parent.get_ref())
+	parent.get_ref().pay_cost(template.cost)
+	parent.get_ref().add_stat('metrics_socskillused', 1)
+	social_cooldowns[s_code] = template.cooldown
+	if typeof(template.charges) == TYPE_INT && template.charges > 0 && ResourceScripts.game_globals.social_skill_unlimited_charges == false:
+		if social_skills_charges.has(s_code):
+			social_skills_charges[s_code] += 1
+		else:
+			social_skills_charges[s_code] = 1
 
 
 func use_social_skill(s_code, target, item, bulk = 1):

@@ -61,7 +61,10 @@ const PATTERNS = {
 			{"mask": "mask_besatkin 2.png", "color": Color("9e9595")},
 		],
 		"layers_alternate": [
-			{"mask": "white_mask.png", "color": Color("ad5c21")},
+			{"mask": "white_mask.png", "color": Color("ad5c21"), "layer": 0},
+		],
+		"layers_alternate_2": [
+			{"mask": "white_mask.png", "color": Color("9e9595"), "layer": 1},
 		],
 	},
 	"fur_white": {
@@ -104,7 +107,10 @@ const PATTERNS = {
 			{"mask": "mask_besatkin 2.png", "color": Color("363533")},
 		],
 		"layers_alternate": [
-			{"mask": "white_mask.png", "color": Color("191918")},
+			{"mask": "white_mask.png", "color": Color("191918"), "layer": 0},
+		],
+		"layers_alternate_2": [
+			{"mask": "white_mask.png", "color": Color("363533"), "layer": 1},
 		],
 	},
 	# The striped and tricolour cats use their own masks rather than the shared
@@ -148,15 +154,17 @@ static func pattern(pattern_id):
 	return PATTERNS.get(pattern_id, {})
 
 
-static func layers(pattern_id, alternate = false):
+static func layers(pattern_id, alternate = 0):
 	var pattern = pattern(pattern_id)
 	var res = pattern.get("layers", [])
-	if alternate and pattern.has("layers_alternate"): #only if alternate layers exists, fallback is basic layers, so no overwriting without checking
-		res = pattern.get("layers_alternate") 
+	if alternate == 1 and pattern.has("layers_alternate"): #only if alternate layers exists, fallback is basic layers, so no overwriting without checking
+		res = pattern.get("layers_alternate")
+	if alternate == 2 and pattern.has("layers_alternate_2"): #only if alternate layers exists, fallback is basic layers, so no overwriting without checking
+		res = pattern.get("layers_alternate_2")  
 	return res
 
 
-static func mask_path(pattern_id, index, alternate = false):
+static func mask_path(pattern_id, index, alternate = 0):
 	var list = layers(pattern_id, alternate)
 	if index < 0 or index >= list.size():
 		return ""
@@ -194,6 +202,15 @@ static func default_colors(pattern_id):
 	for layer in layers(pattern_id):
 		result.append(layer.color)
 	return result
+
+
+# Where in the colour row a layer's colour comes from. An alternate layer naming a
+# main `layer` follows that layer's picker, so a repainted coat stays one coat.
+static func colour_index(pattern_id, index, alternate = 0):
+	var list = layers(pattern_id, alternate)
+	if index >= 0 and index < list.size():
+		index = int(list[index].get("layer", index))
+	return index + (1 if has_base(pattern_id) else 0)
 
 
 static func color_count(pattern_id):
