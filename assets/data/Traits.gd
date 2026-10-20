@@ -564,14 +564,7 @@ var traits = {
 #		effects = [],
 #		tags = ['summon_dog']
 #	},
-	succubus = {#+100% exp from prostitution
-		code = 'succubus',
-		name = '',
-		descript = '',
-		visible = false,
-		icon = null,
-		effects = ['human_form', 'demon_form', 'human_form_default', 'demon_form_default', 'succubus_thralls_0', 'succubus_thralls_1', 'succubus_thralls_2', 'succubus_thralls_3', 'succubus_thralls_4', 'succubus_thralls_5', 'succubus_thralls_6', ],
-	}, #hardcoded
+	#succubus itself is a magic trait in trait_catalogue.gd
 	succubus_magic = {
 		code = 'succubus_magic',
 		name = '',
@@ -1504,6 +1497,52 @@ var traits = {
 		effects = ['jd_demon_arrogance', 'jd_dream_eater', 'jd_dream_eater_display', 'jd_ennui_display', 'jd_ennui_rage', 'jd_ennui_unsilence'],
 		tags = [],
 	},
+	#Jean quest - Sylas - assets/data/skilldata/bosses/sylas.gd
+	sylas_memory_of_arena = {
+		code = 'sylas_memory_of_arena',
+		name = '',
+		descript = '',
+		icon = null,
+		visible = false,
+		effects = ['sylas_arena_display', 'sylas_arena_count', 'sylas_arena_grant'],
+		tags = [],
+	},
+	sylas_vitality = {
+		code = 'sylas_vitality',
+		name = '',
+		descript = '',
+		icon = null,
+		visible = false,
+		effects = ['sylas_vitality', 'sylas_regen', 'sylas_keen_eye'],
+		tags = [],
+	},
+	sylas_quick_retrieval = {
+		code = 'sylas_quick_retrieval',
+		name = '',
+		descript = '',
+		icon = null,
+		visible = false,
+		effects = ['sylas_quick_retrieval_display', 'sylas_quick_retrieval'],
+		tags = [],
+	},
+	sylas_monstrous_reinforcement = {
+		code = 'sylas_monstrous_reinforcement',
+		name = '',
+		descript = '',
+		icon = null,
+		visible = false,
+		effects = ['sylas_reinforcement_display', 'sylas_reinforcement_open', 'sylas_reinforcement_round'],
+		tags = [],
+	},
+	sylas_minion = {
+		code = 'sylas_minion',
+		name = '',
+		descript = '',
+		icon = null,
+		visible = false,
+		effects = ['sylas_minion'],
+		tags = [],
+	},
 	#coalition finale bosses - assets/data/skilldata/bosses/coalition.gd
 	coal_bolthar_trait = {
 		code = 'coal_bolthar_trait',
@@ -1923,13 +1962,15 @@ var traits = {
 		icon = null,
 		effects = [],
 	},
-	heavy_armor = {#removes penalty from heavy armor
+	heavy_armor = {#class trait; a trained slave can also buy it for 25 training points and loses the bought copy on being freed
 		code = 'heavy_armor',
 		name = '',
 		descript = '',
 		visible = false,
-		icon = null,
+		icon = "res://assets/images/iconstraits/l_protection.png",
 		effects = [],
+		cost = 25,
+		tags = ['training_final', 'training_success', 'simple_icon'],
 	},
 	lockpicking = { #allows to pick locks on random events
 		code = 'lockpicking',
