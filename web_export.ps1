@@ -1,8 +1,8 @@
 [CmdletBinding()]
 param(
-	[string]$Godot = "C:\Users\1\Desktop\godot\Godot_v3.5.3-stable_win64.exe",
+	[string]$Godot = "C:\Users\nomer\OneDrive\Desktop\godot\Godot_v3.5.1-stable_win64.exe",
 	[string]$OutputDirectory = "build\web",
-	[string]$GodotTemplateVersion = "3.5.3.stable"
+	[string]$GodotTemplateVersion = "3.5.1.stable"
 )
 
 $ErrorActionPreference = "Stop"
@@ -42,14 +42,19 @@ $webEntryPoint = Join-Path $outputPath "index.html"
 
 # Godot 3 can otherwise export stale compiled scripts from its project cache
 # when a source file changed outside the editor.
-$importProcess = Start-Process -FilePath $Godot -ArgumentList @("--path", $projectRoot, "--editor", "--quit") -WindowStyle Hidden -Wait -PassThru
+# Windows PowerShell 5.1 joins -ArgumentList without quoting, so paths with
+# spaces must be quoted explicitly.
+$importProcess = Start-Process -FilePath $Godot -ArgumentList "--path `"$projectRoot`" --editor --quit" -WindowStyle Hidden -Wait -PassThru
 if ($importProcess.ExitCode -ne 0) {
 	throw "Godot import refresh failed with exit code $($importProcess.ExitCode)."
 }
 
-$exportProcess = Start-Process -FilePath $Godot -ArgumentList @("--path", $projectRoot, "--export", "Web", $webEntryPoint) -WindowStyle Hidden -Wait -PassThru
+$exportLog = Join-Path $projectRoot "build\godot-export.log"
+$exportErrorLog = Join-Path $projectRoot "build\godot-export.err.log"
+$exportProcess = Start-Process -FilePath $Godot -ArgumentList "--path `"$projectRoot`" --export `"Web`" `"$webEntryPoint`"" -WindowStyle Hidden -Wait -PassThru -RedirectStandardOutput $exportLog -RedirectStandardError $exportErrorLog
 if ($exportProcess.ExitCode -ne 0) {
-	throw "Godot web export failed with exit code $($exportProcess.ExitCode)."
+	$exportErrors = (Get-Content -LiteralPath $exportErrorLog -Encoding UTF8 -Tail 20 -ErrorAction SilentlyContinue) -join [Environment]::NewLine
+	throw "Godot web export failed with exit code $($exportProcess.ExitCode). Log: $exportErrorLog$([Environment]::NewLine)$exportErrors"
 }
 if (-not (Test-Path -LiteralPath $webEntryPoint -PathType Leaf) -or -not (Test-Path -LiteralPath (Join-Path $outputPath "index.pck") -PathType Leaf)) {
 	throw "Godot web export did not produce index.html and index.pck."
@@ -98,7 +103,10 @@ foreach ($suffix in $runtimeSuffixes) {
 	Move-Item -LiteralPath (Join-Path $outputPath "index.$suffix") -Destination (Join-Path $outputPath "$versionedBase.$suffix") -Force
 }
 
-$html = Get-Content -LiteralPath $webEntryPoint -Raw
+# Windows PowerShell 5.1 reads and writes the system ANSI code page by default,
+# which can corrupt the UTF-8 characters of the loading shell.
+$utf8NoBom = New-Object Text.UTF8Encoding $false
+$html = [IO.File]::ReadAllText($webEntryPoint, $utf8NoBom)
 $expectedRuntimeReferences = @("src='index.js'", '"executable":"index"', '"index.pck":', '"index.wasm":')
 foreach ($reference in $expectedRuntimeReferences) {
 	if (-not $html.Contains($reference)) {
@@ -114,7 +122,7 @@ foreach ($reference in $expectedRuntimeReferences) {
 		throw "Failed to version the runtime reference in Godot export HTML: $reference"
 	}
 }
-Set-Content -LiteralPath $webEntryPoint -Value $html -NoNewline
+[IO.File]::WriteAllText($webEntryPoint, $html, $utf8NoBom)
 
 Write-Host "Web export ready: $outputPath"
 Write-Host "CG assets are served from: $(Join-Path $outputPath 'cg-assets')"
