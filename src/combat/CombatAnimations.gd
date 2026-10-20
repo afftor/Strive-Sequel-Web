@@ -15,6 +15,8 @@ const ArrowRainEffect = preload("res://src/combat/ArrowRainEffect.gd")
 const TendrilsEffect = preload("res://src/combat/TendrilsEffect.gd")
 const VoidSphereEffect = preload("res://src/combat/VoidSphereEffect.gd")
 const SpaceBend = preload("res://src/combat/SpaceBend.gd")
+const SwordUltEffect = preload("res://src/combat/SwordUltEffect.gd")
+const ScreenSlice = preload("res://src/combat/ScreenSlice.gd")
 const AnimRegistry = preload("res://src/combat/anim_registry.gd")
 
 #The tuning numbers below (cast tables, motion distances, hit reactions, per-skill beats)
@@ -110,6 +112,129 @@ func card_home(node):
 	if node.has_method('get_attack_vector'): return Vector2(0, 0)
 	return node.rect_position
 
+#The whole rest look of a card, for the motions that take it over and give it back (caster lift, holy lance,
+#devastation). The same rule as card_home for the turn, the size and the tint: a fighter card rests upright, at full
+#size and untinted, and a hit reaction still running when such a motion started used to be given back for good -
+#the card left tilted, squashed and red after Devastation (2026-10-09).
+func card_rest(node):
+	var rest = {position = card_home(node), rotation = node.rect_rotation, scale = node.rect_scale,
+		pivot = node.rect_pivot_offset, modulate = node.modulate}
+	if node.has_method('get_attack_vector'):
+		rest.rotation = 0.0
+		rest.scale = Vector2(1, 1)
+		rest.modulate = Color(1, 1, 1, 1)
+	return rest
+
+#REST GUARD
+#Whatever an animation fails to give back - a fighter card off its mark, tilted, squashed or tinted, its portrait shifted
+#in the frame, the combat screen moved or zoomed - eases back to rest once the queue is idle and it has stood still off
+#its rest look for REST_GUARD_TIME. Animations move what they hold every frame, so a still, off-rest look while nothing
+#plays is a leftover, never a pose. A card hidden behind a flying copy stands still too, so the guard waits while one is
+#out (an execution's return outlives the queue by up to two seconds).
+var REST_GUARD_TIME = 1.0
+var REST_GUARD_EASE = 0.2
+#node -> {look, still, settle (-1 when not easing back), from}
+var rest_watch = {}
+
+func rest_guard(delta):
+	var combat = get_parent()
+	if combat == null or !is_instance_valid(combat) or combat.get('battlefieldpositions') == null: return
+	if is_busy or flight_out(combat):
+		rest_watch.clear()
+		return
+	var seen = {}
+	for pos in combat.battlefieldpositions:
+		var card = combat.battlefieldpositions[pos].get_node_or_null('Character')
+		if card == null or !is_instance_valid(card) or !card.visible or !card.has_method('float_busy'): continue
+		seen[card] = true
+		var look = card_look(card)
+		var icon_rest = card.get('icon_rest')
+		guard_rest(card, look, {pos = card_home(card), rot = 0.0, scale = Vector2(1, 1), mod = Color(1, 1, 1, 1),
+			icon = icon_rest if icon_rest != null else look.icon}, card.float_busy(), delta)
+	if combat.get('rest_position') != null:
+		seen[combat] = true
+		var shaking = false
+		for s in ResourceScripts.core_animations.ShakingNodes:
+			shaking = shaking or s.node == combat
+		guard_rest(combat, {pos = combat.rect_position, scale = combat.rect_scale},
+			{pos = combat.rest_position, scale = Vector2(1, 1)}, shaking, delta)
+	for node in rest_watch.keys():
+		if !seen.has(node): rest_watch.erase(node)
+
+#flight copies (execution, holy lance, devastation, the sword ults) go into the combat screen itself
+func flight_out(combat):
+	for child in combat.get_children():
+		if child.name.find('Flight') >= 0: return true
+	return false
+
+#the active card's float owns its height
+func card_look(card):
+	var icon = card.get_node_or_null('Icon')
+	var at = card.rect_position
+	if card.get('float_shifted'): at.y = 0.0
+	return {pos = at, rot = card.rect_rotation, scale = card.rect_scale, mod = card.modulate,
+		icon = icon.rect_position if icon != null else Vector2()}
+
+func guard_rest(node, look, rest, busy, delta):
+	var w = rest_watch.get(node)
+	if w == null:
+		w = {look = look, still = 0.0, settle = -1.0, from = look}
+		rest_watch[node] = w
+	if busy:
+		w.still = 0.0
+		w.settle = -1.0
+		w.look = look
+		return
+	if w.settle >= 0.0:
+		w.settle += delta
+		var k = smoothstep(0.0, 1.0, min(1.0, w.settle / REST_GUARD_EASE))
+		put_look(node, blend_looks(w.from, rest, k))
+		if w.settle >= REST_GUARD_EASE:
+			w.settle = -1.0
+			w.still = 0.0
+			w.look = rest
+		return
+	if looks_alike(look, w.look): w.still += delta
+	else:
+		w.still = 0.0
+		w.look = look
+	if w.still >= REST_GUARD_TIME and !looks_alike(look, rest):
+		trace('  rest guard eases %s back to rest' % node_label(node))
+		w.from = look
+		w.settle = 0.0
+
+func looks_alike(a, b):
+	for key in a:
+		var x = a[key]
+		var y = b[key]
+		match typeof(x):
+			TYPE_VECTOR2:
+				if x.distance_to(y) > 0.5: return false
+			TYPE_COLOR:
+				if abs(x.r - y.r) > 0.01 or abs(x.g - y.g) > 0.01 or abs(x.b - y.b) > 0.01 or abs(x.a - y.a) > 0.01: return false
+			_:
+				if abs(x - y) > 0.05: return false
+	return true
+
+func blend_looks(a, b, k):
+	var res = {}
+	for key in a:
+		match typeof(a[key]):
+			TYPE_VECTOR2: res[key] = a[key].linear_interpolate(b[key], k)
+			TYPE_COLOR: res[key] = a[key].linear_interpolate(b[key], k)
+			_: res[key] = lerp(a[key], b[key], k)
+	return res
+
+func put_look(node, look):
+	if look.has('rot'):
+		node.rect_pivot_offset = node.rect_size / 2
+		node.rect_rotation = look.rot
+	node.rect_scale = look.scale
+	if node.get('float_shifted'): node.rect_position.x = look.pos.x
+	else: node.rect_position = look.pos
+	if look.has('mod'): node.modulate = look.mod
+	if look.has('icon') and node.has_node('Icon'): node.get_node('Icon').rect_position = look.icon
+
 #Put the card back on its mark before an animation reads from it. Only touches a card
 #that is off its mark, so an ordinary animation starts exactly as it did before.
 func settle_card(node):
@@ -173,7 +298,7 @@ var rain_effects = []
 var rain_hits = {}
 var rain_count = 0
 var dark_effects = []
-#target card -> the TendrilsEffect or VoidSphereEffect that shows its damage, taken by hp_update and miss
+#target card -> the TendrilsEffect, VoidSphereEffect or SwordUltEffect that shows its damage, taken by hp_update and miss
 var dark_hits = {}
 #fighter card -> the StatusAura its poison, bleeding, burning, sleep, stun and stealth are shown with
 var status_auras = {}
@@ -226,6 +351,8 @@ func force_end():
 	animation_delays.clear()
 	animations_queue.clear()
 	hp_update_delays.clear()
+	sound_cues.clear()
+	cues_this_slot.clear()
 	custom_delays.clear()
 	buffs_update_delays.clear()
 	crit_display.clear()
@@ -293,7 +420,9 @@ func _process(delta):
 			trace_clock += delta
 			trace_frame()
 	refresh_rate()
+	rest_guard(delta)
 	delta *= rate
+	if !sound_cues.empty(): play_sound_cues(delta)
 	for node in animation_delays:
 		animation_delays[node] -= delta
 		if animation_delays[node] <= 0:
@@ -339,8 +468,10 @@ func check_start():
 func advance_timer():
 	hp_update_delays.clear()
 	status_tick_cards.clear()
+	cues_this_slot.clear()
 	if animations_queue.empty(): return
 	cur_timer = animations_queue.keys().min()
+	if sound_trace != null: sound_trace.append({kind = 'slot', slot = cur_timer})
 	trace('--- slot %s, %d node(s)' % [str(cur_timer), animations_queue[cur_timer].size()])
 	try_clear_custom_delays()
 	#print (cur_timer)
@@ -388,6 +519,8 @@ func start_animation(node):
 			hit_fx_now = data.params.get('hit_fx', null)
 			hit_fx_nodes = data.params.get('hit_fx_nodes', null)
 			hit_fx_key = data.params.get('hit_fx_key', null)
+			if data.params.has('sounds'): queue_sound_cues(data.params.sounds)
+		if sound_trace != null: sound_trace.append({kind = 'anim', slot = cur_timer, node = data.node, type = str(data.type)})
 		var lock = call(true_type, data.node, data.params)
 		hit_fx_now = null
 		hit_fx_nodes = null
@@ -700,16 +833,10 @@ func caster_lift(node, release, palette):
 	if node == null or !is_instance_valid(node) or !node.is_inside_tree(): return
 	var key = node.get_instance_id()
 	if caster_lift_states.has(key): caster_lift_restore(key, true)
-	var origin = {
-		node = node,
-		position = card_home(node),
-		rotation = node.rect_rotation,
-		scale = node.rect_scale,
-		pivot = node.rect_pivot_offset,
-		modulate = node.modulate,
-		ground = card_home(node) + Vector2(node.rect_size.x / 2.0, node.rect_size.y - 4.0),
-		effects = [],
-	}
+	var origin = card_rest(node)
+	origin.node = node
+	origin.ground = card_home(node) + Vector2(node.rect_size.x / 2.0, node.rect_size.y - 4.0)
+	origin.effects = []
 	var settings = {release = release, rise = CASTER_LIFT_RISE, radius = CASTER_LIFT_RADIUS,
 		tilt = CASTER_LIFT_TILT, perspective = CASTER_LIFT_PERSPECTIVE, palette = palette}
 	#the far half goes under the card's portrait, the near half and the pillar over every card
@@ -1181,14 +1308,9 @@ func holy_lance_step(node, args = null):
 	if !node.is_inside_tree() or !node.has_method('get_attack_vector'):
 		return 0.0
 
-	var origin = {
-		position = card_home(node),
-		rotation = node.rect_rotation,
-		scale = node.rect_scale,
-		pivot = node.rect_pivot_offset,
-		modulate = node.modulate,
-	}
+	var origin = card_rest(node)
 	var visual_node = holy_lance_flight_copy(node, args)
+	visual_node.modulate = origin.modulate
 	visual_node.rect_pivot_offset = visual_node.rect_size/2
 	var p = card_home(visual_node)
 	var v = node.get_attack_vector().normalized()
@@ -1310,14 +1432,9 @@ func devastation_dash(node, args = null):
 	if devastation_states.has(key):
 		devastation_restore(key)
 
-	var origin = {
-		position = card_home(node),
-		rotation = node.rect_rotation,
-		scale = node.rect_scale,
-		pivot = node.rect_pivot_offset,
-		modulate = node.modulate,
-	}
+	var origin = card_rest(node)
 	var visual_node = devastation_flight_copy(node, args)
+	visual_node.modulate = origin.modulate
 	visual_node.rect_pivot_offset = visual_node.rect_size/2
 	visual_node.rect_rotation = origin.rotation
 	visual_node.rect_scale = origin.scale
@@ -1818,6 +1935,9 @@ var PROJ_FIRE_BOOM_TIME = 0.42
 #A sound that resolves to nothing, or to an id audio.sounds does not know, is skipped with
 #a note instead of reaching PlaySound and dying on the lookup.
 func play_skill_sound(phase, template, caster, target, tags = null):
+	if sound_trace != null:
+		sound_trace.append({kind = 'call', phase = phase, slot = input_handler.combat_node.turns, code = str(template.get('code', '')),
+			caster = caster, target = target})
 	var sounddata = {}
 	if template.has('sounddata') and template.sounddata is Dictionary:
 		sounddata = template.sounddata
@@ -1843,7 +1963,70 @@ func play_skill_sound(phase, template, caster, target, tags = null):
 	if !audio.sounds.has(sound):
 		print('combat sound %s is not in audio.sounds (phase %s)' % [str(sound), phase])
 		return
+	#sounddata.hitstack = false: an area blow plays each hit sound once, not once on every target it lands
+	#on - targets sharing a sound make one. Every target of a blow is queued in the same slot.
+	if phase.begins_with('hit') and sounddata.get('hitstack', true) == false:
+		var slot = input_handler.combat_node.turns
+		if slot != hit_sound_slot:
+			hit_sound_slot = slot
+			hit_sounds_in_slot.clear()
+		if hit_sounds_in_slot.has(sound): return
+		hit_sounds_in_slot[sound] = true
 	node.process_sound(sound)
+
+var hit_sound_slot = -1
+var hit_sounds_in_slot = {}
+
+#SOUND CUES
+#An sfx entry - or an effect's sfx atomic, through its params - can carry `sounds`, a list of cues:
+#   {sound = 'id', at = 1.2}                   plays 1.2 s after the queue starts the animation
+#   {sound = 'id', on = 'counter', gap = 0.1}  plays as each share of the animation's damage counter
+#                                              lands (COUNTER_ANIMATIONS), then keeps quiet `gap` s
+#A cue plays once per slot: an entry queued on every target of a blow is still one animation.
+const COUNTER_ANIMATIONS = ['supernova', 'arrow_rain', 'dark_tendrils', 'void_sphere', 'sword_sheath', 'sword_chain', 'sword_rend']
+var COUNTER_SOUND_GAP = 0.06 #how long a counter cue keeps quiet after it has played, unless it says
+var sound_cues = []
+var cues_this_slot = {}
+#The combat lab sets this to an Array to learn every moment a sound could play - each skill sound call,
+#with a sound or without, each slot and animation start, each share of a damage counter - and works out
+#what the skill's current data would play there. null in the game: nothing is recorded.
+var sound_trace = null
+
+#a counter effect's DamageCounter takes the animation's counter cues, and the trace of its shares
+func arm_counter(counter, args, code):
+	counter.sounds = counter_cues(args)
+	counter.trace = sound_trace
+	counter.trace_code = code
+
+func queue_sound_cues(cues):
+	if !(cues is Array) or cues.empty(): return
+	var key = str(cues)
+	if cues_this_slot.has(key): return
+	cues_this_slot[key] = true
+	for cue in cues:
+		if !(cue is Dictionary) or cue.get('on', null) != null: continue
+		var sound = cue.get('sound', null)
+		if sound == null or !audio.sounds.has(sound): continue
+		var at = float(cue.get('at', 0.0))
+		if at <= 0.0: input_handler.PlaySound(sound)
+		else: sound_cues.append({left = at, sound = sound})
+
+#on the animation clock: fast combat brings the cues forward with everything else
+func play_sound_cues(delta):
+	for i in range(sound_cues.size() - 1, -1, -1):
+		sound_cues[i].left -= delta
+		if sound_cues[i].left <= 0.0:
+			input_handler.PlaySound(sound_cues[i].sound)
+			sound_cues.remove(i)
+
+#an animation's counter cues, for the DamageCounter of its effect
+func counter_cues(args):
+	var res = []
+	if args == null or !(args.get('sounds', null) is Array): return res
+	for cue in args.sounds:
+		if cue is Dictionary and str(cue.get('on', '')) == 'counter' and cue.get('sound', null) != null:
+			res.append({sound = str(cue.sound), gap = float(cue.get('gap', COUNTER_SOUND_GAP))})
+	return res
 
 #Delays are set by several animations on the same node; the later one must never shorten
 #what an earlier one asked for.
@@ -2049,6 +2232,7 @@ func supernova(node, args = null):
 		size = SUPERNOVA_BALL_SIZE, rays = SUPERNOVA_RAYS, gain = SUPERNOVA_GAIN, soft = SUPERNOVA_SOFT, tint = SUPERNOVA_TINT,
 		field_dim = SUPERNOVA_FIELD_DIM, screen_dim = SUPERNOVA_SCREEN_DIM,
 	}, layer, supernova_shared)
+	arm_counter(effect.counter, args, 'supernova')
 	supernova_effects.append(effect)
 	effect.connect('tree_exited', self, '_on_supernova_exited', [effect], CONNECT_ONESHOT)
 	for hit_node in hit_nodes:
@@ -2093,6 +2277,7 @@ func arrow_rain(node, args = null):
 	effect.rain(self, caster_node, args.hit_nodes if args.has('hit_nodes') else [], side_slots(player_side), get_fx_kit(), {
 		root = layer, shot = shot, arrows = ARROW_RAIN_ARROWS, time = ARROW_RAIN_TIME, stop = ARROW_RAIN_STOP,
 		shake = ARROW_RAIN_SHAKE, hold = ARROW_RAIN_HOLD, seed = 4100 + rain_count * 131})
+	arm_counter(effect.counter, args, 'arrow_rain')
 	rain_effects.append(effect)
 	effect.connect('tree_exited', self, '_on_rain_exited', [effect], CONNECT_ONESHOT)
 	for hit_node in effect.target_cards():
@@ -2183,6 +2368,7 @@ func dark_tendrils(node, args = null):
 	effect.grip(self, caster_node, args.hit_nodes if args.has('hit_nodes') else [], side_slots(player_side), get_fx_kit(), {
 		root = layer, world = field_end(layer), release = TENDRILS_RELEASE, stop = TENDRILS_STOP, shake = TENDRILS_SHAKE,
 		hold = TENDRILS_HOLD, seed = 6100 + dark_effects.size() * 131})
+	arm_counter(effect.counter, args, 'dark_tendrils')
 	track_dark(effect)
 	caster_lift(caster_node, TENDRILS_RELEASE, 'abyss')
 	return effect.lock_time()
@@ -2199,6 +2385,7 @@ func void_sphere(node, args = null):
 	effect.cast(self, caster_node, args.hit_nodes if args.has('hit_nodes') else [], side_slots(player_side), get_fx_kit(), {
 		root = layer, world = field_end(layer), release = VOID_SPHERE_RELEASE, flight = VOID_SPHERE_FLIGHT,
 		stop = VOID_SPHERE_STOP, shake = VOID_SPHERE_SHAKE, hold = VOID_SPHERE_HOLD})
+	arm_counter(effect.counter, args, 'void_sphere')
 	track_dark(effect)
 	caster_lift(caster_node, VOID_SPHERE_RELEASE, 'abyss')
 	return effect.lock_time()
@@ -2216,6 +2403,42 @@ func _on_dark_exited(effect):
 
 func clear_dark_hits():
 	dark_hits.clear()
+
+
+#THE SWORD: THREE ULTS OF THE SWORDSMAN
+#The «Меч» entry of the «Арсенал ульт» mockup in SwordUltEffect.gd: «Ножны» (sword_sheath), «Цепь рывков»
+#(sword_chain) and «Разлом» (sword_rend). Each plays once on the targets' group and lands every target's damage at its
+#final blow; the effect takes the hp_update and the miss through dark_hits, as the dark spells do
+var SWORD_STOP = 0.12 #hit-stop at the final blow
+var SWORD_SHAKE = 18.0
+var SWORD_HOLD = 0.2 #the queue waits this long after a target's number shows
+var SWORD_SHEATH_CUTS = 14
+var SWORD_REND_CUTS = 14
+
+func sword_sheath(node, args = null):
+	return sword_ult(node, args, 'sheath')
+
+func sword_chain(node, args = null):
+	return sword_ult(node, args, 'chain')
+
+func sword_rend(node, args = null):
+	return sword_ult(node, args, 'rend')
+
+func sword_ult(node, args, variant):
+	if args == null: args = {}
+	var caster_node = args.caster_node if args.has('caster_node') else null
+	if caster_node == null or !is_instance_valid(caster_node) or !caster_node.is_inside_tree(): return HIT_TAIL
+	var player_side = group_side(node)
+	if player_side == null: return HIT_TAIL
+	var layer = get_parent() if get_parent() != null else self
+	var effect = SwordUltEffect.new()
+	layer.add_child(effect)
+	effect.cast(self, caster_node, args.hit_nodes if args.has('hit_nodes') else [], side_slots(player_side), get_fx_kit(), {
+		variant = variant, root = layer, world = field_end(layer), stop = SWORD_STOP, shake = SWORD_SHAKE, hold = SWORD_HOLD,
+		cuts = SWORD_REND_CUTS if variant == 'rend' else SWORD_SHEATH_CUTS, seed = 4100 + dark_effects.size() * 131})
+	arm_counter(effect.counter, args, 'sword_' + variant)
+	track_dark(effect)
+	return effect.lock_time()
 
 
 #THE WINDS OF HYPERBOREA
@@ -2325,6 +2548,8 @@ func warm_up_statuses():
 	status_warm_up.warm_up(get_fx_kit())
 	#the dark spells' bend, once per kit as well: its shader is the kit's
 	SpaceBend.new().warm_up(self, get_fx_kit())
+	#and the sword's broken picture
+	ScreenSlice.new().warm_up(self, get_fx_kit())
 
 func hit_pending(node):
 	for time in animations_queue:

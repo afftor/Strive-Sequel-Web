@@ -963,6 +963,11 @@ func try_rebuild_slave_list():
 	if gui_controller.current_screen != self: return
 	SlaveListModule.rebuild()
 
+#breakdowns come in bursts (a bedless night, the food check) and share one rebuild at the end of the frame
+func try_queue_slave_list_rebuild():
+	if gui_controller.current_screen != self: return
+	SlaveListModule.queue_rebuild()
+
 
 #The floorplan keeps its own list of who is idle and who is at work, and nothing in the model
 #tells it when that changed. Whatever moves somebody in or out of work from off this screen -
@@ -1532,14 +1537,14 @@ func test_mode():
 		globals.AddItemToInventory(globals.CreateUsableItem("oblivion_potion", 10))
 		globals.AddItemToInventory(globals.CreateUsableItem("skillbook_hyperborea", 3))
 		globals.AddItemToInventory(
-			globals.CreateGearItemShop("axe", {ToolHandle = 'wood', ToolBlade = 'obsidian'})
+			globals.CreateGearItemShop("axe_pick", {ToolHandle = 'wood', ToolBlade = 'obsidian'})
 		)
 		globals.AddItemToInventory(globals.CreateGearItem("club", {WeaponMace = 'stone'}))
 		globals.AddItemToInventory(
 			globals.CreateGearItemShop("dagger", {WeaponHandle = 'wood', Blade = 'obsidian'})
 		)
 		globals.AddItemToInventory(
-			globals.CreateGearItemShop("pickaxe", {ToolHandle = 'wood', ToolBlade = 'obsidian'})
+			globals.CreateGearItemShop("dishware", {ToolHandle = 'wood', ToolBlade = 'obsidian'})
 		)
 		globals.AddItemToInventory(
 			globals.CreateGearItemShop("staffadv", {Rod = 'mithril', WeaponHandle = 'wood', WeaponEnc = 'fire_ruby'})

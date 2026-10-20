@@ -20,6 +20,8 @@ var CombatAnimations = ResourceScripts.scriptdict.combat_animation.new()
 var ActionQueue
 var queue_script = preload("res://src/combat/action_queue.gd")
 var popup_opened = null
+#where the screen rests: every shake of it comes back here, not to a spot read while another shake had it moved
+var rest_position = Vector2()
 
 var debug = false
 
@@ -103,7 +105,13 @@ signal turn_started
 onready var screen_block = $screen_block
 onready var turnorder_cont = $Panel4/container
 
+#Quitting mid-fight: the queue and its handlers hold each other (queuenode), so empty it or the pair outlives the node
+func _notification(what):
+	if what == NOTIFICATION_PREDELETE and ActionQueue != null:
+		ActionQueue.force_clean()
+
 func _ready():
+	rest_position = rect_position
 	if gui_controller.mansion != null:
 		debug = gui_controller.mansion.in_test_mode
 	autoskill_dummy = ResourceScripts.scriptdict.class_slave.new("combat_dummy")
@@ -296,6 +304,9 @@ func start_combat(newplayergroup, newenemygroup, background, music = 'combatthem
 	input_handler.emit_signal("CombatStarted", encountercode)
 	# input_handler.ActivateTutorial("combat")
 	show()
+	#the screen outlives the fight, so whatever moved or zoomed it in the last one must not carry over
+	rect_position = rest_position
+	rect_scale = Vector2(1, 1)
 	input_handler.combat_node = self
 	gui_controller.combat = self
 	gui_controller.previous_screen = gui_controller.current_screen
@@ -1128,7 +1139,14 @@ func UpdateSkillTargets(caster, skill, glow_skip = false, ignore_stealth = false
 				allowedtargets.ally.append(int(fighter.position))
 		else:
 			allowedtargets.ally.append(int(fighter.position))
-	
+	if caster.is_support_self_only(skill):
+		allowedtargets.enemy.clear()
+		var own = []
+		for pos in allowedtargets.ally:
+			if pos == caster.position:
+				own.push_back(pos)
+		allowedtargets.ally = own
+
 	if glow_skip: return
 
 	Highlight(currentactor,'selected')
@@ -1904,7 +1922,7 @@ func setup_skill_button(newbutton, skill_id):
 	if activecharacter.has_status('no_combat_spells') and skill.ability_type == 'spell':
 		newbutton.disabled = true
 		newbutton.get_node("Icon").material = load("res://assets/sfx/bw_shader.tres")
-	if activecharacter.has_status('no_combat_support') and skill.tags.has('support'):
+	if activecharacter.is_support_self_only(skill) and !activecharacter.can_support_self(skill):
 		newbutton.disabled = true
 		newbutton.get_node("Icon").material = load("res://assets/sfx/bw_shader.tres")
 	if activecharacter.has_status('no_combat_attack') and skill.tags.has('damage'):
