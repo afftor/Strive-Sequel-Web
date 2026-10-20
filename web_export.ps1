@@ -18,9 +18,14 @@ if (-not (Test-Path -LiteralPath $Godot -PathType Leaf)) {
 }
 
 New-Item -ItemType Directory -Force -Path $outputPath | Out-Null
+# Keep the Godot editor from importing the export output as project assets.
+$buildIgnore = Join-Path $projectRoot "build\.gdignore"
+if (-not (Test-Path -LiteralPath $buildIgnore)) {
+	New-Item -ItemType File -Path $buildIgnore | Out-Null
+}
 $resolvedOutputPath = (Resolve-Path -LiteralPath $outputPath).Path.TrimEnd([IO.Path]::DirectorySeparatorChar)
 Get-ChildItem -LiteralPath $resolvedOutputPath -File | Where-Object {
-	$_.Name -match '^index\.[0-9a-f]{12}\.(?:js|wasm|pck|audio\.worklet\.js)$'
+	$_.Name -match '^index\.[0-9a-f]{12}\.(?:js|wasm|pck|[0-9]{3}\.pck|audio\.worklet\.js)$' -or $_.Name -like '*.import'
 } | ForEach-Object {
 	$resolvedRuntimeFile = $_.FullName
 	if (-not $resolvedRuntimeFile.StartsWith($resolvedOutputPath + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {
@@ -65,11 +70,18 @@ $loadingArtDestination = Join-Path $outputPath "web-loading-art.png"
 Copy-Item -LiteralPath $loadingArtSource -Destination $loadingArtDestination -Force
 
 $imageRoot = Join-Path $projectRoot "assets\images"
-$streamRoot = Join-Path $outputPath "cg-assets\assets\images"
+# Start from an empty folder, so images removed from the project disappear from
+# the upload as well.
+$cgRoot = Join-Path $resolvedOutputPath "cg-assets"
+if (Test-Path -LiteralPath $cgRoot) {
+	Remove-Item -LiteralPath $cgRoot -Recurse -Force
+}
+$streamRoot = Join-Path $cgRoot "assets\images"
 New-Item -ItemType Directory -Force -Path $streamRoot | Out-Null
 foreach ($folder in @("fullscreen scenes", "scenes")) {
 	$sourceFolder = Join-Path $imageRoot $folder
-	Get-ChildItem -LiteralPath $sourceFolder -Recurse -File -Filter "*.png" | ForEach-Object {
+	# -Filter "*.png" also matches the "*.png.import" files next to the images.
+	Get-ChildItem -LiteralPath $sourceFolder -Recurse -File | Where-Object { $_.Extension -eq ".png" } | ForEach-Object {
 		$relativePath = $_.FullName.Substring($imageRoot.Length + 1)
 		$destination = Join-Path $streamRoot $relativePath
 		New-Item -ItemType Directory -Force -Path (Split-Path -Parent $destination) | Out-Null
@@ -103,11 +115,48 @@ foreach ($suffix in $runtimeSuffixes) {
 	Move-Item -LiteralPath (Join-Path $outputPath "index.$suffix") -Destination (Join-Path $outputPath "$versionedBase.$suffix") -Force
 }
 
+# Static hosts such as Cloudflare Pages reject files over 25 MiB, so the main
+# pack is published in parts. The loading shell downloads them and joins them
+# again in the browser before the engine starts.
+$packPartSize = 20MB
+$packName = "$versionedBase.pck"
+$packPath = Join-Path $outputPath $packName
+$packSize = (Get-Item -LiteralPath $packPath).Length
+$packParts = @()
+$copyBuffer = New-Object byte[] (1MB)
+$packStream = [IO.File]::OpenRead($packPath)
+try {
+	while ($packStream.Position -lt $packSize) {
+		$partName = "{0}.{1:D3}.pck" -f $versionedBase, $packParts.Count
+		$partStream = [IO.File]::Create((Join-Path $outputPath $partName))
+		$partWritten = 0
+		try {
+			while ($partWritten -lt $packPartSize) {
+				$read = $packStream.Read($copyBuffer, 0, [Math]::Min($copyBuffer.Length, $packPartSize - $partWritten))
+				if ($read -le 0) {
+					break
+				}
+				$partStream.Write($copyBuffer, 0, $read)
+				$partWritten += $read
+			}
+		}
+		finally {
+			$partStream.Dispose()
+		}
+		$packParts += [ordered]@{ file = $partName; size = $partWritten }
+	}
+}
+finally {
+	$packStream.Dispose()
+}
+Remove-Item -LiteralPath $packPath -Force
+$packManifest = [ordered]@{ path = $packName; size = $packSize; parts = $packParts } | ConvertTo-Json -Compress -Depth 3
+
 # Windows PowerShell 5.1 reads and writes the system ANSI code page by default,
 # which can corrupt the UTF-8 characters of the loading shell.
 $utf8NoBom = New-Object Text.UTF8Encoding $false
 $html = [IO.File]::ReadAllText($webEntryPoint, $utf8NoBom)
-$expectedRuntimeReferences = @("src='index.js'", '"executable":"index"', '"index.pck":', '"index.wasm":')
+$expectedRuntimeReferences = @("src='index.js'", '"executable":"index"', '"index.pck":', '"index.wasm":', '/*STRIVE_PCK_PARTS*/null')
 foreach ($reference in $expectedRuntimeReferences) {
 	if (-not $html.Contains($reference)) {
 		throw "Godot export HTML is missing the expected runtime reference: $reference"
@@ -117,6 +166,7 @@ $html = $html.Replace("src='index.js'", "src='$versionedBase.js'")
 $html = $html.Replace('"executable":"index"', '"executable":"' + $versionedBase + '"')
 $html = $html.Replace('"index.pck":', '"' + $versionedBase + '.pck":')
 $html = $html.Replace('"index.wasm":', '"' + $versionedBase + '.wasm":')
+$html = $html.Replace('/*STRIVE_PCK_PARTS*/null', $packManifest)
 foreach ($reference in $expectedRuntimeReferences) {
 	if ($html.Contains($reference)) {
 		throw "Failed to version the runtime reference in Godot export HTML: $reference"
@@ -124,6 +174,10 @@ foreach ($reference in $expectedRuntimeReferences) {
 }
 [IO.File]::WriteAllText($webEntryPoint, $html, $utf8NoBom)
 
+# Cache rules for Cloudflare Pages (Firebase uses firebase.json instead).
+Copy-Item -LiteralPath (Join-Path $projectRoot "web\_headers") -Destination (Join-Path $outputPath "_headers") -Force
+
 Write-Host "Web export ready: $outputPath"
 Write-Host "CG assets are served from: $(Join-Path $outputPath 'cg-assets')"
+Write-Host "Main pack: $($packParts.Count) parts of up to $($packPartSize / 1MB) MiB"
 Write-Host "Runtime cache version: $releaseId"

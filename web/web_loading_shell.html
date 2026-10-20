@@ -175,9 +175,27 @@ $GODOT_HEAD_INCLUDE
 	<script type='text/javascript' src='$GODOT_URL'></script>
 	<script type='text/javascript'>//<![CDATA[
 		const GODOT_CONFIG = $GODOT_CONFIG;
+		// web_export.ps1 replaces the placeholder with the parts of the main pack.
+		// Static hosts such as Cloudflare Pages reject files over 25 MiB, so the
+		// pack is published in parts and joined again below.
+		var PCK_PARTS = /*STRIVE_PCK_PARTS*/null;
 		var nativeFetch = window.fetch.bind(window);
 		var runtimeFiles = GODOT_CONFIG.fileSizes ? Object.keys(GODOT_CONFIG.fileSizes) : [];
+		if (PCK_PARTS) {
+			runtimeFiles = runtimeFiles.concat(PCK_PARTS.parts.map(function(part) {
+				return part.file;
+			}));
+		}
 		var runtimeCacheName = 'strive-runtime-' + GODOT_CONFIG.executable;
+
+		function forgetCachedRuntimeFile(file) {
+			if (!('caches' in window)) {
+				return Promise.resolve();
+			}
+			return caches.open(runtimeCacheName).then(function(cache) {
+				return cache.delete(file);
+			}).catch(function() {});
+		}
 
 		// Chromium's normal HTTP cache may decline very large individual files even
 		// when they are immutable. Keep the monolithic Godot runtime in Cache
@@ -230,7 +248,16 @@ $GODOT_HEAD_INCLUDE
 				console.warn('Unable to clean old web runtime caches:', error);
 			});
 		}
-		var engine = new Engine(GODOT_CONFIG);
+		// Set by the loader below; it also follows the engine download when the
+		// main pack is loaded in parts.
+		var engineProgressHandler = null;
+		var engine = new Engine(Object.assign({}, GODOT_CONFIG, {
+			'onProgress': function(current, total) {
+				if (engineProgressHandler) {
+					engineProgressHandler(current, total);
+				}
+			},
+		}));
 
 		(function() {
 			var loadingOverlay = document.getElementById('web-loading');
@@ -334,12 +361,131 @@ $GODOT_HEAD_INCLUDE
 				}
 			}, 500);
 
+			var PACK_PART_ATTEMPTS = 3;
+			var PACK_PART_CONCURRENCY = 4;
+
+			// Streams one part straight into its place in the joined pack.
+			function loadPackPart(part, pack, offset, onBytes) {
+				return fetch(part.file).then(function(response) {
+					if (!response.ok) {
+						throw new Error('Failed loading file \'' + part.file + '\' (HTTP ' + response.status + ')');
+					}
+					var reader = response.body.getReader();
+					var written = 0;
+					function pump() {
+						return reader.read().then(function(result) {
+							if (result.done) {
+								if (written !== part.size) {
+									throw new Error('Incomplete file \'' + part.file + '\'');
+								}
+								return;
+							}
+							if (written + result.value.length > part.size) {
+								throw new Error('Unexpected size of file \'' + part.file + '\'');
+							}
+							pack.set(result.value, offset + written);
+							written += result.value.length;
+							onBytes(written);
+							return pump();
+						});
+					}
+					return pump();
+				});
+			}
+
+			function loadSplitPack(onProgress) {
+				var parts = PCK_PARTS.parts;
+				var offsets = [];
+				var loaded = [];
+				var total = 0;
+				parts.forEach(function(part) {
+					offsets.push(total);
+					loaded.push(0);
+					total += part.size;
+				});
+				if (total !== PCK_PARTS.size) {
+					return Promise.reject(new Error('The main pack parts do not add up to its size.'));
+				}
+				var pack = new Uint8Array(PCK_PARTS.size);
+
+				function reportPackProgress() {
+					var sum = 0;
+					for (var i = 0; i < loaded.length; i++) {
+						sum += loaded[i];
+					}
+					onProgress(sum);
+				}
+
+				function loadPart(index, attempt) {
+					loaded[index] = 0;
+					reportPackProgress();
+					return loadPackPart(parts[index], pack, offsets[index], function(bytes) {
+						loaded[index] = bytes;
+						reportPackProgress();
+					}).catch(function(error) {
+						if (attempt >= PACK_PART_ATTEMPTS) {
+							throw error;
+						}
+						console.warn('Retrying ' + parts[index].file + ':', error);
+						// A broken cached copy would fail the same way again.
+						return forgetCachedRuntimeFile(parts[index].file).then(function() {
+							return loadPart(index, attempt + 1);
+						});
+					});
+				}
+
+				var nextPart = 0;
+				function loadNextPart() {
+					if (nextPart >= parts.length) {
+						return Promise.resolve();
+					}
+					var index = nextPart++;
+					return loadPart(index, 1).then(loadNextPart);
+				}
+
+				var workers = [];
+				for (var i = 0; i < Math.min(PACK_PART_CONCURRENCY, parts.length); i++) {
+					workers.push(loadNextPart());
+				}
+				return Promise.all(workers).then(function() {
+					return pack;
+				});
+			}
+
+			function startWithSplitPack() {
+				var engineLoaded = 0;
+				var packLoaded = 0;
+				function reportProgress() {
+					setLoadingProgress(engineLoaded + packLoaded, configuredTotal);
+				}
+				engineProgressHandler = function(current) {
+					engineLoaded = current;
+					reportProgress();
+				};
+				return Promise.all([
+					engine.init(GODOT_CONFIG.executable),
+					loadSplitPack(function(bytes) {
+						packLoaded = bytes;
+						reportProgress();
+					}),
+				]).then(function(results) {
+					// Pass the ArrayBuffer: preloadFile uses its argument as a
+					// lookup key, and a Uint8Array would be stringified byte by byte.
+					return engine.preloadFile(results[1].buffer, PCK_PARTS.path);
+				}).then(function() {
+					return engine.start({
+						'args': ['--main-pack', PCK_PARTS.path].concat(GODOT_CONFIG.args || []),
+					});
+				});
+			}
+
 			if (!Engine.isWebGLAvailable()) {
 				displayFailureNotice('WebGL not available');
+			} else if (PCK_PARTS) {
+				startWithSplitPack().then(finishLoading, displayFailureNotice);
 			} else {
-				engine.startGame({
-					'onProgress': setLoadingProgress,
-				}).then(finishLoading, displayFailureNotice);
+				engineProgressHandler = setLoadingProgress;
+				engine.startGame().then(finishLoading, displayFailureNotice);
 			}
 		})();
 	//]]></script>

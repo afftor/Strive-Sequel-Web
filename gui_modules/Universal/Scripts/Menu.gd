@@ -19,7 +19,7 @@ func _ready():
 	gui_controller.add_close_button($Options)
 	gui_controller.add_close_button($Credits)
 	gui_controller.add_close_button($NewOrTutorial)
-	var buttonlist = ['continueb', 'export_progress', 'import_progress', 'newgame', 'loadwindow', 'import_save', 'options', 'credits']
+	var buttonlist = ['continueb', 'newgame', 'loadwindow', 'export_progress', 'import_progress', 'import_save', 'options', 'credits']
 	$version.text = "ver. " + globals.gameversion
 	input_handler.CurrentScene = self
 	#ESC and RMB close windows only on the current screen, which nothing set on first launch
