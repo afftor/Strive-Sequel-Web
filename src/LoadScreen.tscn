@@ -76,7 +76,6 @@ __meta__ = {
 }
 
 [node name="Sprite" type="TextureRect" parent="loading"]
-visible = false
 material = ExtResource( 10 )
 margin_left = 1224.0
 margin_top = 40.0
