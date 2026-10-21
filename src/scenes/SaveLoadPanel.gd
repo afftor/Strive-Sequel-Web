@@ -339,6 +339,6 @@ func Sort(a,b):
 		return true
 	return false
 
-#warning-ignore:return_value_discarded
-func _on_openfolder_pressed():
-	OS.shell_open(ProjectSettings.globalize_path(variables.userfolder + 'saves/'))
+##warning-ignore:return_value_discarded
+#func _on_openfolder_pressed():
+#	OS.shell_open(ProjectSettings.globalize_path(variables.userfolder + 'saves/'))
