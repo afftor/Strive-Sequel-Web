@@ -44,6 +44,11 @@ func load_texture(path):
 		return texture_cache[path]
 	if !pending_requests.has(path):
 		_start_request(path)
+		if !pending_requests.has(path):
+			# The request failed at once. Still yield: the callers wait for
+			# "completed", and the web build crashes on a yield without it.
+			yield(get_tree(), "idle_frame")
+			return null
 	while pending_requests.has(path):
 		yield(self, "texture_loaded")
 	if texture_cache.has(path):

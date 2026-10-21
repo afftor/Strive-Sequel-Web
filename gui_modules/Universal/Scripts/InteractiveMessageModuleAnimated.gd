@@ -1340,17 +1340,21 @@ func clear_character_images():
 	$CharacterImage.hide()
 	$CharacterImage2.hide()
 
+#the web build downloads the CG on first use - these keep what the current scene asked for,
+#so an image that arrives after the dialogue moved on is dropped
+var custom_background_id
+var scene_image_id
+
 func handle_scene_backgrounds(scene):
-	var node = $CustomBackground
 	if scene.has("custom_background"):
+		custom_background_id = scene.custom_background
 		var newtexture = images.get_background(scene.custom_background)
-		if !node.visible:
-			node.texture = newtexture
-			node.modulate.a = 0
-			node.show()
-			ResourceScripts.core_animations.UnfadeAnimation(node, type_trans_time)
-		elif node.texture != newtexture:
-			ResourceScripts.core_animations.SmoothTextureChange(node, newtexture, 1)
+		if newtexture == null:
+			load_custom_background(scene.custom_background)
+		else:
+			apply_custom_background(newtexture)
+	else:
+		custom_background_id = null
 	try_hide_scene_backgrounds(scene, type_trans_time)
 	
 	var shading = $Shading
@@ -1365,6 +1369,27 @@ func handle_scene_backgrounds(scene):
 		yield(get_tree().create_timer(0.2), "timeout")
 		shading.set_meta("fading", false)
 		shading.hide()
+
+func apply_custom_background(newtexture):
+	var node = $CustomBackground
+	if !node.visible:
+		node.texture = newtexture
+		node.modulate.a = 0
+		node.show()
+		ResourceScripts.core_animations.UnfadeAnimation(node, type_trans_time)
+	elif node.texture != newtexture:
+		ResourceScripts.core_animations.SmoothTextureChange(node, newtexture, 1)
+
+func load_custom_background(id):
+	var newtexture = yield(images.get_background_async(id), "completed")
+	if custom_background_id == id and is_visible_in_tree():
+		apply_custom_background(newtexture)
+
+func load_scene_image(id):
+	var image_panel = $BackgroundT1/ImagePanel
+	var newtexture = yield(images.get_scene_async(id), "completed")
+	if scene_image_id == id and image_panel.visible:
+		image_panel.get_node("SceneImage").texture = newtexture
 
 func try_hide_scene_backgrounds(scene, time):
 	var node = $CustomBackground
@@ -1429,7 +1454,11 @@ func handle_characters_sprites(scene):
 		$CharacterImage.hide()
 		if scene.has('image') && scene.image != '' && scene.image != null:
 			image_panel.show()
-			image_panel.get_node("SceneImage").texture = images.get_scene(scene.image)
+			scene_image_id = scene.image
+			var scene_texture = images.get_scene(scene.image)
+			image_panel.get_node("SceneImage").texture = scene_texture
+			if scene_texture == null:
+				load_scene_image(scene.image)
 			input_handler.update_progress_data("monochrome", scene.image)
 			if dialogue_window_type == 1:
 				hide_long_text()
