@@ -89,12 +89,12 @@ foreach ($folder in @("fullscreen scenes", "scenes")) {
 	}
 }
 
-# Give the monolithic runtime files a release-specific name. Their contents are
-# unchanged by this step; the shared fingerprint only makes browser caching
-# safe across deployments. A new export gets a new URL when any runtime file
-# changes, while an ordinary page reload keeps using the cached files.
+# Give the engine files a name of their own contents. They change only with the
+# Godot version, so a game update keeps their URL and the browser keeps using
+# the cached copy. The main pack parts are named by their own contents below.
 $runtimeSuffixes = @("js", "wasm", "pck", "audio.worklet.js")
-$runtimeHashes = foreach ($suffix in $runtimeSuffixes) {
+$engineSuffixes = @("js", "wasm", "audio.worklet.js")
+$runtimeHashes = foreach ($suffix in $engineSuffixes) {
 	$runtimeFile = Join-Path $outputPath "index.$suffix"
 	if (-not (Test-Path -LiteralPath $runtimeFile -PathType Leaf)) {
 		throw "Godot web runtime file not found: $runtimeFile"
@@ -117,37 +117,44 @@ foreach ($suffix in $runtimeSuffixes) {
 
 # Static hosts such as Cloudflare Pages reject files over 25 MiB, so the main
 # pack is published in parts. The loading shell downloads them and joins them
-# again in the browser before the engine starts.
+# again in the browser before the engine starts. Each part is named by its own
+# contents, so after an update players download only the parts that changed.
+# Godot packs the images first and the game scripts (gui_modules, src) at the
+# end, so a code change touches only the first part (the file table) and the
+# last few.
 $packPartSize = 20MB
 $packName = "$versionedBase.pck"
 $packPath = Join-Path $outputPath $packName
 $packSize = (Get-Item -LiteralPath $packPath).Length
 $packParts = @()
-$copyBuffer = New-Object byte[] (1MB)
+$partBuffer = New-Object byte[] $packPartSize
 $packStream = [IO.File]::OpenRead($packPath)
+$hashAlgorithm = [Security.Cryptography.SHA256]::Create()
 try {
 	while ($packStream.Position -lt $packSize) {
-		$partName = "{0}.{1:D3}.pck" -f $versionedBase, $packParts.Count
-		$partStream = [IO.File]::Create((Join-Path $outputPath $partName))
-		$partWritten = 0
-		try {
-			while ($partWritten -lt $packPartSize) {
-				$read = $packStream.Read($copyBuffer, 0, [Math]::Min($copyBuffer.Length, $packPartSize - $partWritten))
-				if ($read -le 0) {
-					break
-				}
-				$partStream.Write($copyBuffer, 0, $read)
-				$partWritten += $read
+		$partLength = 0
+		while ($partLength -lt $packPartSize) {
+			$read = $packStream.Read($partBuffer, $partLength, $packPartSize - $partLength)
+			if ($read -le 0) {
+				break
 			}
+			$partLength += $read
+		}
+		$partHash = ([BitConverter]::ToString($hashAlgorithm.ComputeHash($partBuffer, 0, $partLength))).Replace("-", "").Substring(0, 12).ToLowerInvariant()
+		$partName = "index.$partHash.pck"
+		$partStream = [IO.File]::Create((Join-Path $outputPath $partName))
+		try {
+			$partStream.Write($partBuffer, 0, $partLength)
 		}
 		finally {
 			$partStream.Dispose()
 		}
-		$packParts += [ordered]@{ file = $partName; size = $partWritten }
+		$packParts += [ordered]@{ file = $partName; size = $partLength }
 	}
 }
 finally {
 	$packStream.Dispose()
+	$hashAlgorithm.Dispose()
 }
 Remove-Item -LiteralPath $packPath -Force
 $packManifest = [ordered]@{ path = $packName; size = $packSize; parts = $packParts } | ConvertTo-Json -Compress -Depth 3
@@ -180,4 +187,4 @@ Copy-Item -LiteralPath (Join-Path $projectRoot "web\_headers") -Destination (Joi
 Write-Host "Web export ready: $outputPath"
 Write-Host "CG assets are served from: $(Join-Path $outputPath 'cg-assets')"
 Write-Host "Main pack: $($packParts.Count) parts of up to $($packPartSize / 1MB) MiB"
-Write-Host "Runtime cache version: $releaseId"
+Write-Host "Engine version: $releaseId"

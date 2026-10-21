@@ -250,7 +250,14 @@ $GODOT_HEAD_INCLUDE
 				return part.file;
 			}));
 		}
-		var runtimeCacheName = 'strive-runtime-' + GODOT_CONFIG.executable;
+		// One cache for every release: runtime files are named by their contents, so
+		// the parts an update did not change keep their URL and stay cached.
+		var runtimeCacheName = 'strive-runtime';
+
+		function runtimeFileName(url) {
+			var path = new URL(url, window.location.href).pathname;
+			return decodeURIComponent(path.substring(path.lastIndexOf('/') + 1));
+		}
 
 		function forgetCachedRuntimeFile(file) {
 			if (!('caches' in window)) {
@@ -275,9 +282,8 @@ $GODOT_HEAD_INCLUDE
 				}
 
 				var url = new URL(request.url, window.location.href);
-				var filename = decodeURIComponent(url.pathname.substring(url.pathname.lastIndexOf('/') + 1));
 				var cacheableRuntime = request.method === 'GET' &&
-					url.origin === window.location.origin && runtimeFiles.indexOf(filename) !== -1;
+					url.origin === window.location.origin && runtimeFiles.indexOf(runtimeFileName(url)) !== -1;
 				if (!cacheableRuntime) {
 					return nativeFetch(input, init);
 				}
@@ -302,14 +308,28 @@ $GODOT_HEAD_INCLUDE
 				});
 			};
 
+			// Earlier releases kept a cache per release, named strive-runtime-<release>.
 			caches.keys().then(function(cacheNames) {
 				cacheNames.forEach(function(cacheName) {
-					if (cacheName.indexOf('strive-runtime-') === 0 && cacheName !== runtimeCacheName) {
+					if (cacheName.indexOf('strive-runtime-') === 0) {
 						caches.delete(cacheName);
 					}
 				});
 			}).catch(function(error) {
 				console.warn('Unable to clean old web runtime caches:', error);
+			});
+
+			// Drop the files of earlier releases that this one no longer uses.
+			caches.open(runtimeCacheName).then(function(cache) {
+				return cache.keys().then(function(requests) {
+					requests.forEach(function(request) {
+						if (runtimeFiles.indexOf(runtimeFileName(request.url)) === -1) {
+							cache.delete(request);
+						}
+					});
+				});
+			}).catch(function(error) {
+				console.warn('Unable to clean old web runtime files:', error);
 			});
 		}
 
