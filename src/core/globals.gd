@@ -75,7 +75,7 @@ func is_experimental_build():
 func _init():
 	#load sex actions
 	for i in input_handler.dir_contents('res://src/actions'):
-		if i.ends_with('.gd'):
+		if i.ends_with('.gd') or i.ends_with('.gdc'): #exported builds ship compiled .gdc
 			var newaction = load(i).new()
 			sex_actions_dict[newaction.code] = newaction
 	#crash bypass

@@ -204,7 +204,7 @@ func _build_action_category_tooltip(category):
 
 func _refresh_sex_actions_dict():
 	for path in input_handler.dir_contents('res://src/actions'):
-		if !path.ends_with('.gd'):
+		if !(path.ends_with('.gd') or path.ends_with('.gdc')): #exported builds ship compiled .gdc
 			continue
 		var newaction = load(path).new()
 		globals.sex_actions_dict[newaction.code] = newaction
