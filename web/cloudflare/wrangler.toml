@@ -1,0 +1,11 @@
+# Cloudflare Pages configuration, used by web_deploy.ps1.
+name = "strive-web"
+pages_build_output_dir = "../../build/web"
+compatibility_date = "2026-09-01"
+
+# Anonymous play statistics written by functions/api/stats.js.
+# The table is created by schema.sql.
+[[d1_databases]]
+binding = "STATS"
+database_name = "strive-stats"
+database_id = "de05c17f-8ced-4789-8fdd-47d8d0cb3580"
