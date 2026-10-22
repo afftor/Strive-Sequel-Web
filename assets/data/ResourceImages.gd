@@ -530,6 +530,22 @@ func get_background(id, cash = false):
 			backgrounds[id] = res
 	return res
 
+func get_background_async(id, cash = false):
+	if !backgrounds.has(id):
+		yield(get_tree(), "idle_frame")
+		return null
+	var res = backgrounds[id]
+	if res is String:
+		if WebCgAssets.is_streamed_path(res):
+			return yield(WebCgAssets.load_texture(res), "completed")
+		yield(get_tree(), "idle_frame")
+		res = load(res)
+		if cash:
+			backgrounds[id] = res
+		return res
+	yield(get_tree(), "idle_frame")
+	return res
+
 
 const CARD_BACKGROUND_SIZE = Vector2(226, 160)
 var card_backgrounds = {}

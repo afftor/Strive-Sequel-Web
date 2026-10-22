@@ -1,5 +1,5 @@
 extends Node
-const gameversion = '0.16.2a'
+const gameversion = '0.16.2 Web'
 #pure data script, no autoloads of its own - see its header
 const SaveSanitizer = preload("res://src/core/save_sanitizer.gd")
 #same rule as the sanitizer
@@ -75,7 +75,7 @@ func is_experimental_build():
 func _init():
 	#load sex actions
 	for i in input_handler.dir_contents('res://src/actions'):
-		if i.ends_with('.gd'):
+		if i.ends_with('.gd') or i.ends_with('.gdc'): #exported builds ship compiled .gdc
 			var newaction = load(i).new()
 			sex_actions_dict[newaction.code] = newaction
 	#crash bypass
@@ -1827,6 +1827,10 @@ func SaveGame(name, spread = false):
 #	ResourceScripts.game_res.fix_items_inventory(false)
 
 	var config_data = {version = gameversion, time = OS.get_datetime(), master_name = ResourceScripts.game_party.get_master().get_stat('name'), day = ResourceScripts.game_globals.date, hour = ResourceScripts.game_globals.hour, population = ResourceScripts.game_party.characters.size(), gold = ResourceScripts.game_res.money, master_icon = ResourceScripts.game_party.get_master().get_icon(true), preset = ResourceScripts.game_globals.starting_preset}
+	#the web build without threads has a Thread.start() that silently does nothing - write here
+	if !OS.can_use_threads():
+		_save_thread_write([name, savedict, config_data])
+		return
 	if _save_thread.is_active():
 		_save_thread.wait_to_finish()
 	_save_thread.start(self, "_save_thread_write", [name, savedict, config_data])
