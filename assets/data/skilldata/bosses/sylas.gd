@@ -273,7 +273,7 @@ var skills = {
 		target_range = 'any',
 		damage_type = 'weapon',
 		sfx = [
-			{code = 'earthquake', target = 'target_group', period = 'predamage',sync_to_hit = true},
+			{code = 'earth_spike', target = 'target_group', period = 'predamage', sync_to_hit = true},
 			{code = 'shake_target', target = 'target_group', period = 'predamage', alt_slot = 'SFX_BG'},
 			{code = 'cast_weapon', target = 'caster', period = 'windup', is_cast = true, motion = 'execution_leap'}],
 		sounddata = {initiate = null, strike = 'melee_attack', hit = null},
