@@ -9324,6 +9324,10 @@ Sin embargo, puedes actualizar el archivo.
 	ABORTTUTORIAL = """Abort tutorial""", # MISSING TRANSLATION
 	PROMPTTUTORIAL = """For first-time players, it is recommended to play through the tutorial section to learn the basic controls and mechanics.""", # MISSING TRANSLATION
 	TUTORIAL_TRAINING1 = """This tutorial will explain the basic mechanics of managing your mansion and characters. Your {color=yellow|Master} character represents you and is responsible for managing other characters.""", # MISSING TRANSLATION
+	TUTORIAL_TRAINING1_0 = """Aquí aparecen todos los que viven en la finca. Es la vista con la que se abre la mansión; el plano de la casa está detrás de ella.""",
+	TUTORIAL_RMB_MENU1 = """Antes de partir, un atajo que conviene conocer. La franja de arriba reúne a todos los que no tienen nada que hacer - prueba a hacer {color=yellow|clic derecho} sobre el retrato de tu Amo.""",
+	TUTORIAL_RMB_MENU2 = """Un clic derecho sobre cualquier retrato abre este menú, el camino corto a casi todo: su ficha, clases y maestrías, entrenamiento, su bolsa, su hoja de información y las habilidades sociales que tenga a mano. Todos los retratos del juego responden a él. Vuelve a hacer clic derecho para cerrar el menú.""",
+	TUTORIAL_TRAINING1_1 = """Haz clic en la tarjeta de tu Amo para desplegarla. La tarjeta ampliada contiene sus detalles, reglas de trabajo y habilidades sociales.""",
 	TUTORIAL_TRAINING2 = """Let's start by using the Master's default skill, Mentor, on one of your subordinates. It will increase the amount of experience they gain for one day.""", # MISSING TRANSLATION
 	TUTORIAL_TRAINING3 = """Select a character from the list to finish casting the skill.""", # MISSING TRANSLATION
 	TUTORIAL_TRAINING4 = """The skill you used will go on cooldown, and you will receive a short report, as with many similar actions.""", # MISSING TRANSLATION
@@ -9331,6 +9335,7 @@ Sin embargo, puedes actualizar el archivo.
 	TUTORIAL_TRAINING6 = """By default, characters will have their food rules set to their preferences, but you can customize them further. Clicking on a food option will cycle its priority for that character.""", # MISSING TRANSLATION
 	TUTORIAL_TRAINING7 = """Click a food to allow or forbid it for this character.""", # MISSING TRANSLATION
 	TUTORIAL_TRAINING8 = """Now that this is done, let's switch back to the default menu.""", # MISSING TRANSLATION
+	TUTORIAL_TRAINING8_1 = """Haz clic derecho en cualquier parte para plegar la ficha y volver a tener a mano el resto de la lista.""",
 	TUTORIAL_TRAINING9 = """Select Daisy to access her details and information.""", # MISSING TRANSLATION
 	TUTORIAL_TRAINING10 = """You can open a character window with a double-click, or by using the Character Info button.""", # MISSING TRANSLATION
 	TUTORIAL_TRAINING11 = """Daisy is classified as an untrained slave and requires a trainer to oversee and conduct her training. Untrained slaves will not work without a trainer.""", # MISSING TRANSLATION
@@ -9383,12 +9388,50 @@ Close this menu.""", # MISSING TRANSLATION
 	TUTORIAL_WORK27_1 = """Go back to cooking menu.""", # MISSING TRANSLATION
 	TUTORIAL_WORK28 = """Cancel bread baking.""", # MISSING TRANSLATION
 	TUTORIAL_WORK29 = """And confirm it.""", # MISSING TRANSLATION
+	TUTORIAL_WORK_ROOM1 = """La finca te llegó medio en ruinas. La mayoría de sus salas siguen enterradas bajo los escombros, y despejarlas es como crece la casa - el plano no regala nada más.""",
+	TUTORIAL_WORK_ROOM1_1 = """El plano de la casa está detrás de la lista de personajes. Pliega la lista con el asa de su esquina - los que no tienen nada que hacer esperan en la franja bajo la barra, listos para que los tomes y los pongas a trabajar.""",
+	TUTORIAL_WORK_ROOM2 = """Haz clic en la sala llena de escombros para abrir su ficha.""",
+	TUTORIAL_WORK_ROOM3 = """Despejarla no cuesta materiales, solo tiempo. Empieza.""",
+	TUTORIAL_WORK_ROOM4 = """El trabajo necesita manos. Daisy no tiene nada que hacer - tómala de la franja de descanso.""",
+	TUTORIAL_WORK_ROOM5 = """Ahora ponla en el andamio. El puesto amarillo con el martillo es donde se colocan los constructores.""",
+	TUTORIAL_WORK_ROOM6 = """Termina el turno para que pueda hacer su jornada de trabajo.""",
+	TUTORIAL_WORK_ROOM7 = """Despejar una sala lleva un número fijo de turnos, la haga quien la haga, y un segundo par de manos no lo acelera. Termina otro turno.""",
+	TUTORIAL_WORK_ROOM8 = """La sala está despejada. Haz clic de nuevo en ella para ver qué se puede construir aquí.""",
+	TUTORIAL_WORK_ROOM9 = """Cada sala cumple una función y construirla cuesta materiales. Construye una Cocina - en esta casa no se cocina nada hasta que haya una.""",
+	TUTORIAL_WORK_ROOM10 = """Toma de nuevo a Daisy.""",
+	TUTORIAL_WORK_ROOM11 = """Y vuelve a ponerla en el andamio.""",
+	TUTORIAL_WORK_ROOM12 = """La construcción se mide en trabajo, no en días, así que un mejor constructor levanta una sala antes. Esta ya casi está - termina el turno.""",
+	TUTORIAL_WORK_ROOM14 = """La cocina ya está en pie. Ábrela.""",
+	TUTORIAL_WORK_ROOM15 = """Una sala de oficio abre el taller en su propio oficio. Ábrelo desde aquí.""",
+	TUTORIAL_WORK_CRAFT1 = """Este es el taller. El oficio de la cocina, Cocinar, ya está abierto, y sus recetas aparecen en el centro. Elige el pan.""",
+	TUTORIAL_WORK_CRAFT2 = """El banco de trabajo muestra lo que produce una tanda y lo que consume. El pedido en sí se configura bajo la cola, a la derecha: un {color=yellow|Lote} de tandas, {color=yellow|Mantener en reserva} entre dos números o {color=yellow|Sin fin}. Aumenta este lote en 10 tandas.""",
+	TUTORIAL_WORK_CRAFT3 = """Pulsa {color=yellow|Añadir a la cola}.""",
+	TUTORIAL_WORK_CRAFT4 = """Los pedidos se ponen en cola en lugar de reemplazarse unos a otros, y cada sala de un oficio los trabaja desde arriba. Añade un segundo - elige el estofado de carne.""",
+	TUTORIAL_WORK_CRAFT5 = """Añádelo también a la cola.""",
+	TUTORIAL_WORK_CRAFT6 = """Ahora ambos pedidos esperan en la cola. Un pedido se puede cambiar, subir o bajar, o cancelar - haz clic en el estofado para abrirlo.""",
+	TUTORIAL_WORK_CRAFT7 = """Cancélalo.""",
+	TUTORIAL_WORK_CRAFT8 = """Y confírmalo.""",
+	TUTORIAL_WORK_CRAFT9 = """Un pedido no es más que un plan hasta que alguien lo trabaja. La columna de la izquierda muestra las salas del oficio y sus puestos - pulsa {color=yellow|+ Añadir artesano}.""",
+	TUTORIAL_WORK_CRAFT10 = """Aquí aparecen todos los de la mansión que podrían ocupar el puesto, con cuánto trabajo aportarían cada turno. Elige a Daisy.""",
+	TUTORIAL_WORK_CRAFT11 = """La cocina ya tiene su pedido y su cocinera. Cierra el taller.""",
+	TUTORIAL_WORK_ROOM28 = """Termina el turno. Daisy aún no es buena cocinera, así que una tanda de pan le lleva varios turnos - la cola del taller muestra cuánto lleva, y cada tanda terminada aparece en el registro de la mansión.""",
+	TUTORIAL_WORK_ROOM29 = """No todo el trabajo de la finca se hace bajo techo. Abre Tareas locales.""",
+	TUTORIAL_WORK_ROOM30 = """Los terrenos tienen sus propios edificios, y cada uno tiene sus propias manos. Toma a Aeris.""",
+	TUTORIAL_WORK_ROOM31 = """Ponla en el huerto. Recogerá verduras cada turno.""",
+	TUTORIAL_WORK_ROOM32 = """Termina el turno. Lo que dan los terrenos es con lo que cocina la cocina - aquel estofado de carne pedía verduras.""",
+	TUTORIAL_WORK_ROOM33 = """Así funciona la finca: despeja una sala, construye algo en ella y pon a la gente donde está el trabajo. Vuelve a la mansión.""",
+	TUTORIAL_WORK_BED1 = """Todos en la finca necesitan además un sitio donde dormir. Daisy acaba de perder su cama - quien no tiene una pasa la noche en el suelo y lo paga. Cambia el plano a {color=yellow|Camas} para ver dónde duerme la casa.""",
+	TUTORIAL_WORK_BED2 = """Ahora el plano muestra camas en lugar de puestos de trabajo, y la franja de arriba recoge a todos los que no tienen. Haz clic en Daisy para tomarla.""",
+	TUTORIAL_WORK_BED3 = """Ahora haz clic en una cama libre del dormitorio para acostarla en ella. Arrastrarla hasta allí hace lo mismo, y {color=yellow|Acostarlos} sobre la franja acomoda a todos de una vez.""",
+	TUTORIAL_WORK_BED4 = """Vuelve a tener cama. Cambia el plano de nuevo a {color=yellow|Trabajo} - las camas solo hay que organizarlas cuando llega alguien nuevo o se construye un dormitorio.""",
 	TUTORIAL_LEVELING0 = """Speaking of experience, let's look at another way to gain it.""", # MISSING TRANSLATION
+	TUTORIAL_LEVELING1_0 = """Lo que posee la finca se guarda en su almacén. Ábrelo.""",
 	TUTORIAL_LEVELING1 = """Select Inventory to view your possessions.""", # MISSING TRANSLATION
 	TUTORIAL_LEVELING2 = """Select your Master as the active character to manage.""", # MISSING TRANSLATION
 	TUTORIAL_LEVELING3 = """Use a Scroll of Knowledge to grant your Master some experience. This is an easy way to quickly increase a new character's power.""", # MISSING TRANSLATION
 	TUTORIAL_LEVELING4 = """Close the panel.""", # MISSING TRANSLATION
 	TUTORIAL_LEVELING5 = """Close the inventory.""", # MISSING TRANSLATION
+	TUTORIAL_LEVELING5_1 = """Haz clic otra vez en la tarjeta de tu Amo para desplegarla.""",
 	TUTORIAL_LEVELING6 = """Open the Master's character information window.""", # MISSING TRANSLATION
 	TUTORIAL_LEVELING7 = """Now that you have enough experience, open the Leveling tab.""", # MISSING TRANSLATION
 	TUTORIAL_LEVELING8 = """Experience is used to unlock classes, each granting bonuses, passives, and skills. Unlock the Fighter class.""", # MISSING TRANSLATION
@@ -9403,6 +9446,12 @@ Close this menu.""", # MISSING TRANSLATION
 	TUTORIAL_COMBAT3 = """Accept the Trouble Solving quest.""", # MISSING TRANSLATION
 	TUTORIAL_COMBAT4 = """All quests provide item rewards and guild reputation. Reputation can be used to purchase special guild services. Trouble Solving requires traveling to a procedurally generated location.""", # MISSING TRANSLATION
 	TUTORIAL_COMBAT5 = """Open the map menu to learn how to send characters to a new location.""", # MISSING TRANSLATION
+	TUTORIAL_COMBAT5_0 = """Cierra el tablón de anuncios.""",
+	TUTORIAL_MARKET1 = """Antes de salir de Aliron, visita su {color=yellow|Mercado de esclavos}: allí se compran y venden esclavos y se aceptan encargos de ellos. Ábrelo.""",
+	TUTORIAL_MARKET2 = """El mercado se abre con los encargos que publican las grandes casas. Entrega un esclavo que cumpla uno para ganar oro y rango de esclavista - ahora mismo una casa quiere un humano.""",
+	TUTORIAL_MARKET3 = """Aquí también se venden esclavos. Abre {color=yellow|Comprar}.""",
+	TUTORIAL_MARKET4 = """Los esclavos en venta aparecen con su precio; el botón bajo la ficha de un esclavo lo compra.""",
+	TUTORIAL_MARKET5 = """Pulsa de nuevo el botón {color=yellow|Mercado de esclavos} para cerrarlo.""",
 	TUTORIAL_COMBAT6 = """Select two characters who will travel to complete the task.""", # MISSING TRANSLATION
 	TUTORIAL_COMBAT8 = """In the location list, find the special quest location you need to visit.""", # MISSING TRANSLATION
 	TUTORIAL_COMBAT9 = """Click Send to begin traveling.""", # MISSING TRANSLATION
@@ -9423,6 +9472,9 @@ Close this menu.""", # MISSING TRANSLATION
 	TUTORIAL_COMBAT22 = """Support abilities work similarly but target allies instead. Apply Earth Shield to your Master.""", # MISSING TRANSLATION
 	TUTORIAL_COMBAT24 = """Finish the combat.""", # MISSING TRANSLATION
 	TUTORIAL_COMBAT26 = """The loot window displays the results of the fight.""", # MISSING TRANSLATION
+	TUTORIAL_COMBAT26_1 = """Los combates suelen dejar cautivos, y este ha dejado dos. El primero cumple el encargo que viste en el mercado de esclavos: entrégalo aquí mismo con la franja verde {color=yellow|Entregar}.""",
+	TUTORIAL_COMBAT26_1A = """Un cautivo puede cumplir varios encargos a la vez, así que tú eliges cuál se lo lleva. Elige el encargo que viste en el mercado de esclavos.""",
+	TUTORIAL_COMBAT26_2 = """Entregar un cautivo se paga al instante, igual que en el mercado, y cuenta para tu rango de esclavista.""",
 	TUTORIAL_COMBAT27 = """You received a random character after the fight, which is common in dungeon encounters. Select them to inspect.""", # MISSING TRANSLATION
 	TUTORIAL_COMBAT28 = """Undesirable characters can be sold immediately, recruited, or enslaved.""", # MISSING TRANSLATION
 	TUTORIAL_COMBAT29 = """Attempt to persuade them by selecting the appropriate option.""", # MISSING TRANSLATION

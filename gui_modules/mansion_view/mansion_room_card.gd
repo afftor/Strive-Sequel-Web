@@ -2044,10 +2044,10 @@ func on_craft():
 	if job == ENCHANTING_BENCH:
 		view.open_enchanting()
 		return
-	#The workshop panel over the plan - except while the hard tutorial is walking the player
-	#through the older craft screen, whose buttons its steps point at.
+	#The workshop panel over the plan. The hard tutorial teaches it too - its steps point at the
+	#panel's own buttons (craft_panel.register_tutorial_buttons).
 	var trade = RoomTypes.get_craft_menu(current.type)
-	if trade in ['smith', 'tailor', 'alchemy', 'cooking'] and !input_handler.hard_tutorial_active:
+	if trade in ['smith', 'tailor', 'alchemy', 'cooking']:
 		view.open_crafting(trade)
 		return
 	var mansion = view.get_parent()

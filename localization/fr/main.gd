@@ -9312,6 +9312,10 @@ La luxure satisfaite, vous la regardez gisant là, épuisée, brisée et sans d�
 	ABORTTUTORIAL = """Abort tutorial""", # MISSING TRANSLATION
 	PROMPTTUTORIAL = """For first-time players, it is recommended to play through the tutorial section to learn the basic controls and mechanics.""", # MISSING TRANSLATION
 	TUTORIAL_TRAINING1 = """This tutorial will explain the basic mechanics of managing your mansion and characters. Your {color=yellow|Master} character represents you and is responsible for managing other characters.""", # MISSING TRANSLATION
+	TUTORIAL_TRAINING1_0 = """Tous ceux qui vivent sur le domaine sont listés ici. C'est la vue sur laquelle s'ouvre le manoir ; le plan de la maison se trouve derrière.""",
+	TUTORIAL_RMB_MENU1 = """Avant de partir, un raccourci à connaître. La bande du haut regroupe tous ceux qui n'ont rien à faire - essayez un {color=yellow|clic droit} sur le portrait de votre Maître.""",
+	TUTORIAL_RMB_MENU2 = """Un clic droit sur n'importe quel portrait ouvre ce menu, le raccourci vers presque tout : sa fiche, ses classes et maîtrises, l'entraînement, son sac, sa feuille d'informations et les compétences sociales dont il dispose. Tous les portraits du jeu y répondent. Faites un nouveau clic droit pour fermer le menu.""",
+	TUTORIAL_TRAINING1_1 = """Cliquez sur la carte de votre Maître pour la déplier. La carte étendue contient ses détails, ses règles de travail et ses compétences sociales.""",
 	TUTORIAL_TRAINING2 = """Let's start by using the Master's default skill, Mentor, on one of your subordinates. It will increase the amount of experience they gain for one day.""", # MISSING TRANSLATION
 	TUTORIAL_TRAINING3 = """Select a character from the list to finish casting the skill.""", # MISSING TRANSLATION
 	TUTORIAL_TRAINING4 = """The skill you used will go on cooldown, and you will receive a short report, as with many similar actions.""", # MISSING TRANSLATION
@@ -9319,6 +9323,7 @@ La luxure satisfaite, vous la regardez gisant là, épuisée, brisée et sans d�
 	TUTORIAL_TRAINING6 = """By default, characters will have their food rules set to their preferences, but you can customize them further. Clicking on a food option will cycle its priority for that character.""", # MISSING TRANSLATION
 	TUTORIAL_TRAINING7 = """Click a food to allow or forbid it for this character.""", # MISSING TRANSLATION
 	TUTORIAL_TRAINING8 = """Now that this is done, let's switch back to the default menu.""", # MISSING TRANSLATION
+	TUTORIAL_TRAINING8_1 = """Faites un clic droit n'importe où pour replier la fiche, afin que le reste de la liste soit de nouveau accessible.""",
 	TUTORIAL_TRAINING9 = """Select Daisy to access her details and information.""", # MISSING TRANSLATION
 	TUTORIAL_TRAINING10 = """You can open a character window with a double-click, or by using the Character Info button.""", # MISSING TRANSLATION
 	TUTORIAL_TRAINING11 = """Daisy is classified as an untrained slave and requires a trainer to oversee and conduct her training. Untrained slaves will not work without a trainer.""", # MISSING TRANSLATION
@@ -9371,12 +9376,50 @@ Close this menu.""", # MISSING TRANSLATION
 	TUTORIAL_WORK27_1 = """Go back to cooking menu.""", # MISSING TRANSLATION
 	TUTORIAL_WORK28 = """Cancel bread baking.""", # MISSING TRANSLATION
 	TUTORIAL_WORK29 = """And confirm it.""", # MISSING TRANSLATION
+	TUTORIAL_WORK_ROOM1 = """Le domaine vous est parvenu à moitié en ruine. La plupart de ses salles sont encore ensevelies sous les décombres, et c'est en les déblayant que la maison s'agrandit - le plan ne donne rien d'autre.""",
+	TUTORIAL_WORK_ROOM1_1 = """Le plan de la maison se trouve derrière la liste des personnages. Repliez la liste avec la poignée dans son coin - ceux qui n'ont rien à faire attendent sur la bande sous la barre, prêts à être pris et mis au travail.""",
+	TUTORIAL_WORK_ROOM2 = """Cliquez sur la salle encombrée pour ouvrir sa fiche.""",
+	TUTORIAL_WORK_ROOM3 = """Le déblaiement ne coûte aucun matériau, seulement du temps. Lancez-le.""",
+	TUTORIAL_WORK_ROOM4 = """Le travail demande des bras. Marguerite n'a rien à faire - prenez-la depuis la bande de repos.""",
+	TUTORIAL_WORK_ROOM5 = """Placez-la maintenant sur l'échafaudage. L'emplacement jaune avec le marteau est celui des bâtisseurs.""",
+	TUTORIAL_WORK_ROOM6 = """Terminez le tour pour qu'elle puisse fournir sa journée de travail.""",
+	TUTORIAL_WORK_ROOM7 = """Le déblaiement prend un nombre fixe de tours, quel que soit celui qui s'en charge, et une deuxième paire de bras ne le hâtera pas. Terminez un autre tour.""",
+	TUTORIAL_WORK_ROOM8 = """La salle est dégagée. Cliquez à nouveau dessus pour voir ce qu'on peut y construire.""",
+	TUTORIAL_WORK_ROOM9 = """Chaque salle a une fonction et sa construction coûte des matériaux. Construisez une Cuisine - rien ne se cuisine dans cette maison tant qu'il n'y en a pas.""",
+	TUTORIAL_WORK_ROOM10 = """Reprenez Marguerite.""",
+	TUTORIAL_WORK_ROOM11 = """Et remettez-la sur l'échafaudage.""",
+	TUTORIAL_WORK_ROOM12 = """La construction se mesure en travail plutôt qu'en jours, donc un meilleur bâtisseur élève une salle plus vite. Celle-ci est presque terminée - finissez le tour.""",
+	TUTORIAL_WORK_ROOM14 = """La cuisine est debout. Ouvrez-la.""",
+	TUTORIAL_WORK_ROOM15 = """Une salle d'artisanat ouvre l'atelier sur son propre métier. Ouvrez-le d'ici.""",
+	TUTORIAL_WORK_CRAFT1 = """Voici l'atelier. Le métier de la cuisine, Cuisine, est déjà ouvert, et ses recettes sont listées au centre. Choisissez le pain.""",
+	TUTORIAL_WORK_CRAFT2 = """L'établi montre ce que produit une série et ce qu'elle consomme. La commande elle-même se règle sous la file, à droite : un {color=yellow|Lot} de séries, {color=yellow|Garder en stock} entre deux nombres, ou {color=yellow|Sans fin}. Augmentez ce lot de 10 séries.""",
+	TUTORIAL_WORK_CRAFT3 = """Appuyez sur {color=yellow|Ajouter à la file}.""",
+	TUTORIAL_WORK_CRAFT4 = """Les commandes s'ajoutent à la file au lieu de se remplacer, et chaque salle d'un métier les traite par le haut. Ajoutez-en une deuxième - choisissez la soupe de viande.""",
+	TUTORIAL_WORK_CRAFT5 = """Ajoutez-la aussi à la file.""",
+	TUTORIAL_WORK_CRAFT6 = """Les deux commandes attendent maintenant dans la file. Une commande peut être modifiée, montée ou descendue, ou annulée - cliquez sur la soupe pour l'ouvrir.""",
+	TUTORIAL_WORK_CRAFT7 = """Annulez-la.""",
+	TUTORIAL_WORK_CRAFT8 = """Et confirmez.""",
+	TUTORIAL_WORK_CRAFT9 = """Une commande n'est qu'un projet tant que personne n'y travaille. La colonne de gauche contient les salles du métier et leurs places - appuyez sur {color=yellow|+ Ajouter un artisan}.""",
+	TUTORIAL_WORK_CRAFT10 = """Tous ceux du manoir qui pourraient prendre la place sont proposés, avec le travail qu'ils fourniraient à chaque tour. Choisissez Marguerite.""",
+	TUTORIAL_WORK_CRAFT11 = """La cuisine a sa commande et sa cuisinière. Fermez l'atelier.""",
+	TUTORIAL_WORK_ROOM28 = """Terminez le tour. Marguerite n'est pas encore une grande cuisinière, une série de pain lui prend donc plusieurs tours - la file de l'atelier montre où elle en est, et chaque série terminée est inscrite dans le journal du manoir.""",
+	TUTORIAL_WORK_ROOM29 = """Tout le travail du domaine ne se fait pas à l'intérieur. Ouvrez Tâches locales.""",
+	TUTORIAL_WORK_ROOM30 = """Le domaine a ses propres bâtiments, et chacun a ses propres travailleurs. Prenez Aeris.""",
+	TUTORIAL_WORK_ROOM31 = """Placez-la dans le potager. Elle rapportera des légumes à chaque tour.""",
+	TUTORIAL_WORK_ROOM32 = """Terminez le tour. Ce que rapportent les terres, c'est ce que la cuisine cuisine - cette soupe de viande demandait des légumes.""",
+	TUTORIAL_WORK_ROOM33 = """Voilà le cycle du domaine : déblayer une salle, y construire quelque chose et placer les gens là où se trouve le travail. Retournez au manoir.""",
+	TUTORIAL_WORK_BED1 = """Tout le monde sur le domaine a aussi besoin d'un endroit où dormir. Marguerite vient de perdre son lit - quiconque n'en a pas passe la nuit par terre et en pâtit. Passez le plan en mode {color=yellow|Lits} pour voir où dort la maisonnée.""",
+	TUTORIAL_WORK_BED2 = """Le plan affiche maintenant les lits au lieu des postes de travail, et la bande au-dessus liste tous ceux qui n'en ont pas. Cliquez sur Marguerite pour la prendre.""",
+	TUTORIAL_WORK_BED3 = """Cliquez maintenant sur un lit libre de la chambre pour l'y installer. La faire glisser jusque-là revient au même, et {color=yellow|Les coucher} au-dessus de la bande installe tout le monde d'un coup.""",
+	TUTORIAL_WORK_BED4 = """Elle a de nouveau un lit. Remettez le plan en mode {color=yellow|Travail} - les lits ne se réorganisent que lorsque quelqu'un arrive ou qu'une chambre est construite.""",
 	TUTORIAL_LEVELING0 = """Speaking of experience, let's look at another way to gain it.""", # MISSING TRANSLATION
+	TUTORIAL_LEVELING1_0 = """Ce que possède le domaine est conservé dans sa réserve. Ouvrez-la.""",
 	TUTORIAL_LEVELING1 = """Select Inventory to view your possessions.""", # MISSING TRANSLATION
 	TUTORIAL_LEVELING2 = """Select your Master as the active character to manage.""", # MISSING TRANSLATION
 	TUTORIAL_LEVELING3 = """Use a Scroll of Knowledge to grant your Master some experience. This is an easy way to quickly increase a new character's power.""", # MISSING TRANSLATION
 	TUTORIAL_LEVELING4 = """Close the panel.""", # MISSING TRANSLATION
 	TUTORIAL_LEVELING5 = """Close the inventory.""", # MISSING TRANSLATION
+	TUTORIAL_LEVELING5_1 = """Cliquez de nouveau sur la carte de votre Maître pour la déplier.""",
 	TUTORIAL_LEVELING6 = """Open the Master's character information window.""", # MISSING TRANSLATION
 	TUTORIAL_LEVELING7 = """Now that you have enough experience, open the Leveling tab.""", # MISSING TRANSLATION
 	TUTORIAL_LEVELING8 = """Experience is used to unlock classes, each granting bonuses, passives, and skills. Unlock the Fighter class.""", # MISSING TRANSLATION
@@ -9391,6 +9434,12 @@ Close this menu.""", # MISSING TRANSLATION
 	TUTORIAL_COMBAT3 = """Accept the Trouble Solving quest.""", # MISSING TRANSLATION
 	TUTORIAL_COMBAT4 = """All quests provide item rewards and guild reputation. Reputation can be used to purchase special guild services. Trouble Solving requires traveling to a procedurally generated location.""", # MISSING TRANSLATION
 	TUTORIAL_COMBAT5 = """Open the map menu to learn how to send characters to a new location.""", # MISSING TRANSLATION
+	TUTORIAL_COMBAT5_0 = """Fermez le tableau d'affichage.""",
+	TUTORIAL_MARKET1 = """Avant de quitter Aliron, visitez son {color=yellow|Marché aux esclaves} : on y achète et vend des esclaves, et on y prend des commandes. Ouvrez-le.""",
+	TUTORIAL_MARKET2 = """Le marché s'ouvre sur les commandes que publient les grandes maisons. Livrez un esclave qui en remplit une pour gagner de l'or et du rang d'esclavagiste - une maison veut un humain en ce moment.""",
+	TUTORIAL_MARKET3 = """On vend aussi des esclaves ici. Ouvrez {color=yellow|Location}.""",
+	TUTORIAL_MARKET4 = """Les esclaves à vendre sont listés avec leur prix ; le bouton sous la fiche d'un esclave permet de l'acheter.""",
+	TUTORIAL_MARKET5 = """Appuyez à nouveau sur le bouton {color=yellow|Marché aux esclaves} pour le fermer.""",
 	TUTORIAL_COMBAT6 = """Select two characters who will travel to complete the task.""", # MISSING TRANSLATION
 	TUTORIAL_COMBAT8 = """In the location list, find the special quest location you need to visit.""", # MISSING TRANSLATION
 	TUTORIAL_COMBAT9 = """Click Send to begin traveling.""", # MISSING TRANSLATION
@@ -9411,6 +9460,9 @@ Close this menu.""", # MISSING TRANSLATION
 	TUTORIAL_COMBAT22 = """Support abilities work similarly but target allies instead. Apply Earth Shield to your Master.""", # MISSING TRANSLATION
 	TUTORIAL_COMBAT24 = """Finish the combat.""", # MISSING TRANSLATION
 	TUTORIAL_COMBAT26 = """The loot window displays the results of the fight.""", # MISSING TRANSLATION
+	TUTORIAL_COMBAT26_1 = """Les combats laissent souvent des captifs, et celui-ci en a laissé deux. Le premier correspond à la commande vue au marché aux esclaves : livrez-le ici même avec la bande verte {color=yellow|Livrer}.""",
+	TUTORIAL_COMBAT26_1A = """Un captif peut correspondre à plusieurs commandes à la fois, c'est donc vous qui choisissez laquelle le reçoit. Choisissez la commande vue au marché aux esclaves.""",
+	TUTORIAL_COMBAT26_2 = """Livrer un captif rapporte immédiatement, comme au marché, et compte pour votre rang d'esclavagiste.""",
 	TUTORIAL_COMBAT27 = """You received a random character after the fight, which is common in dungeon encounters. Select them to inspect.""", # MISSING TRANSLATION
 	TUTORIAL_COMBAT28 = """Undesirable characters can be sold immediately, recruited, or enslaved.""", # MISSING TRANSLATION
 	TUTORIAL_COMBAT29 = """Attempt to persuade them by selecting the appropriate option.""", # MISSING TRANSLATION

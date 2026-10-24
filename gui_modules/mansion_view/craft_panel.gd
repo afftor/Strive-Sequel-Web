@@ -110,6 +110,7 @@ func setup(view_node):
 	globals.connecttexttooltip(order.get_node("OrderRow/Help"), tr("CRAFTPANEL_ORDER_HELP"), false, tooltip_node())
 	globals.connecttexttooltip($Body/Columns/Queue/HeaderRow/Help, tr("CRAFTPANEL_QUEUE_HELP"), false, tooltip_node())
 	set_static_texts()
+	register_tutorial_buttons()
 	visible = false
 
 
@@ -145,6 +146,116 @@ func order_box():
 #What the bench says about the thing on it: the description, between the card and the materials.
 func info_box():
 	return $Body/Columns/Bench/Scroll/Content
+
+
+#### the hard tutorial ####
+
+#The rooms chapter gives the kitchen its orders and its cook on this panel. Every list here is
+#built again on each change, and ClearContainer only hides the old rows until the frame ends, so
+#each of these is a search through the rows really shown rather than a node kept from the last
+#build. A search that comes up empty answers null, which the tutorial reads as "not built yet" and
+#asks again on the next frame - that is how a step can wait for the row its last click put there.
+func register_tutorial_buttons():
+	input_handler.register_btn_source('craftpanel_recipe_bread', self, 'tut_get_bread_recipe')
+	input_handler.register_btn_source('craftpanel_recipe_meatsoup', self, 'tut_get_meatsoup_recipe')
+	input_handler.register_btn_source('craftpanel_runs_plus10', self, 'tut_get_runs_plus10')
+	input_handler.register_btn_source('craftpanel_add', self, 'tut_get_add')
+	input_handler.register_btn_source('craftpanel_order_meatsoup', self, 'tut_get_meatsoup_order')
+	input_handler.register_btn_source('craftpanel_order_remove', self, 'tut_get_meatsoup_remove')
+	input_handler.register_btn_source('craftpanel_remove_yes', self, 'tut_get_meatsoup_remove_yes')
+	input_handler.register_btn_source('craftpanel_add_crafter', self, 'tut_get_free_place')
+	input_handler.register_btn_source('craftpanel_crafter_daisy', self, 'tut_get_daisy')
+	input_handler.register_btn_source('craftpanel_close', self, 'tut_get_close')
+
+
+func tut_get_bread_recipe():
+	return tut_get_recipe_row('bread')
+
+
+func tut_get_meatsoup_recipe():
+	return tut_get_recipe_row('meatsoup')
+
+
+func tut_get_recipe_row(code):
+	if !visible or mode != 'craft':
+		return null
+	for row in shown_children($Body/Columns/Recipes/Scroll/List, 'Button'):
+		if row.get_meta("recipe", "") == code:
+			return row
+	return null
+
+
+#The order box stands whatever is on the bench, so a button of it only counts while it is drawn.
+func tut_get_order_button(path):
+	var button = order_box().get_node(path)
+	return button if visible and button.is_visible_in_tree() else null
+
+
+func tut_get_runs_plus10():
+	return tut_get_order_button("AmountRow/Runs/Plus10")
+
+
+func tut_get_add():
+	return tut_get_order_button("Perform")
+
+
+#A queued order is found by what it makes rather than by where it stands in the queue.
+func tut_get_order_row(code):
+	if !visible:
+		return null
+	for row in shown_children($Body/Columns/Queue/Scroll/List, 'Order'):
+		var task = game_res().tasks_progresses.get(row.arraydata, null)
+		if task != null and !game_res().is_improve_task(task) and task.id == code:
+			return row
+	return null
+
+
+func tut_get_meatsoup_order():
+	return tut_get_order_row('meatsoup')
+
+
+#The row's own buttons are only shown on the order that is open, and the question only once asked.
+func tut_get_meatsoup_remove():
+	var row = tut_get_order_row('meatsoup')
+	if row == null or !row.get_node("Actions").visible:
+		return null
+	return row.get_node("Actions/Remove")
+
+
+func tut_get_meatsoup_remove_yes():
+	var row = tut_get_order_row('meatsoup')
+	if row == null or !row.get_node("Confirm").visible:
+		return null
+	return row.get_node("Confirm/Yes")
+
+
+#The first free place in the trade's rooms - the tutorial household has the one kitchen. The
+#column mixes room headers, crafters and free places, so the place is told by its mark.
+func tut_get_free_place():
+	if !visible or picking != null:
+		return null
+	for row in shown_children($Body/Columns/Crafters/Scroll/List, 'Free'):
+		if row.has_meta("free_place"):
+			return row
+	return null
+
+
+#Daisy among the people offered for that place. The list is sorted by skill, so she is found by
+#who she is rather than by where she lands in it.
+func tut_get_daisy():
+	if !visible or picking == null:
+		return null
+	for row in shown_children($Body/Columns/Crafters/Scroll/List, 'Worker'):
+		if !row.has_meta("char_id"):
+			continue
+		var character = person(row.get_meta("char_id"))
+		if character != null and character.get_stat('unique') == 'daisy':
+			return row
+	return null
+
+
+func tut_get_close():
+	return $CloseButton if visible else null
 
 
 func open(code = null):
@@ -390,6 +501,7 @@ func build_crafters():
 			row.connect("pressed", self, "take_off", [id])
 		for i in range(max(0, places - workers.size())):
 			var free = input_handler.DuplicateContainerTemplate(list, 'Free')
+			free.set_meta("free_place", true)
 			free.text = tr("CRAFTPANEL_ADD_CRAFTER")
 			free.connect("pressed", self, "start_pick", [entry.floor, entry.slot])
 
@@ -411,6 +523,7 @@ func build_candidates(list, entry, rooms):
 		if doing != null and doing.text != "":
 			sub = tr("CRAFTPANEL_NOW") % doing.text
 		var row = build_worker_row(list, character, worker_yield(character, entry.room), sub)
+		row.set_meta("char_id", id)
 		row.connect("pressed", self, "put_on", [id, entry.floor, entry.slot])
 
 
@@ -617,6 +730,7 @@ func by_recipe_order(first, second):
 func build_recipe_row(list, data, queued):
 	var row = input_handler.DuplicateContainerTemplate(list, 'Button')
 	row.pressed = picked_recipe.get(job) == data.code
+	row.set_meta("recipe", data.code)
 	var icon = row.get_node("Quality/Item")
 	icon.texture = stock_icon(data.resultitem)
 	icon.material = load("res://assets/ItemShader.tres").duplicate() if data.crafttype == 'modular' else null
