@@ -230,6 +230,7 @@ A new empty mods.ini has been created. Please re-enable compatible mods from the
 	EXPLORESHOP = "Boutique",
 	EXPLORBUYDUNGEON = "Acheter un donjon",
 	EXPLORENOTICEBOARD = "Tableau d'affichage",
+	EXPLORESETTLEMENTMANAGEMENT = "Gestion de la ville",
 	EXPLOREHIRE = "Location",
 	EXPLORESELLCHR = "Vendre des personnages",
 	EXPLOREQUESTS = "Quêtes",
@@ -9347,7 +9348,7 @@ La luxure satisfaite, vous la regardez gisant là, épuisée, brisée et sans d�
 	TUTORIAL_WORK8 = """You can now leave this menu.""", # MISSING TRANSLATION
 	TUTORIAL_WORK9 = """Click Finish Turn to advance time so your characters can progress their work and proficiency learning.""", # MISSING TRANSLATION
 	TUTORIAL_WORK10 = """Now let's take a look at the Service task. It differs from other tasks in the Work menu and has additional rules applied to the character.""", # MISSING TRANSLATION
-	TUTORIAL_WORK11 = """Service allows you to assign a character to various types of service work, including sexual services. Non-sexual tasks have different stat correlations and bonuses, so be sure to read the details. Assign Daisy to work as a waitress.""", # MISSING TRANSLATION
+	TUTORIAL_WORK11 = """Le service vous permet d'affecter un personnage à différents types de travail de service, y compris des services sexuels. Les tâches non sexuelles dépendent d'autres statistiques et donnent d'autres bonus, alors lisez bien les détails. Affectez Marguerite au poste de serveuse.""",
 	TUTORIAL_WORK12 = """Return to the Work menu.""", # MISSING TRANSLATION
 	TUTORIAL_WORK13 = """Even though you selected her as a waitress, you must first reassign her from crafting to service work.""", # MISSING TRANSLATION
 	TUTORIAL_WORK14 = """Here you can review additional rules and benefits of service work. While working, characters generate experience and a stat related to their task each turn.""", # MISSING TRANSLATION
@@ -9391,7 +9392,7 @@ Close this menu.""", # MISSING TRANSLATION
 	TUTORIAL_WORK_ROOM12 = """La construction se mesure en travail plutôt qu'en jours, donc un meilleur bâtisseur élève une salle plus vite. Celle-ci est presque terminée - finissez le tour.""",
 	TUTORIAL_WORK_ROOM14 = """La cuisine est debout. Ouvrez-la.""",
 	TUTORIAL_WORK_ROOM15 = """Une salle d'artisanat ouvre l'atelier sur son propre métier. Ouvrez-le d'ici.""",
-	TUTORIAL_WORK_CRAFT1 = """Voici l'atelier. Le métier de la cuisine, Cuisine, est déjà ouvert, et ses recettes sont listées au centre. Choisissez le pain.""",
+	TUTORIAL_WORK_CRAFT1 = """Voici l'atelier. L'onglet Cuisine, le métier de cette salle, est déjà ouvert, et ses recettes sont listées au centre. Choisissez le pain.""",
 	TUTORIAL_WORK_CRAFT2 = """L'établi montre ce que produit une série et ce qu'elle consomme. La commande elle-même se règle sous la file, à droite : un {color=yellow|Lot} de séries, {color=yellow|Garder en stock} entre deux nombres, ou {color=yellow|Sans fin}. Augmentez ce lot de 10 séries.""",
 	TUTORIAL_WORK_CRAFT3 = """Appuyez sur {color=yellow|Ajouter à la file}.""",
 	TUTORIAL_WORK_CRAFT4 = """Les commandes s'ajoutent à la file au lieu de se remplacer, et chaque salle d'un métier les traite par le haut. Ajoutez-en une deuxième - choisissez la soupe de viande.""",
@@ -10493,7 +10494,7 @@ Sans attendre, Myr commença à psalmodier un puissant sortilège. En quelques i
 
 marmonna Duncan pour lui-même. Cependant, Greg était bien plus surpris par ce qui se passait. Il réalisa qu'il venait de perdre son avantage tactique et se retira rapidement du combat.
 
-{Greg : - Sorciers maudits. Repliez-vous dans les murs de la ville !}
+{color=yellow|Greg : - Sorciers maudits. Repliez-vous dans les murs de la ville !}
 
 Suite à cet ordre, les forces rebelles se replient, mais l'armée des guildes prend rapidement l'initiative et entre en action.""",
 	BETRAYAL_CONFIRMED_10 = """Cependant, avant que le gros des forces de la guilde ne puisse entrer dans la ville, un gigantesque dôme blanc a enveloppé le refuge des rebelles. Une magie d'une ampleur inégalée bloqua complètement toute avancée ou attaque de l'armée de la guilde.
@@ -10694,7 +10695,7 @@ Elle vous tend un rouleau de papier qu'elle a pris dans la pile posée sur une p
 
 {color=yellow|Aire : - On dirait qu'ils ont réussi à pénétrer à l'intérieur. Leur armée principale n'attendait que ça. Je crains que nous ne tenions pas longtemps.}
 
-{Greg : - Bon sang. Ordonnez la retraite. Et assure-toi que la princesse est en sécurité. Maudite soit cette championne inutile, elle n'a pas intérêt à s'en sortir vivante,}""",
+{color=aqua|Greg : - Bon sang. Ordonnez la retraite. Et assure-toi que la princesse est en sécurité. Maudite soit cette championne inutile, elle n'a pas intérêt à s'en sortir vivante,}""",
 	DIVINE_SYMBOL_46 = """{color=aqua|Myr : - Huh, [il] a vraiment réussi à s'en sortir. Vous n'allez pas mener l'assaut ?}
 
 {color=yellow|Duncan : - Non, c'est fini et il n'y a pas de défi. J'ai mis des cavaliers à l'affût de toute fuite potentielle, la princesse devrait être à nous dans peu de temps.}
@@ -10804,7 +10805,7 @@ Vous vous préparez, vous et votre groupe, pour le combat à venir. Duncan se d�
 
 {color=yellow|Anastasia : - C'est mal, je ne peux pas laisser tout le monde derrière moi.}
 
-{Greg : - Ça suffit, nous perdons du temps. Aire ! Faites partir la princesse et revenez me voir immédiatement.}""",
+{color=aqua|Greg : - Ça suffit, nous perdons du temps. Aire ! Faites partir la princesse et revenez me voir immédiatement.}""",
 	GUILD_ATTACK_ON_HIDEOUT_3 = """{color=yellow|Aire : - ...je comprends. Par ici, votre Altesse.}
 
 {color=aqua|Anastasia : - Non, qu'est-ce que je vais faire après ça ?}
@@ -10835,7 +10836,7 @@ GUILD_ATTACK_ON_HIDEOUT_4_2 = """Dans les pièces les plus profondes de la cache
 
 {color=yellow|Anastasia : - C'est mal, je ne peux pas laisser tout le monde derrière moi.}
 
-{Greg : - Ce n'est pas un débat. Vous serez exécuté si vous vous retrouvez entre leurs mains. Allez-y, nous allons les retenir pour qu'ils ne vous poursuivent pas.}
+{color=aqua|Greg : - Ce n'est pas un débat. Vous serez exécuté si vous vous retrouvez entre leurs mains. Allez-y, nous allons les retenir pour qu'ils ne vous poursuivent pas.}
 
 {color=yellow|Anastasia : - ...}""",
 
@@ -10892,7 +10893,7 @@ Avant qu'elle ne puisse dire quoi que ce soit d'autre, les hommes de Duncan s'em
 
 {color=aqua|Duncan : - Greg, baisse-toi et rends-toi. Cette rébellion pathétique est terminée.}
 
-{Greg : - Ah, Duncan. J'aurais pu m'attendre à ce que tu te montres ici. Dommage pour toi, Anastasia est déjà loin d'ici.}
+{color=yellow|Greg : - Ah, Duncan. J'aurais pu m'attendre à ce que tu te montres ici. Dommage pour toi, Anastasia est déjà loin d'ici.}
 
 {color=aqua|Duncan : - Nous verrons cela, mes hommes ont déjà encerclé la zone. Maintenant, lâchez votre w-}
 
@@ -11288,7 +11289,7 @@ La prêtresse prend encore une longue pause pour contempler la situation et fini
 	LOOKING_FOR_PRINCESS_OPTION_44 = """*Refus*""",
 	LOOKING_FOR_PRINCESS_43 = """Vous avez choisi le sacrifice pour prendre la place d'Anastasia. En vous séparant de [name], vous ne vous attendez pas à revoir [lui].
 
-{Partez maintenant et dites à vos maîtres que nous tenons toujours à notre accord.}
+{color=aqua|Partez maintenant et dites à vos maîtres que nous tenons toujours à notre accord.}
 
 Anastasia observe tranquillement [name] être emmené, s'en voulant peut-être d'avoir causé une autre mort.""",
 	LOOKING_FOR_PRINCESS_44 = """{color=aqua|Prêtresse : - Alors nous allons procéder comme nous l'avons décidé.}
@@ -11354,7 +11355,7 @@ Il est temps de rentrer chez soi.""",
 	PRE_ANASTASIA_EXECUTION_10 = """- D'accord, mais nous ne pouvons pas simplement l'achever et en finir. Pas tout seul en tout cas. Venez.""",
 	PRE_ANASTASIA_EXECUTION_11 = """Les guildes et les propriétaires se sont de nouveau rassemblés, principalement pour célébrer la fin de la guerre maintenant qu'elle a été gagnée.
 
-{Comme beaucoup l'ont déjà appris, la princesse rebelle a finalement été capturée par [name], qui deviendra le prochain maire de la ville à la lumière de [ses] accomplissements. Aujourd'hui, nous, les chefs de guilde, décidons du sort de la princesse. }
+{color=aqua|Comme beaucoup l'ont déjà appris, la princesse rebelle a finalement été capturée par [name], qui deviendra le prochain maire de la ville à la lumière de [ses] accomplissements. Aujourd'hui, nous, les chefs de guilde, décidons du sort de la princesse. }
 
 {color=yellow|Myr : - Comme chacun le sait, elle est à l'origine de la guerre civile qui a entraîné de nombreuses pertes, tant en vies humaines qu'en biens...}""",
 	PRE_ANASTASIA_EXECUTION_12 = """{color=aqua|Sigmund : - Vous tenez vraiment à vos jouets magiques, hein. Les mages ont-ils toujours été aussi mercantiles ?}
@@ -12792,7 +12793,7 @@ La voix d'Amelia devient plus douce et plus soyeuse tandis qu'elle commence à v
 
 Amelia dégrafe lentement le devant de sa chemise en satin pour mettre à nu ses seins voluptueux. Elle trace de petits cercles avec ses doigts huileux autour de ses mamelons durs et arque gracieusement son dos en se penchant vers votre bite. 
 
-{Amelia : - Si cela vous fait plaisir, monseigneur ?}
+{color=yellow|Amelia : - Si cela vous fait plaisir, monseigneur ?}
 
 Sans attendre de réponse, Amelia prend ses seins lourds dans ses mains et les presse ensemble autour de la tige de votre bite. En partant des hanches, elle presse ses seins pour masser votre pénis. De l'huile s'étale sur sa peau lisse tandis qu'elle rebondit légèrement de haut en bas avec votre bite entourée de son décolleté.""",
 	AMELIA_SILK_REPLY_1_1_6 = """Amelia baisse le menton et commence à lécher la tête de votre pénis qui glisse entre ses seins. A chaque rebond, sa langue se rapproche jusqu'à ce que ta bite atteigne ses lèvres avides et qu'elle l'aspire dans sa bouche. Elle te suce de manière experte tout en continuant à masser ton pénis avec ses seins.
@@ -13002,7 +13003,7 @@ Vos poussées s'accélèrent et vous pilonnez la chatte d'Amelia sans ménagemen
 
 Une fois que ses cris se sont calmés, vous saisissez sa taille étroite à deux mains pour pouvoir la baiser plus fort. Vos deux corps sont couverts d'une fine couche de sueur. Amelia halète bruyamment tandis que votre pénis s'enfonce violemment dans sa chatte. Vous sentez que votre orgasme approche à grands pas. 
 
-{Amelia : - Joue en moi [Maître], jouis dans ma petite chatte désobéissante !}
+{color=yellow|Amelia : - Joue en moi [Maître], jouis dans ma petite chatte désobéissante !}
 
 Votre dernière poussée puissante la soulève du sol. Empalée sur votre bite. Elle est suspendue au harnais tandis que votre sperme jaillit dans sa chatte meurtrie. Amelia hurle, le dos arqué, pendant que votre sperme l'envahit, puis miaule longuement lorsque vous vous retirez.""",
 	AMELIA_BONDAGE_8 = """Amelia chantonne doucement alors qu'elle se tient sur une jambe, le sperme coulant de sa chatte gonflée sur ses bas. Vous lui demandez si elle a appris sa leçon ou si elle a besoin d'une autre discipline.
@@ -14359,7 +14360,7 @@ Vous quittez la pièce et attendez qu'ils aient fini.""",
 
 {color=aqua|Myr : - Excellent. Je suis sûr qu'[il] aura un travail qui vous conviendra. Peut-être que tu trouveras aussi un homme et que tu cesseras d'être une telle emmerdeuse. Adios.}
 
-{Jean : - Attendez, je n'ai pas fini !}
+{color=yellow|Jean : - Attendez, je n'ai pas fini !}
 
 Avant que Jean n'ait pu protester, la puissante force magique vous a poussés tous les deux hors du bureau de Myr.""",
 	JEAN_INTRO_4 = """ - Maudite sorcière... ! Merde... 
@@ -15308,7 +15309,7 @@ Tout est silencieux pendant quelques instants alors que tu la tiens là, son sou
 	
 	CALI_AMELIA_1 = """Comme d'habitude aujourd'hui, Cali a suivi ses cours avec Amelia à la Guilde des serviteurs. Mais cette fois-ci, Amelia ne peut s'empêcher de remarquer que la jeune fille est distraite, et que son effort est loin d'être habituel.
 
-{Cali, dis-moi, y a-t-il quelque chose qui te tracasse ?}
+{color=aqua|Cali, dis-moi, y a-t-il quelque chose qui te tracasse ?}
 
 Cali releva la tête alors qu'elle était plongée dans ses pensées, regardant Amelia d'un air quelque peu surpris.
 
@@ -15317,7 +15318,7 @@ Cali releva la tête alors qu'elle était plongée dans ses pensées, regardant 
 {color=yellow|Amelia : - C'est bon Cali, tu peux me faire confiance. Si ce n'est pas en tant que mentor, au moins en tant qu'amie.}""",
 	CALI_AMELIA_2 = """Cali réfléchit un long moment avant de prendre une lente inspiration.
 
-{J'ai essayé d'attirer l'attention du [Maître] ces derniers temps. Mais ça ne marche pas. C'est comme s'[il] ne me remarquait pas du tout...}
+{color=yellow|J'ai essayé d'attirer l'attention du [Maître] ces derniers temps. Mais ça ne marche pas. C'est comme s'[il] ne me remarquait pas du tout...}
 
 {color=aqua|Amelia : - Je vois. Oui, ce serait décourageant.}
 
@@ -15353,7 +15354,7 @@ CALI_AMELIA_4_1 = """Cali se laissait distraire par la conversation alors qu'Ame
 Cali commença à répondre, mais au lieu de cela, elle laissa échapper un petit gémissement doux quand Amelia fit glisser le haut de la fille, sa main saisissant les doux seins de la jeune fille. Ils n'étaient pas très gros, mais le corps de la jeune fille était si beau qu'Amelia ne pouvait s'empêcher de les explorer.""",
 	CALI_AMELIA_5 = """Quelques instants plus tard, les deux s'embrassaient à nouveau, sans interruption dès que leurs langues se rencontraient. Les hanches d'Amelia se frottaient doucement sur sa jambe nue. Après que le souffle leur ait demandé de rompre le baiser, le visage de Cali devint d'un rouge profond lorsque la main d'Amelia se glissa plus bas, écartant sa culotte.
 
-{Cali : - A-ah!}
+{color=yellow|Cali : - A-ah!}
 
 Cali parlait dans une panique hébétée avant de transformer ses protestations en un gémissement de besoin lorsque la femme commença à frotter doucement. Les protestations maintenant étouffées, Amelia continuait à faire ce qui était nécessaire. Quelques instants après la stimulation de la jeune fille, Amelia déplace sa main vers sa robe, la tirant vers le bas pour exposer ses seins à la jeune fille.""",
 	CALI_AMELIA_6 = """Cali se penchera bientôt sur Amelia pour l'embrasser à nouveau, les baisers étant nécessaires et désespérés à mesure que le désir de la jeune fille grandit. Le doux son des lèvres et des langues entrelacées est bientôt interrompu par un gémissement guttural, Amelia ayant glissé ses doigts dans la jeune fille.
@@ -22870,6 +22871,22 @@ Touche de raccourci : 3""",
 	FACTION_POINTS = "Points de faction",
 	UNSPENT_POINTS = "Points non dépensés",
 	UPGRADES_INFO = """Upgrade effects and quest settings update after some time has passed.""", # MISSING TRANSLATION
+	SETTLEMENT_MANAGEMENT_LABEL = "Gestion de la ville",
+	SETTLEMENT_MANAGEMENT_INFO = "Payé sur le trésor. Chaque amélioration prend effet immédiatement.",
+	SETTLEMENT_MANAGEMENT_GOLD = "Or : %d",
+	SETTLEMENT_MANAGEMENT_SATURATION = "Saturation : %d",
+	SETTLEMENT_MANAGEMENT_SATURATION_BONUS = "Saturation : %d (+%d%%)",
+	SETTLEMENT_MANAGEMENT_UNLOCKED = "Désormais ouverte : %s",
+	SETTLEMENT_MANAGEMENT_UNLOCKED_LOG = "La Gestion de la ville est désormais ouverte : %s. C'est la première option du menu de la ville.",
+	SETTLEMENT_UPGRADE_PRICE = "Coût : %d or",
+	SETTLEMENT_UPGRADE_BUILT = "Construit",
+	SETTLEMENT_UPGRADE_TRADE_POST = "Comptoir commercial",
+	SETTLEMENT_UPGRADE_TRADE_POST_DISC = "Des marchands acheminent les marchandises de cette ville jusqu'au marché d'Aliron, où elles sont vendues avec tout le reste.",
+	SETTLEMENT_UPGRADE_TRADE_POST_NOW = "Ses marchandises sont en vente au marché d'Aliron.",
+	SETTLEMENT_UPGRADE_TAVERN = "Taverne",
+	SETTLEMENT_UPGRADE_TAVERN_DISC = "Attire davantage de clients en quête de compagnie.",
+	SETTLEMENT_UPGRADE_TAVERN_NEXT = "Suivant : saturation +%d%% (%d → %d par semaine).",
+	SETTLEMENT_UPGRADE_TAVERN_NOW = "Saturation +%d%%.",
 	UNLOCKED_LABEL = """Unlocked""", # MISSING TRANSLATION
 	POINTS_LABEL = """points""", # MISSING TRANSLATION
 	CANT_PURCHASE_LOC_LABEL = """Can't purchase anymore""", # MISSING TRANSLATION
@@ -23100,7 +23117,7 @@ This stat will grow by attending to this job.""", # MISSING TRANSLATION
 	RENCONTRE_PULLTAIL_ACCEPT_1 = "Malgré une douleur intense, {^[nom2] :[race2] [garçon2] :[il2]} supporte stoïquement vos sévices",
 	DATING_PULLTAIL_RESIST_1 = "{^[name2] :[race2] [boy2] :[he2]} a l'air {^mad:en colère} et essaie de se libérer",
 	DATING_PULLTAIL_RESIST_2 = "{^[nom2] :[race2] [garçon2] :[he2]} {^whines:cry} en signe de protestation{^ :, implorant la pitié}.",
-	DATING_SLAP_INITIATE_1 = "Vous giflez {^[nom2] :[race2] [garçon2]} au visage{ : laissant une marque sur [sa2] joue}.",
+	DATING_SLAP_INITIATE_1 = "Vous giflez {^[name2]:[race2] [boy2]} au visage{^:, laissant une marque sur [his2] joue}.",
 	DATING_SLAP_ACCEPT_1 = "Malgré une douleur intense, {^[name2] :[race2] [boy2] :[he2]} supporte stoïquement votre violence",
 	DATING_SLAP_RESIST_1 = "{^[name2] :[race2] [boy2] :[he2]} a l'air {^mad:très agité}.", 
 	DATING_FOOD_INITIATE_1 = "Vous offrez à {^[nom2] :[race2] [garçon2] :[he2]} une gâterie de [nourriture].",
@@ -27270,7 +27287,7 @@ Upon your arrival, she turns toward you. Her eyes still glow that unsettling vio
 	JEAN_SYLAS_SEARCH_JEAN_OPTION_RECORDS = """I read the records, alright. You were sealed five hundred years ago. Doesn't even sound that long for a creature like you.""", # MISSING TRANSLATION
 	JEAN_SYLAS_DEMON_TIME_LONG = """{color=aqua|Jean: — Five hundred years, dammit! Five hundred years sealed in a piece of glass! All just because one of those fucking zealots turned out to be oh so holy and raised an alarm after noticing my presence!}""", # MISSING TRANSLATION
 	JEAN_SYLAS_DEMON_TIME_RECORDS = """{color=aqua|Jean: — Fuck you! Five hundred years isn't long when you're having fun, not when you're stuck in one place! And all because one of those fucking zealots turned out to be oh so holy and raised an alarm after noticing my presence!}""", # MISSING TRANSLATION
-	JEAN_SYLAS_DEMON_MONOLOGUE_1 = """{color=reed|Jean: — I was so bored and could do nothing about it! Well... almost nothing. Of course, I tirelessly worked on my plan to escape, but that's a given.}
+	JEAN_SYLAS_DEMON_MONOLOGUE_1 = """{color=aqua|Jean: — I was so bored and could do nothing about it! Well... almost nothing. Of course, I tirelessly worked on my plan to escape, but that's a given.}
 
 The creature continues, clearly reveling in its own cunning, savoring each word like a well‑earned victory.""", # MISSING TRANSLATION
 	JEAN_SYLAS_DEMON_MONOLOGUE_2 = """{color=aqua|Jean: — Even stuck in that glass, I shaped legends. I guided discoveries. I nudged the curious exactly where I needed them. I changed dozens of hosts just to grab a tiny bit more power for myself each time...}
@@ -31595,6 +31612,101 @@ It is not the kind of intimacy that announces itself loudly, but it stays with y
 You leave her in the shade and return to the others, carrying with you the strange certainty that Kuro is still watching.""", # MISSING TRANSLATION
 	ENEMYRILU_MADDENED = """Strange girl""", # MISSING TRANSLATION
 	
+	CRAFTPANEL_TITLE = """Atelier""",
+	CRAFTPANEL_JOB_SMITH = """Forge""",
+	CRAFTPANEL_JOB_TAILOR = """Couture""",
+	CRAFTPANEL_JOB_ALCHEMY = """Alchimie""",
+	CRAFTPANEL_JOB_COOKING = """Cuisine""",
+	CRAFTPANEL_TAB_HINT = """%s de travail par tour · %d dans la file""",
+	CRAFTPANEL_CRAFTERS = """Artisans""",
+	CRAFTPANEL_CRAFTERS_HELP = """Tous ceux qui travaillent dans les salles de ce métier, et le travail que chacun apporte à la file à chaque tour. Les outils d'une salle multiplient ce que font ses artisans.\nCliquez sur une place libre pour y mettre quelqu'un, ou sur un artisan pour le retirer.""",
+	CRAFTPANEL_PER_TURN = """%s par tour""",
+	CRAFTPANEL_NO_ROOM = """Pas encore de salle pour ce métier""",
+	CRAFTPANEL_TOOLS_HINT = """Outils de cette salle : travail ×%s""",
+	CRAFTPANEL_SKILL = """%s %s""",
+	CRAFTPANEL_TAKE_OFF = """Cliquez pour retirer %s de ce travail""",
+	CRAFTPANEL_ADD_CRAFTER = """+ Ajouter un artisan""",
+	CRAFTPANEL_PICK_FOR = """%s : qui y travaille ?""",
+	CRAFTPANEL_BACK = """Retour""",
+	CRAFTPANEL_NOBODY_FREE = """Personne au manoir ne peut prendre cette place.""",
+	CRAFTPANEL_IDLE = """Sans tâche""",
+	CRAFTPANEL_NOW = """Actuellement : %s""",
+	CRAFTPANEL_MODE_RECIPES = """Recettes""",
+	CRAFTPANEL_MODE_IMPROVE = """Améliorations""",
+	CRAFTPANEL_FILTER_ALL = """Tout""",
+	CRAFTPANEL_FILTER_MATERIALS = """Matériaux""",
+	CRAFTPANEL_FILTER_GEAR = """Équipement""",
+	CRAFTPANEL_FILTER_COSTUME = """Costumes""",
+	CRAFTPANEL_FILTER_USABLES = """Consommables""",
+	CRAFTPANEL_ITEMS_ALL = """Tout""",
+	CRAFTPANEL_ITEMS_WEAPONS = """Armes""",
+	CRAFTPANEL_ITEMS_ARMOR = """Armures""",
+	CRAFTPANEL_NO_RECIPES = """Aucune recette ne correspond.""",
+	CRAFTPANEL_IN_QUEUE = """Déjà dans la file""",
+	CRAFTPANEL_NEEDS_EXPANSION = """Requiert Agrandissement %s""",
+	CRAFTPANEL_ANY_MATERIAL = """%s : tout matériau adapté, choisi sur l'établi""",
+	CRAFTPANEL_EDITING = """Modification d'une commande. Matériaux fixés.""",
+	CRAFTPANEL_NEW_ORDER = """Nouvelle commande""",
+	CRAFTPANEL_CARD_META = """en stock %d""",
+	CRAFTPANEL_STATS = """Statistiques""",
+	CRAFTPANEL_STATS_POOR = """En qualité Médiocre""",
+	CRAFTPANEL_CHOOSE = """Choisir""",
+	CRAFTPANEL_PICK_BELOW = """choisissez ci-dessous""",
+	CRAFTPANEL_CHOOSE_MATERIAL = """· choisissez un matériau""",
+	CRAFTPANEL_CAPACITY_BONUS = """Capacité d'enchantement : %s""",
+	CRAFTPANEL_NO_BONUS = """aucun bonus""",
+	CRAFTPANEL_AMOUNT_BATCH = """Lot""",
+	CRAFTPANEL_AMOUNT_KEEP = """Garder en stock""",
+	CRAFTPANEL_AMOUNT_ENDLESS = """Sans fin""",
+	CRAFTPANEL_ORDER_HELP = """Lot fait un nombre fixe de séries. Garder en stock reprend dès que le stock passe sous le nombre bas et s'arrête au nombre haut. Sans fin continue jusqu'à ce que vous la retiriez.\nLes matériaux sont pris au début de chaque série ; une commande qui en manque attend et la suivante est traitée.""",
+	CRAFTPANEL_RUNS = """Séries""",
+	CRAFTPANEL_FROM = """de""",
+	CRAFTPANEL_TO = """à""",
+	CRAFTPANEL_UNTIL_REMOVED = """jusqu'à son retrait""",
+	CRAFTPANEL_TURN = """%d tour""",
+	CRAFTPANEL_TURNS = """%d tours""",
+	CRAFTPANEL_CHOOSE_FOR = """Choisissez un matériau pour : %s""",
+	CRAFTPANEL_SHORT_OF = """Il manque %s. La commande attend""",
+	CRAFTPANEL_SHORT_FIRST_STEP = """Il manque %s pour la première étape. La commande attend""",
+	CRAFTPANEL_ADD = """Ajouter à la file""",
+	CRAFTPANEL_SAVE = """Enregistrer""",
+	CRAFTPANEL_NO_ITEMS = """Aucun équipement que cet atelier puisse améliorer.""",
+	CRAFTPANEL_HIGHEST = """qualité maximale""",
+	CRAFTPANEL_STEP_WORK = """Travail pour l'étape suivante""",
+	CRAFTPANEL_STEP_GOLD = """Or pour l'étape suivante, payé au début de son travail""",
+	CRAFTPANEL_GOLD_BY_STEP = """Or pour chaque étape, payé au début de son travail :""",
+	CRAFTPANEL_MATERIAL_BY_STEP = """Pour chaque étape, pris au début de son travail :""",
+	CRAFTPANEL_WORN_BY = """Porté par %s""",
+	CRAFTPANEL_ON_BENCH = """À l'atelier""",
+	CRAFTPANEL_ON_BENCH_NOW = """Sur l'établi""",
+	CRAFTPANEL_STEP_OF = """Étape %d sur %d""",
+	CRAFTPANEL_NOW_QUALITY = """actuel""",
+	CRAFTPANEL_TO_CRAFT = """%s pour fabriquer""",
+	CRAFTPANEL_AT_BEST = """Cette pièce est déjà à son meilleur.""",
+	CRAFTPANEL_SEND = """Envoyer à : %s""",
+	CRAFTPANEL_QUEUE = """File""",
+	CRAFTPANEL_QUEUE_HELP = """Toutes les salles de ce métier traitent cette même file par le haut. Cliquez sur une commande pour la modifier, faites-la glisser ou utilisez les flèches pour la déplacer.\nAméliorer un équipement le retire à celui qui le porte et de la réserve jusqu'à la fin du travail ; il lui revient ensuite.""",
+	CRAFTPANEL_QUEUE_EMPTY = """Rien dans la file. Ceux qui travaillent ici se reposent.""",
+	CRAFTPANEL_ORDER_LEFT = """reste %d""",
+	CRAFTPANEL_ORDER_ENDLESS = """Sans fin""",
+	CRAFTPANEL_ORDER_KEEP = """Stock %d–%d · %d en réserve""",
+	CRAFTPANEL_STATUS_WORKING = """En cours""",
+	CRAFTPANEL_STATUS_WAITING = """Suivant""",
+	CRAFTPANEL_STATUS_NOMAT = """Rupture""",
+	CRAFTPANEL_STATUS_NOGOLD = """Sans or""",
+	CRAFTPANEL_STATUS_NOWORKERS = """Personne""",
+	CRAFTPANEL_STATUS_HELD = """Bloquée""",
+	CRAFTPANEL_STATUS_STOCKED = """Stock plein""",
+	CRAFTPANEL_ONGOING = """En continu""",
+	CRAFTPANEL_REMOVE_ORDER = """Retirer cette commande ?""",
+	CRAFTPANEL_STOP_IMPROVE = """Arrêter et reprendre la pièce ?""",
+	CRAFTPANEL_REMOVE = """Retirer""",
+	CRAFTPANEL_KEEP = """Garder""",
+	CRAFTPANEL_LOG_IMPROVED = """%s est maintenant %s.""",
+	CRAFTPANEL_LOG_BACK_WITH = """%s l'a récupérée.""",
+
+	TRAITREPLACE_KEEP = """Garder""",
+
 }
 
 

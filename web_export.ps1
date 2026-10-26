@@ -119,26 +119,121 @@ foreach ($suffix in $runtimeSuffixes) {
 # pack is published in parts. The loading shell downloads them and joins them
 # again in the browser before the engine starts. Each part is named by its own
 # contents, so after an update players download only the parts that changed.
-# Godot packs the images first and the game scripts (gui_modules, src) at the
-# end, so a code change touches only the first part (the file table) and the
-# last few.
-$packPartSize = 20MB
+# The cuts are placed by the contents too: a part ends where a rolling hash of
+# its last 64 bytes matches a fixed pattern. A file that grows or shrinks
+# shifts every byte after it, but the cuts move along with those bytes, so only
+# the parts around the change get new names. The file table at the start of
+# the pack changes with every update, so it is cut off into a part of its own.
+$packPartMinSize = 512KB
+$packPartMaxSize = 24MB
+# After the minimum size, a cut comes on average every 2^21 bytes (2 MiB).
+$packPartMaskBits = 21
+Add-Type -TypeDefinition @'
+using System.Collections.Generic;
+using System.IO;
+
+public static class StrivePackCutter
+{
+	// Must never change: a different table would move every cut, and players
+	// would download the whole pack again.
+	static readonly ulong[] Gear = MakeGear();
+
+	static ulong[] MakeGear()
+	{
+		var gear = new ulong[256];
+		ulong state = 0;
+		for (int i = 0; i < gear.Length; i++)
+		{
+			// splitmix64
+			state += 0x9E3779B97F4A7C15UL;
+			ulong z = state;
+			z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9UL;
+			z = (z ^ (z >> 27)) * 0x94D049BB133111EBUL;
+			gear[i] = z ^ (z >> 31);
+		}
+		return gear;
+	}
+
+	// Where the file table of a Godot 3 pack ends. The table holds the offset
+	// and MD5 of every file, so any change rewrites it.
+	public static long TableEnd(string path)
+	{
+		using (var reader = new BinaryReader(File.OpenRead(path)))
+		{
+			if (reader.ReadUInt32() != 0x43504447 || reader.ReadUInt32() != 1)
+			{
+				throw new InvalidDataException("Not a Godot 3 pack: " + path);
+			}
+			// After the engine version and 16 reserved words.
+			reader.BaseStream.Position = 84;
+			int count = reader.ReadInt32();
+			for (int i = 0; i < count; i++)
+			{
+				int pathLength = reader.ReadInt32();
+				// Path, offset, size and MD5.
+				reader.BaseStream.Position += pathLength + 8 + 8 + 16;
+			}
+			return reader.BaseStream.Position;
+		}
+	}
+
+	// Returns the length of each part, in order. One part always ends at
+	// firstCut.
+	public static int[] Cut(string path, long firstCut, int minSize, int maskBits, int maxSize)
+	{
+		// Bit k of the gear hash depends on the last k + 1 bytes only, so the
+		// top bits cover the last 64 bytes.
+		ulong mask = ~0UL << (64 - maskBits);
+		var lengths = new List<int>();
+		var buffer = new byte[1 << 20];
+		long position = 0;
+		int length = 0;
+		ulong hash = 0;
+		using (var stream = File.OpenRead(path))
+		{
+			int read;
+			while ((read = stream.Read(buffer, 0, buffer.Length)) > 0)
+			{
+				for (int i = 0; i < read; i++)
+				{
+					hash = (hash << 1) + Gear[buffer[i]];
+					length++;
+					position++;
+					if (position == firstCut || (length >= minSize && (hash & mask) == 0) || length >= maxSize)
+					{
+						lengths.Add(length);
+						length = 0;
+						hash = 0;
+					}
+				}
+			}
+		}
+		if (length > 0)
+		{
+			lengths.Add(length);
+		}
+		return lengths.ToArray();
+	}
+}
+'@
 $packName = "$versionedBase.pck"
 $packPath = Join-Path $outputPath $packName
 $packSize = (Get-Item -LiteralPath $packPath).Length
 $packParts = @()
-$partBuffer = New-Object byte[] $packPartSize
+$packTableEnd = [StrivePackCutter]::TableEnd($packPath)
+$partLengths = [StrivePackCutter]::Cut($packPath, $packTableEnd, $packPartMinSize, $packPartMaskBits, $packPartMaxSize)
+$partBuffer = New-Object byte[] $packPartMaxSize
 $packStream = [IO.File]::OpenRead($packPath)
 $hashAlgorithm = [Security.Cryptography.SHA256]::Create()
 try {
-	while ($packStream.Position -lt $packSize) {
-		$partLength = 0
-		while ($partLength -lt $packPartSize) {
-			$read = $packStream.Read($partBuffer, $partLength, $packPartSize - $partLength)
+	foreach ($partLength in $partLengths) {
+		$filled = 0
+		while ($filled -lt $partLength) {
+			$read = $packStream.Read($partBuffer, $filled, $partLength - $filled)
 			if ($read -le 0) {
-				break
+				throw "The main pack ended before its last part: $packPath"
 			}
-			$partLength += $read
+			$filled += $read
 		}
 		$partHash = ([BitConverter]::ToString($hashAlgorithm.ComputeHash($partBuffer, 0, $partLength))).Replace("-", "").Substring(0, 12).ToLowerInvariant()
 		$partName = "index.$partHash.pck"
@@ -186,5 +281,5 @@ Copy-Item -LiteralPath (Join-Path $projectRoot "web\_headers") -Destination (Joi
 
 Write-Host "Web export ready: $outputPath"
 Write-Host "CG assets are served from: $(Join-Path $outputPath 'cg-assets')"
-Write-Host "Main pack: $($packParts.Count) parts of up to $($packPartSize / 1MB) MiB"
+Write-Host "Main pack: $($packParts.Count) parts of up to $($packPartMaxSize / 1MB) MiB"
 Write-Host "Engine version: $releaseId"
