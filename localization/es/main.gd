@@ -210,6 +210,7 @@ pero conservarás todos tus personajes, objetos e inventario. Usa este modo para
 	EXPLORESHOP = "Mercado",
 	EXPLORBUYDUNGEON = "Comprar mazmorra",
 	EXPLORENOTICEBOARD = "Tablón de anuncios",
+	EXPLORESETTLEMENTMANAGEMENT = "Gestión de la ciudad",
 	EXPLOREHIRE = "Comprar",
 	EXPLORESELLCHR = "Vender personajes",
 	EXPLOREQUESTS = "Misiones",
@@ -9359,7 +9360,7 @@ Sin embargo, puedes actualizar el archivo.
 	TUTORIAL_WORK8 = """You can now leave this menu.""", # MISSING TRANSLATION
 	TUTORIAL_WORK9 = """Click Finish Turn to advance time so your characters can progress their work and proficiency learning.""", # MISSING TRANSLATION
 	TUTORIAL_WORK10 = """Now let's take a look at the Service task. It differs from other tasks in the Work menu and has additional rules applied to the character.""", # MISSING TRANSLATION
-	TUTORIAL_WORK11 = """Service allows you to assign a character to various types of service work, including sexual services. Non-sexual tasks have different stat correlations and bonuses, so be sure to read the details. Assign Daisy to work as a waitress.""", # MISSING TRANSLATION
+	TUTORIAL_WORK11 = """El servicio te permite asignar a un personaje a varios tipos de trabajo de servicio, incluidos los servicios sexuales. Las tareas no sexuales dependen de otras estadísticas y dan otras bonificaciones, así que lee los detalles. Asigna a Daisy como camarera.""",
 	TUTORIAL_WORK12 = """Return to the Work menu.""", # MISSING TRANSLATION
 	TUTORIAL_WORK13 = """Even though you selected her as a waitress, you must first reassign her from crafting to service work.""", # MISSING TRANSLATION
 	TUTORIAL_WORK14 = """Here you can review additional rules and benefits of service work. While working, characters generate experience and a stat related to their task each turn.""", # MISSING TRANSLATION
@@ -9403,7 +9404,7 @@ Close this menu.""", # MISSING TRANSLATION
 	TUTORIAL_WORK_ROOM12 = """La construcción se mide en trabajo, no en días, así que un mejor constructor levanta una sala antes. Esta ya casi está - termina el turno.""",
 	TUTORIAL_WORK_ROOM14 = """La cocina ya está en pie. Ábrela.""",
 	TUTORIAL_WORK_ROOM15 = """Una sala de oficio abre el taller en su propio oficio. Ábrelo desde aquí.""",
-	TUTORIAL_WORK_CRAFT1 = """Este es el taller. El oficio de la cocina, Cocinar, ya está abierto, y sus recetas aparecen en el centro. Elige el pan.""",
+	TUTORIAL_WORK_CRAFT1 = """Este es el taller. Ya está abierta la pestaña Cocina, el oficio de esta sala, y sus recetas aparecen en el centro. Elige el pan.""",
 	TUTORIAL_WORK_CRAFT2 = """El banco de trabajo muestra lo que produce una tanda y lo que consume. El pedido en sí se configura bajo la cola, a la derecha: un {color=yellow|Lote} de tandas, {color=yellow|Mantener en reserva} entre dos números o {color=yellow|Sin fin}. Aumenta este lote en 10 tandas.""",
 	TUTORIAL_WORK_CRAFT3 = """Pulsa {color=yellow|Añadir a la cola}.""",
 	TUTORIAL_WORK_CRAFT4 = """Los pedidos se ponen en cola en lugar de reemplazarse unos a otros, y cada sala de un oficio los trabaja desde arriba. Añade un segundo - elige el estofado de carne.""",
@@ -11075,7 +11076,7 @@ Antes de que pudiera decir nada más, saltaste sobre Anastasia y le diste una fu
 {color=aqua|Sacerdotisa: — Disculparé esta exhibición indecorosa por ahora. Ahora vete y recuerda nuestra agencia en el futuro.}
 
 Diciendo esto, la sacerdotisa abandonó el salón y los guardias te llevaron a la salida. Sin palabras y atada, Anastasia no tuvo más opción que dejar que la arrastraras.""",
-	LOOKING_FOR_PRINCESS_32_f = """{color=rojo|Fracaso}
+	LOOKING_FOR_PRINCESS_32_f = """{color=red|Fracaso}
 
 """,
 	LOOKING_FOR_PRINCESS_32 = """{color=aqua|Anastasia: — ¡Bastardos traidores, sois peores que esta gente! Vosotros y vuestra podrida Freya debéis haber sido...}
@@ -22352,6 +22353,22 @@ Tecla de acceso rápido: 3""",
 	FACTION_POINTS = "Puntos de facción",
 	UNSPENT_POINTS = "Puntos no gastados",
 	UPGRADES_INFO = """Upgrade effects and quest settings update after some time has passed.""", # MISSING TRANSLATION
+	SETTLEMENT_MANAGEMENT_LABEL = "Gestión de la ciudad",
+	SETTLEMENT_MANAGEMENT_INFO = "Se paga con el tesoro. Cada mejora surte efecto de inmediato.",
+	SETTLEMENT_MANAGEMENT_GOLD = "Oro: %d",
+	SETTLEMENT_MANAGEMENT_SATURATION = "Saturación: %d",
+	SETTLEMENT_MANAGEMENT_SATURATION_BONUS = "Saturación: %d (+%d%%)",
+	SETTLEMENT_MANAGEMENT_UNLOCKED = "Ahora disponible en %s",
+	SETTLEMENT_MANAGEMENT_UNLOCKED_LOG = "La Gestión de la ciudad ya está disponible en %s: es la primera opción del menú de la ciudad.",
+	SETTLEMENT_UPGRADE_PRICE = "Costo: %d de oro",
+	SETTLEMENT_UPGRADE_BUILT = "Construido",
+	SETTLEMENT_UPGRADE_TRADE_POST = "Puesto comercial",
+	SETTLEMENT_UPGRADE_TRADE_POST_DISC = "Los mercaderes llevan los bienes de esta ciudad al mercado de Aliron, donde se venden junto con todo lo demás.",
+	SETTLEMENT_UPGRADE_TRADE_POST_NOW = "Sus bienes están a la venta en el mercado de Aliron.",
+	SETTLEMENT_UPGRADE_TAVERN = "Taberna",
+	SETTLEMENT_UPGRADE_TAVERN_DISC = "Atrae a más clientes en busca de compañía.",
+	SETTLEMENT_UPGRADE_TAVERN_NEXT = "Siguiente: saturación +%d%% (%d → %d por semana).",
+	SETTLEMENT_UPGRADE_TAVERN_NOW = "Saturación +%d%%.",
 	UNLOCKED_LABEL = """Unlocked""", # MISSING TRANSLATION
 	POINTS_LABEL = """points""", # MISSING TRANSLATION
 	CANT_PURCHASE_LOC_LABEL = """Can't purchase anymore""", # MISSING TRANSLATION
@@ -22575,7 +22592,7 @@ Ya no te queda más tiempo.""",
 	DATING_PULLTAIL_ACCEPT_1 = "A pesar del intenso dolor, {^[name2]:[race2] [boy2]:[he2]} soporta estoicamente tu abuso.",
 	DATING_PULLTAIL_RESIST_1 = "{^[name2]:[race2] [boy2]:[he2]} parece {^mad:angry} y trata de liberarse.",
 	DATING_PULLTAIL_RESIST_2 = "{^[name2]:[race2] [boy2]:[he2]} {^whines:cries} En protesta{^:, begging for mercy}.",
-	DATING_SLAP_INITIATE_1 = "Tu das una bofetada {^[name2]:[race2] [boy2]} a través de la cara{: dejando una marca en [his2] mejilla}.",
+	DATING_SLAP_INITIATE_1 = "Tu das una bofetada {^[name2]:[race2] [boy2]} a través de la cara{^:, dejando una marca en [his2] mejilla}.",
 	DATING_SLAP_ACCEPT_1 = "A pesar del intenso dolor, {^[name2]:[race2] [boy2]:[he2]} soporta estoicamente tu abuso.",
 	DATING_SLAP_RESIST_1 = "{^[name2]:[race2] [boy2]:[he2]} parece {^mad:very agited}.",
 	DATING_FOOD_INITIATE_1 = "Tu ofreces {^[name2]:[race2] [boy2]:[he2]} un regalo de [food].",
@@ -26760,7 +26777,7 @@ Upon your arrival, she turns toward you. Her eyes still glow that unsettling vio
 	JEAN_SYLAS_SEARCH_JEAN_OPTION_RECORDS = """I read the records, alright. You were sealed five hundred years ago. Doesn't even sound that long for a creature like you.""", # MISSING TRANSLATION
 	JEAN_SYLAS_DEMON_TIME_LONG = """{color=aqua|Jean: — Five hundred years, dammit! Five hundred years sealed in a piece of glass! All just because one of those fucking zealots turned out to be oh so holy and raised an alarm after noticing my presence!}""", # MISSING TRANSLATION
 	JEAN_SYLAS_DEMON_TIME_RECORDS = """{color=aqua|Jean: — Fuck you! Five hundred years isn't long when you're having fun, not when you're stuck in one place! And all because one of those fucking zealots turned out to be oh so holy and raised an alarm after noticing my presence!}""", # MISSING TRANSLATION
-	JEAN_SYLAS_DEMON_MONOLOGUE_1 = """{color=reed|Jean: — I was so bored and could do nothing about it! Well... almost nothing. Of course, I tirelessly worked on my plan to escape, but that's a given.}
+	JEAN_SYLAS_DEMON_MONOLOGUE_1 = """{color=aqua|Jean: — I was so bored and could do nothing about it! Well... almost nothing. Of course, I tirelessly worked on my plan to escape, but that's a given.}
 
 The creature continues, clearly reveling in its own cunning, savoring each word like a well‑earned victory.""", # MISSING TRANSLATION
 	JEAN_SYLAS_DEMON_MONOLOGUE_2 = """{color=aqua|Jean: — Even stuck in that glass, I shaped legends. I guided discoveries. I nudged the curious exactly where I needed them. I changed dozens of hosts just to grab a tiny bit more power for myself each time...}
@@ -31084,6 +31101,101 @@ It is not the kind of intimacy that announces itself loudly, but it stays with y
 
 You leave her in the shade and return to the others, carrying with you the strange certainty that Kuro is still watching.""", # MISSING TRANSLATION
 	ENEMYRILU_MADDENED = """Strange girl""", # MISSING TRANSLATION
+	CRAFTPANEL_TITLE = """Taller""",
+	CRAFTPANEL_JOB_SMITH = """Herrería""",
+	CRAFTPANEL_JOB_TAILOR = """Sastrería""",
+	CRAFTPANEL_JOB_ALCHEMY = """Alquimia""",
+	CRAFTPANEL_JOB_COOKING = """Cocina""",
+	CRAFTPANEL_TAB_HINT = """%s de trabajo por turno · %d en la cola""",
+	CRAFTPANEL_CRAFTERS = """Artesanos""",
+	CRAFTPANEL_CRAFTERS_HELP = """Todos los que trabajan en las salas de este oficio y cuánto trabajo aporta cada uno a la cola por turno. Las herramientas de una sala multiplican lo que hacen sus artesanos.\nHaz clic en un puesto libre para poner a alguien en él, o en un artesano para retirarlo.""",
+	CRAFTPANEL_PER_TURN = """%s por turno""",
+	CRAFTPANEL_NO_ROOM = """Aún no hay sala para este oficio""",
+	CRAFTPANEL_TOOLS_HINT = """Herramientas de esta sala: trabajo ×%s""",
+	CRAFTPANEL_SKILL = """%s %s""",
+	CRAFTPANEL_TAKE_OFF = """Haz clic para retirar a %s de este trabajo""",
+	CRAFTPANEL_ADD_CRAFTER = """+ Añadir artesano""",
+	CRAFTPANEL_PICK_FOR = """%s: ¿quién trabaja aquí?""",
+	CRAFTPANEL_BACK = """Atrás""",
+	CRAFTPANEL_NOBODY_FREE = """Nadie en la mansión puede ocupar este puesto.""",
+	CRAFTPANEL_IDLE = """Sin tarea""",
+	CRAFTPANEL_NOW = """Ahora: %s""",
+	CRAFTPANEL_MODE_RECIPES = """Recetas""",
+	CRAFTPANEL_MODE_IMPROVE = """Mejorar equipo""",
+	CRAFTPANEL_FILTER_ALL = """Todo""",
+	CRAFTPANEL_FILTER_MATERIALS = """Materiales""",
+	CRAFTPANEL_FILTER_GEAR = """Equipo""",
+	CRAFTPANEL_FILTER_COSTUME = """Disfraces""",
+	CRAFTPANEL_FILTER_USABLES = """Consumibles""",
+	CRAFTPANEL_ITEMS_ALL = """Todo""",
+	CRAFTPANEL_ITEMS_WEAPONS = """Armas""",
+	CRAFTPANEL_ITEMS_ARMOR = """Armaduras""",
+	CRAFTPANEL_NO_RECIPES = """Ninguna receta coincide.""",
+	CRAFTPANEL_IN_QUEUE = """Ya está en la cola""",
+	CRAFTPANEL_NEEDS_EXPANSION = """Requiere Ampliación %s""",
+	CRAFTPANEL_ANY_MATERIAL = """%s: cualquier material adecuado, se elige en el banco""",
+	CRAFTPANEL_EDITING = """Editando un pedido. Materiales fijados.""",
+	CRAFTPANEL_NEW_ORDER = """Nuevo pedido""",
+	CRAFTPANEL_CARD_META = """en almacén %d""",
+	CRAFTPANEL_STATS = """Estadísticas""",
+	CRAFTPANEL_STATS_POOR = """Con calidad Pobre""",
+	CRAFTPANEL_CHOOSE = """Elegir""",
+	CRAFTPANEL_PICK_BELOW = """elige abajo""",
+	CRAFTPANEL_CHOOSE_MATERIAL = """· elige un material""",
+	CRAFTPANEL_CAPACITY_BONUS = """Capacidad de encantamiento: %s""",
+	CRAFTPANEL_NO_BONUS = """sin bonificación""",
+	CRAFTPANEL_AMOUNT_BATCH = """Lote""",
+	CRAFTPANEL_AMOUNT_KEEP = """Mantener en reserva""",
+	CRAFTPANEL_AMOUNT_ENDLESS = """Sin fin""",
+	CRAFTPANEL_ORDER_HELP = """Lote hace un número fijo de tandas. Mantener en reserva vuelve a empezar cada vez que el almacén baja del número inferior y se detiene en el superior. Sin fin sigue hasta que lo quites.\nLos materiales se toman al empezar cada tanda; un pedido al que le faltan espera y se trabaja el siguiente.""",
+	CRAFTPANEL_RUNS = """Tandas""",
+	CRAFTPANEL_FROM = """de""",
+	CRAFTPANEL_TO = """a""",
+	CRAFTPANEL_UNTIL_REMOVED = """hasta que lo quites""",
+	CRAFTPANEL_TURN = """%d turno""",
+	CRAFTPANEL_TURNS = """%d turnos""",
+	CRAFTPANEL_CHOOSE_FOR = """Elige un material para: %s""",
+	CRAFTPANEL_SHORT_OF = """Falta %s. El pedido espera""",
+	CRAFTPANEL_SHORT_FIRST_STEP = """Falta %s para el primer paso. El pedido espera""",
+	CRAFTPANEL_ADD = """Añadir a la cola""",
+	CRAFTPANEL_SAVE = """Guardar cambios""",
+	CRAFTPANEL_NO_ITEMS = """No hay equipo que este taller pueda mejorar.""",
+	CRAFTPANEL_HIGHEST = """calidad máxima""",
+	CRAFTPANEL_STEP_WORK = """Trabajo para el siguiente paso""",
+	CRAFTPANEL_STEP_GOLD = """Oro para el siguiente paso, se paga al empezar su trabajo""",
+	CRAFTPANEL_GOLD_BY_STEP = """Oro por cada paso, se paga al empezar su trabajo:""",
+	CRAFTPANEL_MATERIAL_BY_STEP = """Para cada paso, se toma al empezar su trabajo:""",
+	CRAFTPANEL_WORN_BY = """Lo lleva %s""",
+	CRAFTPANEL_ON_BENCH = """En el taller""",
+	CRAFTPANEL_ON_BENCH_NOW = """Ahora en el banco""",
+	CRAFTPANEL_STEP_OF = """Paso %d de %d""",
+	CRAFTPANEL_NOW_QUALITY = """ahora""",
+	CRAFTPANEL_TO_CRAFT = """%s para fabricar""",
+	CRAFTPANEL_AT_BEST = """Esta pieza ya está en su mejor estado.""",
+	CRAFTPANEL_SEND = """Enviar a: %s""",
+	CRAFTPANEL_QUEUE = """Cola""",
+	CRAFTPANEL_QUEUE_HELP = """Todas las salas de este oficio trabajan esta misma cola desde arriba. Haz clic en un pedido para cambiarlo; arrástralo o usa las flechas para moverlo.\nMejorar equipo se lo quita a quien lo lleva y lo saca del almacén hasta que termina el trabajo; después vuelve a su dueño.""",
+	CRAFTPANEL_QUEUE_EMPTY = """No hay nada en cola. Quien trabaja aquí descansa.""",
+	CRAFTPANEL_ORDER_LEFT = """faltan %d""",
+	CRAFTPANEL_ORDER_ENDLESS = """Sin fin""",
+	CRAFTPANEL_ORDER_KEEP = """Reserva %d–%d · hay %d""",
+	CRAFTPANEL_STATUS_WORKING = """En curso""",
+	CRAFTPANEL_STATUS_WAITING = """Siguiente""",
+	CRAFTPANEL_STATUS_NOMAT = """Sin material""",
+	CRAFTPANEL_STATUS_NOGOLD = """Sin oro""",
+	CRAFTPANEL_STATUS_NOWORKERS = """Sin gente""",
+	CRAFTPANEL_STATUS_HELD = """Bloqueado""",
+	CRAFTPANEL_STATUS_STOCKED = """Completo""",
+	CRAFTPANEL_ONGOING = """Continuo""",
+	CRAFTPANEL_REMOVE_ORDER = """¿Quitar este pedido?""",
+	CRAFTPANEL_STOP_IMPROVE = """¿Detener y recuperar la pieza?""",
+	CRAFTPANEL_REMOVE = """Quitar""",
+	CRAFTPANEL_KEEP = """Mantener""",
+	CRAFTPANEL_LOG_IMPROVED = """%s ahora es %s.""",
+	CRAFTPANEL_LOG_BACK_WITH = """%s la vuelve a tener.""",
+
+	TRAITREPLACE_KEEP = """Mantener""",
+
 }
 
 

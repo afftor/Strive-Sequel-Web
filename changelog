@@ -207,20 +207,126 @@ Interface:
 	Fixed the sex minigame firing an orgasm while a deny or cum-target popup was open
 	Dates now use the nude sprite for a character kept under the nudity rule
 
+0.16.0e
+Added clothes coloring options to paperdoll customization
+Fixed 4 other localizations being broken
+Fixed skeleton archers not being able to attack when disarmed 
+0.16.0d
+Fixed linux version cheat menu
+Fixed chinese localization being broken
+Fixed small chest clothes not displaying correctly
+Fixed serelization issue preventing older events from triggering
+0.16.0c
+Fixed old save compatibility
+0.16.0b
+Added alternative act 3 coaliton boss
+Multiple updates and fixes to paperdoll, including a couple new hairstyles
+Character cards now warn ahead of the turn about a missing or poor meal and a missing or poor bed
+Mansion floorplan now stands in a drawn courtyard
+Added arrows to step between characters with a card open
+Estate log now reports the turn's gathering and the week's upkeep, and folds crafting into one report per turn
+Salvage bench can be improved twice more like previous upgrade
+Base stats now read as trained/cap +bonus instead of folding gear into both halves
+Beds no longer gate buying, hiring or recruiting - the unhoused are seated automatically and take the slept-rough penalty until then
+Work and Beds are tabs on the idle strip now, and pressing the active one no longer hides the plan
+Build cards state turns left instead of days, and per-turn work also shows as a share of the whole
+Room crafting queues name the product and how many are wanted instead of the recipe id
+Refused lines in the floorplan character menu are greyed out with the reason on the tooltip
+Storage counter turns red once a material has filled its shelf share
+Cheat menu can unlock the New Game+ panel without finishing act 1
+Master's Mentor grants 2 extra training slots again
+Shattered now reduces MDEF by 25% per stack instead of 50%
+Fixed fighter cards drifting out of their frames over a long fight
+Fixed dead combat summons piling up in saves, and purged the ones older saves leaked
+Fixed the practice room teacher chair
+Fixed a child sent to a tutelage still showing as idle, where dropping them on work cancelled it
+Fixed romance events pairing characters who were away from the estate
+Fixed the demolition confirmation having its No button covered
+Fixed level-up marks and experience strips going stale when a popup was closed with its X button
+Fixed system messages drawing under the panels
+Fixed human hair length being rolled twice, and several styles pointing at missing art
+Fixed flat and masculine-chested characters going bare in outfits with no flat chest piece
+Fixed single-target resurrection skills not working correctly
+Fixed sex encounter results printing experience before the character's bonus
+Fixed effects without tags breaking the stat panel, and log rows vanishing in untranslated locales
+0.16.0a
+The mansion now always opens on the character list; the view buttons on the left (Work, Beds, Tasks, Estate) bring the floorplan up over it, and pressing the one already active puts it away and gives the list back
+Character cards in the list now carry an experience bar, and the floorplan character tooltip shows experience towards the next class
+Characters standing in rooms, on tasks and on slots now show what they add per turn, both on the room card and on the floorplan tooltip
+Estate activity log now records finished minor trainings, stat changes, new friendships, rivalries and lovers, and what the service task brought in
+Service earnings are logged as one report per turn with a per-worker breakdown that can be expanded
+Crafted items are now named in the activity log in their quality colour
+Higher tier crafting is now unlocked by Workshop Expansion instead of Craft Tools; Craft Tools now only raises work speed of its room (old saves convert accordingly)
+Workshop achievements now follow the rooms: Master smith, tailor, alchemist and the new Master cook are earned by building every improvement a forge, tailor workshop, alchemy room or kitchen offers, and Master craftsman by finishing all four
+Quest tasks now state progress per turn instead of per day, matching every other figure on the card
+Fixed production figures on task cards showing work units instead of produced items for recipes that store less than one work per item
+Fixed group scenes describing the wrong participants during an enthusiasm event, and added a warning when no actor or receiver is selected
+Fixed stat names coming out blank in the log
+Fixed a room card left open behind the unfolded character list swallowing clicks meant for the list
+Retired the old tutorial panel button and its option toggle
+A date that never once made your partner wary of you now ends with a choice instead of a silent respect penalty: put them in their place, which costs part of the evening's warmth, or endorse it and lose respect
+Night companions in the master's bed now sleep with him on a chance drawn from their consent, and the estate log reports what the night was and whose sex skill it improved. A bed the companions barely consent to keeps to light play; a willing one does not
+The satisfaction everyone used to wake with for merely sharing the master's bed is now paid only for a night that actually came to something
+Harlotry now lets you train a bed partner's sex skills past Skilled all the way to Mastered
+Strapons can no longer be equipped by anyone but women
+0.16.0
+Revamped slave list 
+Completely redone paperdoll, added animations, refined face and details, improved performance and portraits
+Remade whole mansion behavior, now it has physical rooms and beds
+Now you can pass turns even if you have more characters than the beds. The characters not assigned to beds will receive severe penalty to their work stats and regeneration.
+Added multiple new functionalities to mansion rooms i.e. autopurchase of materials
+Added buyback menu to shops
+Fixed working progress not transfering to other items
+Instant combat win now shows defeated enemy team
+Readjusted prices to make certian crafting recipes profitable again
+Enemies no longer benefit 2.5x modifier for evasion, hitrate and speed off masteries (effectively reduces the highest evasion and speed stats that they can get down by almost thrice)
+Infinity tower:
+	Now starting floor 10 chests have a 25% chance to have some meteorite ore
+	Now mastery bonuses on elites only grant 1x stats instead of 2.5x
+Fixed some quests and dialogues
+Updates some localizations over functional translations
+Tutorial adjusted for new changes (recommended for mansion interaction)
+0.15.1
+Added act 4 finale
 Revamped food mechanic. Now characters eat 1 food item per attempt and it lasts multiple turns based on the food eaten. Better food provides various bonuses. Characters also can be demanding higher quality food if they have higher fame or value.
 Cleave and Strike Through now had additional effects when certain conditions met
 Added new trait for Ratkin: In the shadows reduces ranged physical hit chance by 30%.
-Added character sorting behavior to main character list
+Added option to sort characters by category
 Added some new sound effects to time equipment and turn pass 
 Slaves now can only be trained after 1 turn to prevent them being sold for better price instantly
+Added hotkeys and settings for them, including new quicksave/load option
 Added workunits display as well as how much work characters make per turn
+Added stat icons to character and inventory interfaces
+Added flag buttons to language selection
+Added comic scene to Rouge's scene about Ketch's escape
+Added interactive breast animation to character paperdolls
+Added Goblin Stronghold biome to the infinite dungeon
+Added setting to control automatic disabling of mods after game updates
+Experimental builds now display a startup notice instead of checking for stable updates
 Added 2 new skills: 
 Warcry - Warfare skill removing fear and silence from caster
 Hardened Grip - Mind spell, providing disarm immunity to target
 Disarm now forces ranged attackers to use melee attack with its inherent penalty
+Low-level biomes stop appearing on deeper infinite dungeon floors
+Combat skip and intimidation victories now go directly to the rewards screen without opening combat
+Expanded combat animations 
+Reworked Greg boss fight
+Aire's Overwatch is now limited to 5 counterattacks per turn
+Rebalanced work requirements for multiple crafting recipes
+Radiance now removes In the Shadows from targets
+Improved end turn performance and reduced interface freezing
 Fixed Mae having wrong default portrait
 Fixed Lira's quest 3rd part
 Fixed in the shadows giving evasion against physical attacks
+Fixed multiple tutorial issues
+Fixed combat defeat and game over causing events and interfaces to continue processing
+Fixed animated backgrounds not disabling correctly and flickering after video restart
+Fixed MP regeneration scaling incorrectly
+Fixed errors caused by status stacks without duration and buff pages updating after combat
+Fixed resurrected, summoned and transformed units not being added to combat turn order in time
+Fixed NG+ race display for new game+
+Fixed task tool bonuses providing incorrect bonus modifiers
+Fixed some quest interface localization issues
 0.15.0c
 Master's Mentor trait now boosts Training Points gained instead of trainee capacity
 Amelia is now recruited with proper training and points

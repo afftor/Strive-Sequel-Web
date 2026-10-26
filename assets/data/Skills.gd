@@ -263,7 +263,7 @@ var Skilllist = {
 		target_range = 'any',
 		damage_type = 'fire',
 		sfx = [
-			{code = 'inferno', target = 'target_group', period = 'windup'},
+			{code = 'righteous_fire', target = 'target_group', period = 'windup'},
 			{code = 'magma_blast', target = 'target', period = 'predamage'},
 			{code = 'charge_fire', target = 'caster', period = 'windup', is_cast = true}],
 		sounddata = {initiate = 'firebolt', strike = null, hit = 'firehit', hittype = 'static'},
@@ -842,7 +842,7 @@ var Skilllist = {
 		target_range = 'any',
 		damage_type = 'light',
 		sfx = [
-			{code = 'radiance', target = 'target_group', period = 'windup'},
+			{code = 'blessing', target = 'target_group', period = 'windup'},
 			{code = 'cast_light', target = 'caster', period = 'windup', is_cast = true}], 
 		sounddata = {initiate = null, strike = 'blade', hit = null},
 		value = 0.3
@@ -1166,7 +1166,7 @@ var Skilllist = {
 		target_number = 'all',
 		target_range = 'any',
 		damage_type = 'fire',
-		sfx = [{code = 'inferno', target = 'target_group', period = 'windup'},
+		sfx = [{code = 'righteous_fire', target = 'target_group', period = 'windup'},
 			{code = 'charge_fire', target = 'caster', period = 'windup', is_cast = true}],
 		sounddata = {initiate = 'firebolt', strike = null, hit = 'spell_explosion', hittype = 'static'},
 		value = 0.3,
@@ -1216,7 +1216,7 @@ var Skilllist = {
 		combatcooldown = 0,
 		cooldown = 2,
 		catalysts = {},
-		sfx = [{code = 'blizzard', target = 'target_line', period = 'windup'},
+		sfx = [{code = 'eye_of_the_storm', target = 'target_line', period = 'windup'},
 			{code = 'charge_frost', target = 'caster', period = 'windup', is_cast = true}],
 		sounddata = {initiate = 'spell_break', strike = null, hit = null},
 		target = 'enemy',
@@ -1246,7 +1246,7 @@ var Skilllist = {
 		damage_type = 'weapon',
 		sfx = [
 			{code = 'execution', target = 'target', period = 'predamage', sync_to_hit = true, hit_motion = 'tilt'},
-			{code = 'blood_boil', target = 'target', period = 'postdamage'},
+			{code = 'blood_explosion', target = 'target', period = 'postdamage'},
 			{code = 'cast_weapon', target = 'caster', period = 'windup', is_cast = true, motion = 'execution_leap'}],
 		sounddata = {initiate = null, strike = 'melee_attack', hit = null},
 		aipatterns = ['attack'],
@@ -1386,7 +1386,7 @@ var Skilllist = {
 		target_range = 'any',
 		damage_type = 'fire',
 		sfx = [
-			{code = 'inferno', target = 'target_group', period = 'windup'},
+			{code = 'righteous_fire', target = 'target_group', period = 'windup'},
 			{code = 'charge_fire', target = 'caster', period = 'windup', is_cast = true}],
 		sounddata = {initiate = 'firebolt', strike = null, hit = 'spell_explosion', hittype = 'static'},
 		value = 1,
@@ -1497,7 +1497,7 @@ var Skilllist = {
 		sfx = [
 			{code = 'bolt_trap', target = 'target', period = 'predamage',},
 			{code = 'sunder', target = 'target', period = 'predamage', sync_to_hit = true, hit_motion = 'tilt'},
-			{code = 'blood_boil', target = 'target', period = 'postdamage',},
+			{code = 'blood_explosion', target = 'target', period = 'postdamage',},
 			{code = 'cast_weapon', target = 'caster', period = 'windup', is_cast = true}], 
 		sounddata = {initiate = null, strike = 'fleshhit', hit = 'fleshhit'},
 		value = 0.8,
@@ -1609,7 +1609,7 @@ var Skilllist = {
 		damage_type = 'light',
 		sfx = [
 			{code = 'projectile_fireball', target = 'target_group', period = 'predamage', duration = 0.4, speed = 1.2, arc = 750, no_delays = true, color = '96503e'},
-			{code = 'radiance', target = 'target_group', period = 'predamage'},
+			{code = 'blessing', target = 'target_group', period = 'predamage'},
 			{code = 'cast_light', target = 'caster', period = 'windup', is_cast = true}], 
 		sounddata = {initiate = null, strike = 'blade', hit = null},
 		value = 0.6,
