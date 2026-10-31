@@ -28,7 +28,9 @@ const FILTERS = {All = 'all', Materials = 'materials', Gear = 'gear', Costume = 
 const ITEM_FILTERS = {All = 'all', Weapons = 'weapons', Armor = 'armor'}
 const ARMOR_TYPES = ['heavy', 'medium', 'cloth']
 const AMOUNT_MODES = {Batch = 'batch', Keep = 'keep', Endless = 'endless'}
-const MAX_AMOUNT = 999
+const MAX_AMOUNT = 99999
+#the order's numbers the player can type; each is AmountRow/<Field>/Value
+const AMOUNT_FIELDS = ['runs', 'low', 'high']
 #where the lines from the item card meet before they drop to the slots
 const WIRE_BUS = 14.0
 const WIRE_WIDTH = 2.0
@@ -101,6 +103,12 @@ func setup(view_node):
 	row.get_node("Low/Plus").connect("pressed", self, "change_amount", ['low', 1])
 	row.get_node("High/Minus").connect("pressed", self, "change_amount", ['high', -1])
 	row.get_node("High/Plus").connect("pressed", self, "change_amount", ['high', 1])
+	for field in AMOUNT_FIELDS:
+		var input = amount_input(field)
+		input.max_length = str(MAX_AMOUNT).length()
+		input.connect("text_changed", self, "amount_typed", [field])
+		input.connect("text_entered", self, "amount_entered", [field])
+		input.connect("focus_exited", self, "amount_left", [field])
 	order.get_node("Perform").connect("pressed", self, "perform")
 	var content = bench.get_node("Scroll/Content")
 	content.get_node("Wire").connect("draw", self, "draw_wire", [content.get_node("Wire")])
@@ -805,7 +813,7 @@ func pick_recipe(code, redraw = true):
 	if changed:
 		fill_parts(data)
 		var have = result_stock(data)
-		amount = {mode = 'batch', runs = 1, low = int(max(data.resultamount, round(have / 2.0))), high = int(max(have + data.resultamount * 5, 20))}
+		amount = {mode = 'batch', runs = 1, low = clamp_amount('low', max(data.resultamount, round(have / 2.0))), high = clamp_amount('high', max(have + data.resultamount * 5, 20))}
 		$Body/Columns/Bench/Scroll.scroll_vertical = 0
 	if redraw:
 		rebuild()
@@ -1235,16 +1243,30 @@ func build_order_row(data, locked):
 	row.visible = !one_off(data)
 	row.get_node("RunsLabel").visible = amount.mode == 'batch'
 	row.get_node("Runs").visible = amount.mode == 'batch'
-	row.get_node("Runs/Value").text = str(amount.runs)
 	for part in ['LowLabel', 'Low', 'HighLabel', 'High']:
 		row.get_node(part).visible = amount.mode == 'keep'
-	row.get_node("Low/Value").text = str(amount.low)
-	row.get_node("High/Value").text = str(amount.high)
 	row.get_node("EndlessLabel").visible = amount.mode == 'endless'
-	for stepper in ['Runs', 'Low', 'High']:
-		for button in row.get_node(stepper).get_children():
+	for field in AMOUNT_FIELDS:
+		show_amount(field)
+		amount_input(field).editable = !locked
+		for button in row.get_node(field.capitalize()).get_children():
 			if button is BaseButton:
 				button.disabled = locked
+
+
+func amount_input(field):
+	return order_box().get_node("AmountRow/" + field.capitalize() + "/Value")
+
+
+#A number the player is still typing is left as typed; anything else that changed the amount is
+#written in. Writing only on a difference also keeps a text_changed from the write from looping.
+func show_amount(field):
+	var input = amount_input(field)
+	if input.has_focus() and input.text != "" and int(input.text) == amount[field]:
+		return
+	if input.text != str(amount[field]):
+		input.text = str(amount[field])
+		input.caret_position = input.text.length()
 
 
 #Beside the button only what holds the order back is said; how it is getting on is the queue's to show.
@@ -1289,13 +1311,76 @@ func set_amount_mode(value):
 
 
 func change_amount(field, step):
-	amount[field] = int(clamp(amount[field] + step, 1 if field != 'low' else 0, MAX_AMOUNT))
-	if amount.high <= amount.low:
-		if field == 'high':
-			amount.low = max(0, amount.high - 1)
-		else:
-			amount.high = amount.low + 1
+	amount[field] = clamp_amount(field, amount[field] + step)
+	keep_limits_apart(field)
 	rebuild()
+
+
+#Runs and the top of the stock start at one, its bottom at nothing; the bottom stops one short of
+#MAX_AMOUNT so the top still fits above it.
+func clamp_amount(field, value):
+	if field == 'low':
+		return int(clamp(value, 0, MAX_AMOUNT - 1))
+	return int(clamp(value, 1, MAX_AMOUNT))
+
+
+#The stock's top must stay above its bottom; the limit just changed wins and the other one moves.
+func keep_limits_apart(field):
+	if field == 'runs' or amount.high > amount.low:
+		return
+	if field == 'high':
+		amount.low = amount.high - 1
+	else:
+		amount.high = amount.low + 1
+
+
+#Typing changes the order as it goes, so the bench follows the number. The stock limits are put
+#apart only once the player leaves the field: a "to" typed digit by digit would otherwise drag
+#"from" down to its first digit.
+func amount_typed(text, field):
+	var input = amount_input(field)
+	var digits = ""
+	var caret = 0
+	for i in range(text.length()):
+		if text[i] >= '0' and text[i] <= '9':
+			digits += text[i]
+			if i < input.caret_position:
+				caret += 1
+	if digits != text:
+		input.text = digits
+		input.caret_position = caret
+	if digits == "":
+		return
+	amount[field] = clamp_amount(field, int(digits))
+	rebuild()
+
+
+func amount_entered(_text, field):
+	amount_input(field).release_focus()
+
+
+func amount_left(field):
+	var low = amount.low
+	var high = amount.high
+	keep_limits_apart(field)
+	if amount.low != low or amount.high != high:
+		rebuild()
+	else:
+		show_amount(field)
+
+
+#Godot keeps the caret in a field until another control takes the focus, and no button on this
+#panel takes it, so a click anywhere off the field being typed in finishes the number. _input runs
+#before the click reaches its button, which then sees the number already in order.
+func _input(event):
+	if !(event is InputEventMouseButton) or !event.pressed or !is_visible_in_tree():
+		return
+	if event.button_index != BUTTON_LEFT and event.button_index != BUTTON_RIGHT:
+		return
+	for field in AMOUNT_FIELDS:
+		var input = amount_input(field)
+		if input.has_focus() and !input.get_global_rect().has_point(event.position):
+			input.release_focus()
 
 
 func amount_order():
@@ -1915,13 +2000,14 @@ func pick_order(id):
 			parts[task.id] = task.partdict.duplicate()
 		amount = {mode = 'batch', runs = 1, low = 10, high = 40}
 		if task.has('repeat'):
-			amount.runs = int(max(1, task.repeat))
+			amount.runs = clamp_amount('runs', task.repeat)
 		elif task.has('continuous'):
 			amount.mode = 'endless'
 		elif task.has('cap_up'):
 			amount.mode = 'keep'
-			amount.low = int(task.cap_low)
-			amount.high = int(task.cap_up)
+			amount.low = clamp_amount('low', task.cap_low)
+			amount.high = clamp_amount('high', task.cap_up)
+			keep_limits_apart('high')
 	rebuild()
 
 

@@ -327,6 +327,13 @@ var tutorials = {
 			text = "TUTORIAL_WORK_CRAFT11",
 			panel_pos = Vector2(1200, 170)
 		},{
+			#The panel lives on the plan's own overlay and leaves the mansion's state alone, so the
+			#slave list stays folded the way the rooms chapter left it - the old craft screen was a
+			#mansion state of its own and needed it folded away again here.
+			buttons = ['craftpanel_close'],
+			text = "TUTORIAL_WORK_CRAFT11",
+			panel_pos = Vector2(1200, 170)
+		},{
 			#Closing the workshop hands the room card back (mansion_view.close_crafting), and the
 			#sheet behind the card sits on the plan's overlay layer, above the clock: the first
 			#click anywhere only puts the card away, Finish Turn included. Put away here, so the
