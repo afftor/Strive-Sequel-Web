@@ -789,6 +789,7 @@ However, while it might seem that Landowners have nothing but contempt for those
 	SLAVE_MARKET_COL_RACE = "Race",
 	SLAVE_MARKET_COL_PRICE = "Price",
 	SLAVE_MARKET_COL_TYPE = "Type",
+	SLAVE_MARKET_SORT_HINT = "Click to sort by this column, click again to reverse it, once more to go back to the default order.",
 	SLAVE_MARKET_RELINQUISH = "Relinquish",
 	SLAVE_MARKET_RELINQUISH_FOR = "Relinquish: %s",
 	SLAVE_MARKET_NO_CLASSES = "No classes yet",
@@ -1675,7 +1676,7 @@ Hotkey: 3""",
 	SKILLAIR_CUTTER = "Air Cutter",
 	SKILLAIR_CUTTERDESCRIPT = "Deals 85% of ATK as {color=yellow|Air} damage to one target and 70% of ATK to 2 random enemies. Has 50% chance to cause targets to bleed for 2 turns.",
 	SKILLHOLY_LANCE = "Holy Lance",
-	SKILLHOLY_LANCEDESCRIPT = "Deals 100% of ATK as {color=yellow|Light} damage to a row.",
+	SKILLHOLY_LANCEDESCRIPT = "Deals 120% of ATK as {color=yellow|Light} damage to a row. On a miss, the blow lands anyway for half damage.",
 	SKILLSWIPE = "Swipe",
 	SKILLSWIPE_EN = "Swipe",
 	SKILLSWIPEDESCRIPT = "Deals 70% of ATK as {color=yellow|Air} damage to a column. Has 30% chance to reduce target's DEF by 20 for 2 turns.",
@@ -2584,6 +2585,41 @@ Gain {color=aqua|Blackened Blade}.""",
 Sequentially inflict {color=aqua|Ensnare}, {color=aqua|Disarm}, {color=aqua|Blind}, and {color=aqua|Shred}.
 The last hit deals increased damage.
 {color=red|On Kill: Reset cooldown.}""",
+	SKILLERDYNA_LETS_SEE_WHAT_YOU_GOT = "Let's See What You Got",
+	SKILLERDYNA_LETS_SEE_WHAT_YOU_GOTDESCRIPT = """Cannot target an enemy affected by {color=aqua|Subject of Observation} or {color=aqua|Evaluated}.
+Before the hit, remove {color=aqua|In the Shadow} from the target and {color=aqua|Blind} from self.
+Deals 80% of ATK as physical damage to an enemy.
+Hit or miss, inflict {color=aqua|Subject of Observation} on the target and gain {color=aqua|Observing}.""",
+	SKILLERDYNA_SLICE_AND_DIVE = "Slice & Dive",
+	SKILLERDYNA_SLICE_AND_DIVEDESCRIPT = """Deals 90% of ATK as physical damage to a row of enemies.
+If the user is not {color=aqua|Ensnared}, strike a random row once more.""",
+	SKILLERDYNA_ASSAULT_AND_BATTERY = "Assault & Battery",
+	SKILLERDYNA_ASSAULT_AND_BATTERYDESCRIPT = """Deals 75% of ATK as physical damage to an enemy 2 times.
+On hit, if the target has more than 50% HP, inflict {color=aqua|Shred} for 2 turns.""",
+	SKILLERDYNA_NAIL_IT = "Nail it!",
+	SKILLERDYNA_NAIL_ITDESCRIPT = """Toss the dagger, dealing 50% of ATK as physical damage to an enemy. The toss has +100 Hit Rate against a target affected by {color=aqua|Subject of Observation} or {color=aqua|Evaluated}.
+If it hits, follow up with a melee strike against the same target that deals 120% of ATK and cannot miss.
+The melee strike inflicts {color=aqua|Impale} if the target is affected by {color=aqua|Bleed}.""",
+	SKILLERDYNA_DECEPTIVE_RUSE = "Deceptive Ruse",
+	SKILLERDYNA_DECEPTIVE_RUSEDESCRIPT = """Can be used while {color=aqua|Disarmed}.
+Remove all negative effects from self.
+Stun 1-3 random enemies for 1 turn. A target that cannot be stunned is {color=aqua|Disarmed} and {color=aqua|Silenced} for 1 turn instead.""",
+	SKILLERDYNA_RULES_OF_THE_BACKSTREET = "Rules of the Backstreet",
+	SKILLERDYNA_RULES_OF_THE_BACKSTREETDESCRIPT = """Can be used while {color=aqua|Disarmed}.
+Deals 150% of ATK as physical damage to an enemy.
+If the user is not {color=aqua|Disarmed}, inflict 1 {color=aqua|Fragile} on hit.
+Repeat once for each stack of {color=aqua|Battle Precognition}.
+On kill, gain {color=aqua|Battle Precognition}.""",
+	SKILLERDYNA_HOW_PREDICTABLE = "How Predictable~",
+	SKILLERDYNA_HOW_PREDICTABLEDESCRIPT = """Can only be used while {color=aqua|Observing}. Can be used while {color=aqua|Disarmed}.
+Consume {color=aqua|Observing} to gain {color=aqua|Battle Precognition}.
+Heal self for 10% of Max HP.
+Turn every {color=aqua|Subject of Observation} on enemies into {color=aqua|Evaluated}.""",
+	SKILLERDYNA_EQUALIZER = "Equalizer",
+	SKILLERDYNA_EQUALIZERDESCRIPT = """Deals 100% of ATK as physical damage to an enemy. A miss turns into a hit that deals half damage.
+After the hit, the target taunts the user for 4 turns, and every other enemy takes 50% of the user's ATK as damage and is {color=aqua|Subdued} for 2 turns.""",
+	SKILLERDYNA_OBSERVATION_LOST = "Lost Sight",
+	SKILLERDYNA_OBSERVATION_LOSTDESCRIPT = "Remove {color=aqua|Subject of Observation} from all enemies.",
 	SKILLOMINOUS_WHISPERS = "Ominous Whispers",
 	SKILLOMINOUS_WHISPERSDESCRIPT = "Deal low {color=yellow|Mind} magical damage to all enemies and inflict {color=aqua|Fear}. If target HP is below 50%, also inflict {color=aqua|Shattered}.",
 	SKILLHEXED_COFFIN_NAIL = "Hexed Coffin Nail",
@@ -4738,7 +4774,7 @@ While this was an unpleasant expirience for [name], it will certainly teach [him
 	DATING_LOW_FEAR_WARNING = """
 {color=yellow|[name] felt too at ease around you, weakening [his] respect.}""",
 	DATING_PRESUMPTION_ASK = "[name] has been entirely at ease in your company. There is a new familiarity in the way [he] speaks to you, and you find yourself thinking [he] has grown presumptuous.",
-	DATING_PRESUMPTION_DISCIPLINE = "Put [him] in [his] place",
+	DATING_PRESUMPTION_DISCIPLINE = "Reassert your authority",
 	DATING_PRESUMPTION_ENDORSE = "Endorse it",
 	DATING_PRESUMPTION_DISCIPLINE_RESULT = """
 
@@ -4974,11 +5010,10 @@ Pregnancy Debuffs are weaker
 Offspring will inherit only this parent's stats.""",
 	TRAITSUCCUBUS = "Succubus",
 	TRAITSUCCUBUSALT = "Incubus",
-	TRAITSUCCUBUSDESCRIPT = """Sex activities provide 50% more experience.
-Can infallibly recruit random characters by using Lust.
-Sexual Training actions have lower chance to fail.
-+2 Sex Stamina, +1 Training Slot, +1 Magic Mastery Point.
-Grants Lust Drain, Enthrall, Release Thrall and Euphoria. Gains strength with each Thrall.""",
+	TRAITSUCCUBUSDESCRIPT = """50% more xp from sex activities
++2 Sex Stamina
++1 Training Slot
++1 Magic Mastery Point.""",
 	TRAITSUCCUBUSFLAVOR = "Demonic essence has remade [him] for good. Lust is no longer something [he] feels, but something [he] wields.",
 	TRAITPETDESCRIPT = "Prostitution is 25% more efficient.",
 	TRAITSEXTOYDESCRIPT = "Prostitution is 20% more efficient. Unlocks sextoy service assignment.",
@@ -5098,7 +5133,7 @@ Physical and Sexual training actions are 25% more impactful.""",
 	TRAITDEADLYDESCRIPT = "Crit Chance +6%.",
 	TRAITLIVELYDESCRIPT = "+3 Health Regen",
 	TRAITMVORTEXDESCRIPT = "+2 Mana Regen",
-	TRAITGIFTEDDESCRIPT = "Maximum Mana +50%, MATK +5%.",
+	TRAITGIFTEDDESCRIPT = "Maximum Mana +40%, MATK +5%.",
 	TRAITGIFTEDFLAVOR = "Ancient magic resides in [his] body.",
 	TRAITHIDDENPOWERSDESCRIPT = "MATK +10%.",
 	TRAITHEALTHYDESCRIPT = "+10 Max Health.",
@@ -6284,6 +6319,53 @@ This effect is removed if the applier fell for a taunt or is immobilised.""",
 	EFFECTNAME_BLACKEN_BLADE = "Blacken Blade",
 	EFFECT_BLACKEN_BLADE_DESCRIPT = """Deals additional 50% of caster's MATK as {color=yellow|Dark} damage on every hit
 All attacks have a 20% chance to inflict Bleed.""",
+	EFFECT_ERDYNA_HARDY_CONSTITUTION_DESCRIPT = """Hardy Constitution:
+Take further reduced damage from DoT effects.
+Immune to Burn. +50 Fire resist.
+30% chance to reduce physical damage taken by 50%.
+Gain Unstoppable when HP drops below 50%.""",
+	EFFECT_ERDYNA_DRACONIC_CONSTITUTION_DESCRIPT = """Draconic Constitution:
+Take further reduced damage from DoT effects.
+Immune to Burn. +50 Fire resist.
+30% chance to reduce physical damage taken by 50%.
+Gain Unstoppable when HP drops below 50%.""",
+	EFFECT_ERDYNA_KING_OF_BANDITS_DESCRIPT = """King of Bandits:
+Immune to Provoke.
+When being melee attacked while Disarmed, 50% chance to remove Disarm from self and Disarm the attacker for 2 turns.
+At the start of combat, and when HP drops below 50% for the first time, use Equalizer on a random enemy.""",
+	EFFECT_ERDYNA_HOARDER_INCISOR_DESCRIPT = """Hoarder Incisor:
+While not Disarmed, physical attacks have a 25% chance to inflict Bleed for 2 turns and a 30% chance to remove a random positive effect from the target.
+A target that cannot be Disarmed, such as one under Hardened Grip, keeps its positive effects.""",
+	EFFECT_ERDYNA_HOW_COULD_YOU_DESCRIPT = """How could you...:
+Deal 20% more damage to you.""",
+	EFFECTNAME_ERDYNA_OBSERVING = "Observing",
+	EFFECT_ERDYNA_OBSERVING = """+150 Evasion. Allows the use of How Predictable~.
+When struck by a physical attack or Blinded, lose this effect and free every enemy from Subject of Observation.""",
+	EFFECTNAME_ERDYNA_SUBJECT_OF_OBSERVATION = "Subject of Observation",
+	EFFECT_ERDYNA_SUBJECT_OF_OBSERVATION = """-25% ATK and MATK. -25 Hit Rate and Evasion.
+Removed when Erdyna loses Observing or when the battle ends.""",
+	EFFECTNAME_ERDYNA_EVALUATED = "Evaluated",
+	EFFECT_ERDYNA_EVALUATED = """-50% ATK and MATK. -50 Hit Rate and Evasion. Take 20% more damage.
+Removed when the battle ends.""",
+	EFFECTNAME_ERDYNA_BATTLE_PRECOGNITION = "Battle Precognition",
+	EFFECT_ERDYNA_BATTLE_PRECOGNITION = """+20 ATK, +10% Crit Rate, +20 Hit Rate and +10% damage reduction per stack (Max 6).
+At 3+ stacks: immune to Disarm.""",
+	EFFECT_ERDYNA_EQUALIZER_FOCUS = "Taunted by the target of Equalizer.",
+	EFFECTNAME_ERDYNA_SUBDUED = "Subdued",
+	EFFECT_ERDYNA_SUBDUED = """-50 Hit Rate. Damaging spells have a 25% chance to miss.
+Melee attacks and non-damaging skills used on enemies always miss.
+-75% outgoing healing.
+Under Blood Boil, the duration drops by one extra turn at the end of each turn.""",
+	ERDYNA_EQUALIZER_OPENING = """
+Erdyna: Let's even the odds a little.
+""",
+	ERDYNA_EQUALIZER_HALF_HP = """
+Erdyna: Fine. No more playing around!
+""",
+	ERDYNA_OBSERVATION_BROKEN = """
+Erdyna loses her focus - the observation is broken!""",
+	ERDYNA_DISARM_REVERSAL = """
+Erdyna snatches her blade back and turns the grip against the attacker!""",
 	EFFECT_CURSED_GIRL_DESCRIPT = "Cursed Girl: When hit by Devour magic spell, gain shock and 3 fragiles. When hit by Light damage, there is a 20% chance to become stunned.",
 	EFFECT_GUARDIAN_SPIRIT_PROTECTION_FRENZIED_DESCRIPT = "Guardian Spirit Protection [Frenzied]: When being hit by non-light damage, 30% chance to inflict Cursed to the attacker. When being hit by a Cursed enemy, reduce damage taken by 30% and inflict Dark damage back to the attacker.",
 	SEB_RILU_ATTACK = """
@@ -9815,12 +9897,12 @@ All party recovers 35% HP.""",
 
 As the [scncharboy] is made your slave, [scncharhe] can be a very useful addition to your roost or net a good sum from the collectors.""",
 	DIALOGUEVENTFAIRYLEAVEREPLY = "After chatting for a bit you part your ways with fairy. ",
-	DIALOGUETUTELAGETEXT = """You decided to keep the newborn child, however you have to decide on its future education which might improve or correct their potential. In either way growing up will take 2 weeks.
+	DIALOGUETUTELAGETEXT = """You decided to keep the newborn child, however you have to decide on its future education which might improve or correct their potential. In either way growing up will take 2 weeks. Paid educations must first be unlocked with improvements of the Master's Office.
 
 {color=aqua|No Training}— {color=yellow|No cost}, but has chance to obtain a new negative trait;
-{color=aqua|Slave Training}— {color=yellow|500 gold}, provides a large boost to Loyalty with a chance to improve Tame or Authority factors;
+{color=aqua|Slave Training} (only for slaves)— {color=yellow|500 gold}, completes basic slave training, improves Tame or Authority factor and teaches a specialization: Workforce, Warrior or Service;
 {color=aqua|Academy}— {color=yellow|1.500 gold}, provides a boost to Physics and Wits and a good amount of EXP;
-{color=aqua|Heir Education} (only for potential Heirs)— {color=yellow|5.000 gold}, provides boost to all stats and factors, large amount of EXP and 1 random positive trait.""",
+{color=aqua|Heir Education} (only for potential Heirs)— {color=yellow|5.000 gold}, provides a large boost to Physics, Wits and Charm, improves two random factors, large amount of EXP and 1 random positive trait.""",
 	DIALOGUETUTNOTHING = "No Training (free)",
 	DIALOGUETUTSLAVE = "Slave Training (500 Gold)",
 	DIALOGUETUTSLAVE1 = "Slave Training: Workforce (500 Gold)",
@@ -10030,6 +10112,7 @@ The woman disappears as quickly as she appeared before you, leaving you in front
 	ENEMYCOAL_MOAB = "Mother of All Bombs",
 	ENEMYKURO = "Kuro",
 	ENEMYERDYNA = "Erdyna",
+	ENEMYERDYNA_BETRAYAL = "Erdyna",
 	ENEMYNIXX = "Nixx",
 	ENEMYUNLIT_BRAZIER = "Unlit Brazier",
 	ENEMYLIGHTED_BRAZIER = "Lighted Brazier",
@@ -11186,19 +11269,18 @@ Close this menu.""",
 	TUTORIAL_WORK_ROOM11 = "And put her back on the scaffolding.",
 	TUTORIAL_WORK_ROOM12 = "Building is measured in work rather than in days, so a better builder raises a room sooner. This one is nearly up - finish the turn.",
 	TUTORIAL_WORK_ROOM14 = "The kitchen is standing. Open it.",
-	TUTORIAL_WORK_ROOM15 = "A craft room is where its own orders are given. Open the craft menu from here.",
-	TUTORIAL_WORK_ROOM16 = "The kitchen's own trade is already selected. Choose bread.",
-	TUTORIAL_WORK_ROOM17 = "Confirm.",
-	TUTORIAL_WORK_ROOM18 = "You can adjust the quantity. Add 10 more units.",
-	TUTORIAL_WORK_ROOM19 = "Confirm.",
-	TUTORIAL_WORK_ROOM20 = "Orders queue up rather than replacing one another. Add a second one - meat soup.",
-	TUTORIAL_WORK_ROOM21 = "Confirm.",
-	TUTORIAL_WORK_ROOM22 = "Confirm.",
-	TUTORIAL_WORK_ROOM23 = "Both orders are waiting on the right now. An order can be called off outright - remove the soup.",
-	TUTORIAL_WORK_ROOM24 = "And confirm it.",
-	TUTORIAL_WORK_ROOM25 = "Close the craft window.",
-	TUTORIAL_WORK_ROOM26 = "An order is only a plan until somebody stands in the room to work it. Pick Daisy up.",
-	TUTORIAL_WORK_ROOM27 = "Put her at the kitchen's workplace.",
+	TUTORIAL_WORK_ROOM15 = "A craft room opens the workshop on its own trade. Open it from here.",
+	TUTORIAL_WORK_CRAFT1 = "This is the workshop. The kitchen's trade, Cooking, is already open, and its recipes are listed in the middle. Choose bread.",
+	TUTORIAL_WORK_CRAFT2 = "The bench shows what a run makes and what it takes. The order itself is set up under the queue on the right: a {color=yellow|Batch} of runs, {color=yellow|Keep in stock} between two numbers, or {color=yellow|Endless}. Make this batch 10 runs bigger.",
+	TUTORIAL_WORK_CRAFT3 = "Press {color=yellow|Add to queue}.",
+	TUTORIAL_WORK_CRAFT4 = "Orders queue up rather than replacing one another, and every room of a trade works them from the top. Add a second one - choose meat soup.",
+	TUTORIAL_WORK_CRAFT5 = "Add it to the queue as well.",
+	TUTORIAL_WORK_CRAFT6 = "Both orders are waiting in the queue now. An order can be changed, moved up or down, or called off - click the soup to open it.",
+	TUTORIAL_WORK_CRAFT7 = "Call it off.",
+	TUTORIAL_WORK_CRAFT8 = "And confirm it.",
+	TUTORIAL_WORK_CRAFT9 = "An order is only a plan until somebody works it. The left column holds the trade's rooms and their places - press {color=yellow|+ Add a crafter}.",
+	TUTORIAL_WORK_CRAFT10 = "Everyone at the mansion who could take the place is offered, with how much work they would put in each turn. Choose Daisy.",
+	TUTORIAL_WORK_CRAFT11 = "The kitchen has its order and its cook. Close the workshop.",
 	TUTORIAL_WORK_ROOM28 = "Finish the turn. What she baked is listed in the estate log.",
 	TUTORIAL_WORK_ROOM29 = "Not all of the estate's work happens indoors. Open Local Tasks.",
 	TUTORIAL_WORK_ROOM30 = "The grounds carry buildings of their own, and each is worked by its own hands. Pick Aeris up.",
@@ -29865,6 +29947,7 @@ She looks up at you, and there's a fire in her eyes that wasn't there before.
 A few minutes later, she steps out.
 
 The costume fits her as if it were made for her. The leather and feathers frame her body in a way that is both wild and elegant, the headdress lending her a strange, fierce grace she's never shown before.""",
+	LIRA_TRIBAL_OUTFIT_NAME = "Tribal",
 	LIRA_QUEST2_CATCHES_REFLECTION_NEARBY_LANTERN_PAUSES = """She catches her reflection in a nearby lantern and pauses, her hand rising to touch the feathers at her shoulder. Her cheeks are still slightly flushed, but a slow smile spreads across her face. She turn to you, her ears twitching slightly.
 
 {color=yellow|Lira: — Well... Do you like how I look, [master]?}""",
@@ -32502,7 +32585,7 @@ You leave her in the shade and return to the others, carrying with you the stran
 	MANSIONROOM_PRACTICE_ROOM = "Practice Room",
 	MANSIONROOM_PRACTICE_ROOMDESCRIPT = "Whoever is assigned here gains 3-5 in the chosen stat per turn. Tutoring Area adds a tutor slot: +50% to that gain, and a tutor is required to remove a negative mental trait.",
 	MANSIONROOM_MASTERS_OFFICE = "Master's Office",
-	MANSIONROOM_MASTERS_OFFICEDESCRIPT = "Gives everyone on the estate +5% experience.",
+	MANSIONROOM_MASTERS_OFFICEDESCRIPT = "Gives everyone on the estate +5% experience. Its improvements unlock education for children born on the estate: Slave Training, Academy and Heir Education.",
 	MANSIONROOM_FARM = "Farm",
 	MANSIONROOM_FARMDESCRIPT = "Whoever assigned here produces what their own body allows - milk, eggs and the like - chosen per person.",
 	MANSIONROOM_FISHING_HUT = "Fishing Hut",
@@ -32592,9 +32675,15 @@ You leave her in the shade and return to the others, carrying with you the stran
 	MANSIONUPG_TUTORING_AREA = "Tutoring Area",
 	MANSIONUPG_TUTORING_AREADESCRIPT = "Adds a slot for a tutor. A tutor raises the stat gain and is required to remove a negative trait.",
 	MANSIONUPG_TUTORING_AREABONUS1 = "+1 tutor slot, and negative traits can be removed",
-	MANSIONUPG_LEDGERS = "Ledgers",
-	MANSIONUPG_LEDGERSDESCRIPT = "This room's crafters follow its own order of work instead of the estate's queue.",
-	MANSIONUPG_LEDGERSBONUS1 = "This room keeps its own order of work",
+	MANSIONUPG_SLAVE_CURRICULUM = "Training Manuals",
+	MANSIONUPG_SLAVE_CURRICULUMDESCRIPT = "Manuals on raising obedient servants. Slave children born on the estate can be sent to Slave Training: Workforce, Warrior or Service.",
+	MANSIONUPG_SLAVE_CURRICULUMBONUS1 = "Unlocks Slave Training for newborns",
+	MANSIONUPG_ACADEMY_PATRONAGE = "Academy Patronage",
+	MANSIONUPG_ACADEMY_PATRONAGEDESCRIPT = "An arrangement with an academy, where children born on the estate can study.",
+	MANSIONUPG_ACADEMY_PATRONAGEBONUS1 = "Unlocks Academy for newborns",
+	MANSIONUPG_HEIR_TUTORS = "Heir's Tutors",
+	MANSIONUPG_HEIR_TUTORSDESCRIPT = "Private tutors fit to raise a successor. Heirs born on the estate can receive Heir Education.",
+	MANSIONUPG_HEIR_TUTORSBONUS1 = "Unlocks Heir Education for newborns",
 	MANSIONUPG_BUILDERS = "Second Scaffold",
 	MANSIONUPG_BUILDERSDESCRIPT = "Adds a builder slot to this room's construction and upgrades.",
 	MANSIONUPG_BUILDERSBONUS1 = "+1 builder",
@@ -33048,8 +33137,6 @@ You leave her in the shade and return to the others, carrying with you the stran
 	CHARCREATE_APPLY_CHANGES_QUESTION = "Apply the changes?",
 	MANSIONVIEW_ERR_ENOUGH = "You have as many of these as the estate needs.",
 	MANSIONVIEW_EMPTYPLOT = "Empty plot",
-	MANSIONVIEW_ORDERHEADER = "Order of work",
-	MANSIONVIEW_NOORDERS = "The estate has nothing queued for this trade",
 	MANSIONVIEW_FARMHEADER = "%s produces (%d/%d)",
 	MANSIONVIEW_FARMHEADEREMPTY = "Nobody is working the farms",
 	MANSIONVIEW_FARMPICKHINT = "Click to set what they produce.",

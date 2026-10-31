@@ -195,8 +195,8 @@ var skills = {
 		effects = [Effectdata.rebuild_template({effect = 'burn', duration = 4})], 
 		cost = {mp = 14},
 		charges = 0,
-		combatcooldown = 0,
-		cooldown = 5,
+		combatcooldown = 5,
+		cooldown = 0,
 		catalysts = {},
 		target = 'enemy',
 		target_number = 'single',
@@ -292,7 +292,7 @@ var effects = {
 		tick_event = variables.TR_TURN_F,
 		rem_event = [variables.TR_COMBAT_F, variables.TR_DEATH],
 		duration = 4,
-		tags = ['buff'],
+		tags = ['buff', 'bloodboil'],
 		statchanges = {atk_add_part = 0.25, resist_stun = 200, resist_wet = 200, resist_fear = 200},
 		buffs = [
 			{
