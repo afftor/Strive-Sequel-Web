@@ -1,8 +1,8 @@
 [CmdletBinding()]
 param(
-	[string]$Godot = "C:\Users\1\Desktop\godot\Godot_v3.5.3-stable_win64.exe",
+	[string]$Godot = "C:\Users\nomer\OneDrive\Desktop\godot\Godot_v3.5.1-stable_win64.exe",
 	[string]$OutputDirectory = "build\web",
-	[string]$GodotTemplateVersion = "3.5.3.stable"
+	[string]$GodotTemplateVersion = "3.5.1.stable"
 )
 
 $ErrorActionPreference = "Stop"
@@ -18,6 +18,21 @@ if (-not (Test-Path -LiteralPath $Godot -PathType Leaf)) {
 }
 
 New-Item -ItemType Directory -Force -Path $outputPath | Out-Null
+# Keep the Godot editor from importing the export output as project assets.
+$buildIgnore = Join-Path $projectRoot "build\.gdignore"
+if (-not (Test-Path -LiteralPath $buildIgnore)) {
+	New-Item -ItemType File -Path $buildIgnore | Out-Null
+}
+$resolvedOutputPath = (Resolve-Path -LiteralPath $outputPath).Path.TrimEnd([IO.Path]::DirectorySeparatorChar)
+Get-ChildItem -LiteralPath $resolvedOutputPath -File | Where-Object {
+	$_.Name -match '^index\.[0-9a-f]{12}\.(?:js|wasm|pck|[0-9]{3}\.pck|audio\.worklet\.js)$' -or $_.Name -like '*.import'
+} | ForEach-Object {
+	$resolvedRuntimeFile = $_.FullName
+	if (-not $resolvedRuntimeFile.StartsWith($resolvedOutputPath + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {
+		throw "Refusing to remove a runtime file outside the web export: $resolvedRuntimeFile"
+	}
+	Remove-Item -LiteralPath $resolvedRuntimeFile -Force
+}
 if (-not (Test-Path -LiteralPath $templateSource -PathType Container)) {
 	throw "Godot web templates not found: $templateSource"
 }
@@ -29,10 +44,22 @@ foreach ($template in @("webassembly_debug.zip", "webassembly_release.zip", "ver
 $env:APPDATA = $godotUserCache
 $env:LOCALAPPDATA = $godotUserCache
 $webEntryPoint = Join-Path $outputPath "index.html"
-& $Godot --path $projectRoot --export "Web" $webEntryPoint
-$exportExitCode = $LASTEXITCODE
-if ($null -ne $exportExitCode -and $exportExitCode -ne 0) {
-	throw "Godot web export failed with exit code $exportExitCode."
+
+# Godot 3 can otherwise export stale compiled scripts from its project cache
+# when a source file changed outside the editor.
+# Windows PowerShell 5.1 joins -ArgumentList without quoting, so paths with
+# spaces must be quoted explicitly.
+$importProcess = Start-Process -FilePath $Godot -ArgumentList "--path `"$projectRoot`" --editor --quit" -WindowStyle Hidden -Wait -PassThru
+if ($importProcess.ExitCode -ne 0) {
+	throw "Godot import refresh failed with exit code $($importProcess.ExitCode)."
+}
+
+$exportLog = Join-Path $projectRoot "build\godot-export.log"
+$exportErrorLog = Join-Path $projectRoot "build\godot-export.err.log"
+$exportProcess = Start-Process -FilePath $Godot -ArgumentList "--path `"$projectRoot`" --export `"Web`" `"$webEntryPoint`"" -WindowStyle Hidden -Wait -PassThru -RedirectStandardOutput $exportLog -RedirectStandardError $exportErrorLog
+if ($exportProcess.ExitCode -ne 0) {
+	$exportErrors = (Get-Content -LiteralPath $exportErrorLog -Encoding UTF8 -Tail 20 -ErrorAction SilentlyContinue) -join [Environment]::NewLine
+	throw "Godot web export failed with exit code $($exportProcess.ExitCode). Log: $exportErrorLog$([Environment]::NewLine)$exportErrors"
 }
 if (-not (Test-Path -LiteralPath $webEntryPoint -PathType Leaf) -or -not (Test-Path -LiteralPath (Join-Path $outputPath "index.pck") -PathType Leaf)) {
 	throw "Godot web export did not produce index.html and index.pck."
@@ -43,11 +70,18 @@ $loadingArtDestination = Join-Path $outputPath "web-loading-art.png"
 Copy-Item -LiteralPath $loadingArtSource -Destination $loadingArtDestination -Force
 
 $imageRoot = Join-Path $projectRoot "assets\images"
-$streamRoot = Join-Path $outputPath "cg-assets\assets\images"
+# Start from an empty folder, so images removed from the project disappear from
+# the upload as well.
+$cgRoot = Join-Path $resolvedOutputPath "cg-assets"
+if (Test-Path -LiteralPath $cgRoot) {
+	Remove-Item -LiteralPath $cgRoot -Recurse -Force
+}
+$streamRoot = Join-Path $cgRoot "assets\images"
 New-Item -ItemType Directory -Force -Path $streamRoot | Out-Null
 foreach ($folder in @("fullscreen scenes", "scenes")) {
 	$sourceFolder = Join-Path $imageRoot $folder
-	Get-ChildItem -LiteralPath $sourceFolder -Recurse -File -Filter "*.png" | ForEach-Object {
+	# -Filter "*.png" also matches the "*.png.import" files next to the images.
+	Get-ChildItem -LiteralPath $sourceFolder -Recurse -File | Where-Object { $_.Extension -eq ".png" } | ForEach-Object {
 		$relativePath = $_.FullName.Substring($imageRoot.Length + 1)
 		$destination = Join-Path $streamRoot $relativePath
 		New-Item -ItemType Directory -Force -Path (Split-Path -Parent $destination) | Out-Null

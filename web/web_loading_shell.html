@@ -89,6 +89,11 @@
 			box-shadow: 0 1px 8px rgba(0, 0, 0, 0.28);
 		}
 
+		#web-loading-progress-group {
+			display: grid;
+			gap: 8px;
+		}
+
 		#web-loading-progress-inner {
 			height: 100%;
 			width: 100%;
@@ -100,6 +105,16 @@
 
 		#web-loading-progress.web-loading-progress--finalizing #web-loading-progress-inner {
 			animation: web-loading-finalizing 1200ms ease-in-out infinite alternate;
+		}
+
+		#web-loading-stats {
+			display: flex;
+			justify-content: space-between;
+			gap: 12px;
+			font: 13px/1.2 Arial, sans-serif;
+			font-variant-numeric: tabular-nums;
+			color: #f7eeee;
+			text-shadow: 0 1px 4px rgba(0, 0, 0, 0.85);
 		}
 
 		@keyframes web-loading-spin {
@@ -133,6 +148,52 @@
 			border-radius: 8px;
 			box-shadow: 0 3px 16px rgba(0, 0, 0, 0.4);
 		}
+
+		/* Mute and fullscreen buttons. Below the loading overlay, so they show up
+		   once the game does. */
+		.page-button {
+			position: fixed;
+			bottom: 10px;
+			z-index: 5;
+			display: grid;
+			place-items: center;
+			width: 34px;
+			height: 34px;
+			padding: 0;
+			color: #f7eeee;
+			background: rgba(20, 11, 21, 0.55);
+			border: 1px solid rgba(255, 255, 255, 0.25);
+			border-radius: 6px;
+			opacity: 0.5;
+			cursor: pointer;
+			transition: opacity 150ms ease;
+		}
+
+		.page-button:hover,
+		.page-button:focus-visible {
+			opacity: 1;
+		}
+
+		#fullscreen-button {
+			right: 10px;
+		}
+
+		#mute-button {
+			right: 52px;
+		}
+
+		.page-button[hidden],
+		#fullscreen-exit-icon,
+		:root:fullscreen #fullscreen-enter-icon,
+		#sound-off-icon,
+		.page-button--muted #sound-on-icon {
+			display: none;
+		}
+
+		:root:fullscreen #fullscreen-exit-icon,
+		.page-button--muted #sound-off-icon {
+			display: block;
+		}
 	</style>
 $GODOT_HEAD_INCLUDE
 </head>
@@ -142,10 +203,34 @@ $GODOT_HEAD_INCLUDE
 		Please try updating or use a different browser.
 	</canvas>
 
+	<button id='mute-button' class='page-button' type='button' title='Mute' aria-label='Mute'>
+		<svg id='sound-on-icon' viewBox='0 0 24 24' width='20' height='20' aria-hidden='true'>
+			<path d='M11 5 6 9H3v6h3l5 4zM15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' />
+		</svg>
+		<svg id='sound-off-icon' viewBox='0 0 24 24' width='20' height='20' aria-hidden='true'>
+			<path d='M11 5 6 9H3v6h3l5 4zM16 9l5 6M21 9l-5 6' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' />
+		</svg>
+	</button>
+
+	<button id='fullscreen-button' class='page-button' type='button' title='Fullscreen' aria-label='Fullscreen'>
+		<svg id='fullscreen-enter-icon' viewBox='0 0 24 24' width='20' height='20' aria-hidden='true'>
+			<path d='M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' />
+		</svg>
+		<svg id='fullscreen-exit-icon' viewBox='0 0 24 24' width='20' height='20' aria-hidden='true'>
+			<path d='M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' />
+		</svg>
+	</button>
+
 	<div id='web-loading' aria-hidden='true'>
 		<div id='web-loading-indicator'>
 			<div id='web-loading-spinner'></div>
-			<div id='web-loading-progress'><div id='web-loading-progress-inner'></div></div>
+			<div id='web-loading-progress-group'>
+				<div id='web-loading-progress'><div id='web-loading-progress-inner'></div></div>
+				<div id='web-loading-stats'>
+					<span id='web-loading-bytes'>0 B / —</span>
+					<span id='web-loading-speed'>—/s</span>
+				</div>
+			</div>
 		</div>
 	</div>
 
@@ -302,10 +387,64 @@ $GODOT_HEAD_INCLUDE
 			var loadingOverlay = document.getElementById('web-loading');
 			var loadingProgressTrack = document.getElementById('web-loading-progress');
 			var loadingProgress = document.getElementById('web-loading-progress-inner');
+			var loadingBytes = document.getElementById('web-loading-bytes');
+			var loadingSpeed = document.getElementById('web-loading-speed');
 			var status = document.getElementById('status');
 			var statusNotice = document.getElementById('status-notice');
+			var configuredTotal = 0;
+			var downloadSamples = [];
+			var lastDownloaded = 0;
+			var lastProgressAt = 0;
+			var speedTimer = null;
+
+			if (GODOT_CONFIG.fileSizes) {
+				Object.keys(GODOT_CONFIG.fileSizes).forEach(function(file) {
+					configuredTotal += GODOT_CONFIG.fileSizes[file] || 0;
+				});
+			}
+
+			function formatBytes(bytes) {
+				var units = ['B', 'KB', 'MB', 'GB'];
+				var value = Math.max(0, bytes || 0);
+				var unit = 0;
+
+				while (value >= 1000 && unit < units.length - 1) {
+					value /= 1000;
+					unit += 1;
+				}
+
+				var decimals = unit === 0 || value >= 100 ? 0 : (value >= 10 ? 1 : 2);
+				return value.toFixed(decimals) + ' ' + units[unit];
+			}
+
+			if (configuredTotal > 0) {
+				loadingBytes.textContent = '0 B / ' + formatBytes(configuredTotal);
+			}
 
 			function setLoadingProgress(current, total) {
+				var now = performance.now();
+				var knownTotal = total > 0 ? total : configuredTotal;
+
+				if (current < lastDownloaded) {
+					downloadSamples = [];
+				}
+				lastDownloaded = current;
+				lastProgressAt = now;
+				downloadSamples.push({ time: now, bytes: current });
+				while (downloadSamples.length > 2 && downloadSamples[1].time < now - 2000) {
+					downloadSamples.shift();
+				}
+
+				var firstSample = downloadSamples[0];
+				var elapsed = (now - firstSample.time) / 1000;
+				var bytesPerSecond = elapsed >= 0.25 ?
+					Math.max(0, (current - firstSample.bytes) / elapsed) : 0;
+
+				loadingBytes.textContent = formatBytes(current) + ' / ' +
+					(knownTotal > 0 ? formatBytes(knownTotal) : '—');
+				loadingSpeed.textContent = bytesPerSecond > 0 ?
+					formatBytes(bytesPerSecond) + '/s' : '—/s';
+
 				if (total > 0) {
 					var progress = Math.max(0, Math.min(1, current / total));
 					if (progress >= 1) {
@@ -320,6 +459,7 @@ $GODOT_HEAD_INCLUDE
 			}
 
 			function finishLoading() {
+				clearInterval(speedTimer);
 				// Wait for two browser frames, so the game canvas has had a chance to paint.
 				requestAnimationFrame(function() {
 					requestAnimationFrame(function() {
@@ -329,6 +469,7 @@ $GODOT_HEAD_INCLUDE
 			}
 
 			function displayFailureNotice(err) {
+				clearInterval(speedTimer);
 				var msg = err.message || err;
 				console.error(msg);
 				statusNotice.textContent = msg;
@@ -336,12 +477,220 @@ $GODOT_HEAD_INCLUDE
 				status.style.display = 'flex';
 			}
 
+			speedTimer = setInterval(function() {
+				var now = performance.now();
+				if (lastProgressAt > 0 && now - lastProgressAt > 1500) {
+					loadingSpeed.textContent = '0 B/s';
+					downloadSamples = [{ time: now, bytes: lastDownloaded }];
+				}
+			}, 500);
+
+			var PACK_PART_ATTEMPTS = 3;
+			var PACK_PART_CONCURRENCY = 4;
+
+			// Streams one part straight into its place in the joined pack.
+			function loadPackPart(part, pack, offset, onBytes) {
+				return fetch(part.file).then(function(response) {
+					if (!response.ok) {
+						throw new Error('Failed loading file \'' + part.file + '\' (HTTP ' + response.status + ')');
+					}
+					var reader = response.body.getReader();
+					var written = 0;
+					function pump() {
+						return reader.read().then(function(result) {
+							if (result.done) {
+								if (written !== part.size) {
+									throw new Error('Incomplete file \'' + part.file + '\'');
+								}
+								return;
+							}
+							if (written + result.value.length > part.size) {
+								throw new Error('Unexpected size of file \'' + part.file + '\'');
+							}
+							pack.set(result.value, offset + written);
+							written += result.value.length;
+							onBytes(written);
+							return pump();
+						});
+					}
+					return pump();
+				});
+			}
+
+			function loadSplitPack(onProgress) {
+				var parts = PCK_PARTS.parts;
+				var offsets = [];
+				var loaded = [];
+				var total = 0;
+				parts.forEach(function(part) {
+					offsets.push(total);
+					loaded.push(0);
+					total += part.size;
+				});
+				if (total !== PCK_PARTS.size) {
+					return Promise.reject(new Error('The main pack parts do not add up to its size.'));
+				}
+				var pack = new Uint8Array(PCK_PARTS.size);
+
+				function reportPackProgress() {
+					var sum = 0;
+					for (var i = 0; i < loaded.length; i++) {
+						sum += loaded[i];
+					}
+					onProgress(sum);
+				}
+
+				function loadPart(index, attempt) {
+					loaded[index] = 0;
+					reportPackProgress();
+					return loadPackPart(parts[index], pack, offsets[index], function(bytes) {
+						loaded[index] = bytes;
+						reportPackProgress();
+					}).catch(function(error) {
+						if (attempt >= PACK_PART_ATTEMPTS) {
+							throw error;
+						}
+						console.warn('Retrying ' + parts[index].file + ':', error);
+						// A broken cached copy would fail the same way again.
+						return forgetCachedRuntimeFile(parts[index].file).then(function() {
+							return loadPart(index, attempt + 1);
+						});
+					});
+				}
+
+				var nextPart = 0;
+				function loadNextPart() {
+					if (nextPart >= parts.length) {
+						return Promise.resolve();
+					}
+					var index = nextPart++;
+					return loadPart(index, 1).then(loadNextPart);
+				}
+
+				var workers = [];
+				for (var i = 0; i < Math.min(PACK_PART_CONCURRENCY, parts.length); i++) {
+					workers.push(loadNextPart());
+				}
+				return Promise.all(workers).then(function() {
+					return pack;
+				});
+			}
+
+			function startWithSplitPack() {
+				var engineLoaded = 0;
+				var packLoaded = 0;
+				function reportProgress() {
+					setLoadingProgress(engineLoaded + packLoaded, configuredTotal);
+				}
+				engineProgressHandler = function(current) {
+					engineLoaded = current;
+					reportProgress();
+				};
+				return Promise.all([
+					engine.init(GODOT_CONFIG.executable),
+					loadSplitPack(function(bytes) {
+						packLoaded = bytes;
+						reportProgress();
+					}),
+				]).then(function(results) {
+					// Pass the ArrayBuffer: preloadFile uses its argument as a
+					// lookup key, and a Uint8Array would be stringified byte by byte.
+					return engine.preloadFile(results[1].buffer, PCK_PARTS.path);
+				}).then(function() {
+					return engine.start({
+						'args': ['--main-pack', PCK_PARTS.path].concat(GODOT_CONFIG.args || []),
+					});
+				});
+			}
+
+			// The button switches fullscreen on and off; a double-click on the game only
+			// switches it on (Esc leaves), because the game itself uses double-clicks,
+			// e.g. in the mansion list. The whole page goes fullscreen, so the button
+			// stays visible; the canvas follows the window size.
+			var canvas = document.getElementById('canvas');
+			var fullscreenButton = document.getElementById('fullscreen-button');
+			function enterFullscreen() {
+				if (document.fullscreenElement) {
+					return;
+				}
+				document.documentElement.requestFullscreen().catch(function(error) {
+					console.warn('Unable to enter fullscreen:', error);
+				});
+				// Keyboard input goes to the game only while the canvas has focus.
+				canvas.focus();
+			}
+			canvas.addEventListener('dblclick', enterFullscreen);
+			fullscreenButton.addEventListener('click', function() {
+				if (document.fullscreenElement) {
+					document.exitFullscreen().catch(function() {});
+					canvas.focus();
+				} else {
+					enterFullscreen();
+				}
+			});
+			document.addEventListener('fullscreenchange', function() {
+				var label = document.fullscreenElement ? 'Exit fullscreen' : 'Fullscreen';
+				fullscreenButton.title = label;
+				fullscreenButton.setAttribute('aria-label', label);
+			});
+			// Without fullscreen support (e.g. in a frame that does not allow it) the
+			// button would do nothing.
+			fullscreenButton.hidden = !document.fullscreenEnabled;
+
+			// The mute button silences the game through a gain node placed in front of
+			// the speakers, so the music keeps playing. Suspending the AudioContext
+			// would not stick: the engine resumes it on every click and key press.
+			var muteButton = document.getElementById('mute-button');
+			var MUTE_KEY = 'strive-muted';
+			var gameAudioOutputs = [];
+			var muted = false;
+			try {
+				muted = window.localStorage.getItem(MUTE_KEY) === '1';
+			} catch (_error) {}
+			function applyMute() {
+				gameAudioOutputs.forEach(function(output) {
+					output.gain.value = muted ? 0 : 1;
+				});
+				var label = muted ? 'Unmute' : 'Mute';
+				muteButton.title = label;
+				muteButton.setAttribute('aria-label', label);
+				muteButton.classList.toggle('page-button--muted', muted);
+			}
+			var NativeAudioContext = window.AudioContext || window.webkitAudioContext;
+			if (NativeAudioContext) {
+				// The engine creates its AudioContext when it starts, after this runs.
+				var MutableAudioContext = function(options) {
+					var context = new NativeAudioContext(options);
+					var output = context.createGain();
+					output.connect(context.destination);
+					// The engine connects all of its sound to context.destination.
+					Object.defineProperty(context, 'destination', { value: output });
+					gameAudioOutputs.push(output);
+					applyMute();
+					return context;
+				};
+				MutableAudioContext.prototype = NativeAudioContext.prototype;
+				window.AudioContext = MutableAudioContext;
+			} else {
+				muteButton.hidden = true;
+			}
+			muteButton.addEventListener('click', function() {
+				muted = !muted;
+				try {
+					window.localStorage.setItem(MUTE_KEY, muted ? '1' : '0');
+				} catch (_error) {}
+				applyMute();
+				canvas.focus();
+			});
+			applyMute();
+
 			if (!Engine.isWebGLAvailable()) {
 				displayFailureNotice('WebGL not available');
+			} else if (PCK_PARTS) {
+				startWithSplitPack().then(finishLoading, displayFailureNotice);
 			} else {
-				engine.startGame({
-					'onProgress': setLoadingProgress,
-				}).then(finishLoading, displayFailureNotice);
+				engineProgressHandler = setLoadingProgress;
+				engine.startGame().then(finishLoading, displayFailureNotice);
 			}
 		})();
 	//]]></script>

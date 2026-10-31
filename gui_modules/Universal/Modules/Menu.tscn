@@ -244,44 +244,11 @@ custom_styles/normal = SubResource( 4 )
 toggle_mode = true
 text = "MENUCONTINUE"
 
-[node name="exportprogress" type="Button" parent="VBoxContainer"]
-margin_left = 3.0
-margin_top = 98.0
-margin_right = 917.0
-margin_bottom = 188.0
-size_flags_horizontal = 4
-size_flags_vertical = 4
-custom_colors/font_color = Color( 0.913725, 0.894118, 0.737255, 1 )
-custom_colors/font_color_pressed = Color( 0.733333, 0.74902, 0.545098, 1 )
-custom_fonts/font = SubResource( 5 )
-custom_styles/hover = SubResource( 1 )
-custom_styles/pressed = SubResource( 2 )
-custom_styles/focus = SubResource( 3 )
-custom_styles/normal = SubResource( 4 )
-toggle_mode = true
-text = "MENUEXPORTPROGRESS"
-
-[node name="importprogress" type="Button" parent="VBoxContainer"]
-margin_top = 196.0
-margin_right = 920.0
-margin_bottom = 286.0
-size_flags_horizontal = 4
-size_flags_vertical = 4
-custom_colors/font_color = Color( 0.913725, 0.894118, 0.737255, 1 )
-custom_colors/font_color_pressed = Color( 0.733333, 0.74902, 0.545098, 1 )
-custom_fonts/font = SubResource( 5 )
-custom_styles/hover = SubResource( 1 )
-custom_styles/pressed = SubResource( 2 )
-custom_styles/focus = SubResource( 3 )
-custom_styles/normal = SubResource( 4 )
-toggle_mode = true
-text = "MENUIMPORTPROGRESS"
-
 [node name="newgamebutton" type="Button" parent="VBoxContainer"]
 margin_left = 134.0
-margin_top = 294.0
+margin_top = 98.0
 margin_right = 786.0
-margin_bottom = 384.0
+margin_bottom = 188.0
 size_flags_horizontal = 4
 size_flags_vertical = 4
 custom_colors/font_color = Color( 0.913725, 0.894118, 0.737255, 1 )
@@ -299,9 +266,9 @@ __meta__ = {
 
 [node name="loadbutton" type="Button" parent="VBoxContainer"]
 margin_left = 236.0
-margin_top = 392.0
+margin_top = 196.0
 margin_right = 684.0
-margin_bottom = 482.0
+margin_bottom = 286.0
 size_flags_horizontal = 4
 size_flags_vertical = 4
 custom_colors/font_color = Color( 0.913725, 0.894118, 0.737255, 1 )
@@ -316,6 +283,39 @@ text = "MENULOAD"
 __meta__ = {
 "_editor_description_": ""
 }
+
+[node name="exportprogress" type="Button" parent="VBoxContainer"]
+margin_left = 3.0
+margin_top = 294.0
+margin_right = 917.0
+margin_bottom = 384.0
+size_flags_horizontal = 4
+size_flags_vertical = 4
+custom_colors/font_color = Color( 0.913725, 0.894118, 0.737255, 1 )
+custom_colors/font_color_pressed = Color( 0.733333, 0.74902, 0.545098, 1 )
+custom_fonts/font = SubResource( 5 )
+custom_styles/hover = SubResource( 1 )
+custom_styles/pressed = SubResource( 2 )
+custom_styles/focus = SubResource( 3 )
+custom_styles/normal = SubResource( 4 )
+toggle_mode = true
+text = "MENUEXPORTPROGRESS"
+
+[node name="importprogress" type="Button" parent="VBoxContainer"]
+margin_top = 392.0
+margin_right = 920.0
+margin_bottom = 482.0
+size_flags_horizontal = 4
+size_flags_vertical = 4
+custom_colors/font_color = Color( 0.913725, 0.894118, 0.737255, 1 )
+custom_colors/font_color_pressed = Color( 0.733333, 0.74902, 0.545098, 1 )
+custom_fonts/font = SubResource( 5 )
+custom_styles/hover = SubResource( 1 )
+custom_styles/pressed = SubResource( 2 )
+custom_styles/focus = SubResource( 3 )
+custom_styles/normal = SubResource( 4 )
+toggle_mode = true
+text = "MENUIMPORTPROGRESS"
 
 [node name="importsave" type="Button" parent="VBoxContainer"]
 margin_left = 91.0
