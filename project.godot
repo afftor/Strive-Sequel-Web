@@ -133,6 +133,7 @@ config/icon="res://assets/images/iconsclasses/Master.png"
 
 ResourceScripts="*res://assets/data/ResourceScripts.gd"
 WebCgAssets="*res://src/web/web_cg_asset_loader.gd"
+WebTextInput="*res://src/web/web_text_input.gd"
 modding_core="*res://src/core/modding_core.gd"
 variables="*res://src/core/variables.gd"
 images="*res://assets/data/ResourceImages.gd"
