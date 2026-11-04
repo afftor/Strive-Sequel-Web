@@ -1,11 +1,18 @@
 <!DOCTYPE html>
-<html xmlns='http://www.w3.org/1999/xhtml' lang='' xml:lang=''>
+<html xmlns='http://www.w3.org/1999/xhtml' lang='en' xml:lang='en'>
 <head>
 	<meta charset='utf-8' />
 	<meta name='viewport' content='width=device-width, user-scalable=no' />
 	<!-- Proves ownership of the site in Google Search Console. -->
 	<meta name='google-site-verification' content='eIjr6zJLzCrJxyMO1j6ZlBc8kTsuQrWD_GR24mGgAEg' />
-	<title>$GODOT_PROJECT_NAME</title>
+	<!-- Says what the page is to visitors, link previews and site scanners: the page
+	     itself is only a canvas until the game loads. -->
+	<title>$GODOT_PROJECT_NAME (Strive: Conquest) - play in the browser</title>
+	<meta name='description' content='Browser version of Strive: Conquest (Strive for Power 2), a fantasy RPG and management game for adults (18+). Official page: https://strive4power.itch.io/strive-conquest' />
+	<meta property='og:type' content='website' />
+	<meta property='og:title' content='$GODOT_PROJECT_NAME (Strive: Conquest) - play in the browser' />
+	<meta property='og:description' content='Browser version of Strive: Conquest (Strive for Power 2), a fantasy RPG and management game for adults (18+).' />
+	<meta name='rating' content='adult' />
 	<style type='text/css'>
 		:root {
 			background: #2b1d2b;
@@ -60,6 +67,9 @@
 		#web-loading.web-loading--hidden {
 			opacity: 0;
 			pointer-events: none;
+			/* After the fade, so the link in the overlay leaves the tab order too. */
+			visibility: hidden;
+			transition: opacity 300ms ease, visibility 0s 300ms;
 		}
 
 		#web-loading-indicator {
@@ -117,6 +127,33 @@
 			font-variant-numeric: tabular-nums;
 			color: #f7eeee;
 			text-shadow: 0 1px 4px rgba(0, 0, 0, 0.85);
+		}
+
+		#web-loading-about {
+			margin: 0;
+			font: 12px/1.4 Arial, sans-serif;
+			color: rgba(247, 238, 238, 0.85);
+			text-shadow: 0 1px 4px rgba(0, 0, 0, 0.85);
+		}
+
+		#web-loading-about a {
+			color: #f2d7cf;
+		}
+
+		#web-noscript {
+			position: fixed;
+			inset: 0;
+			z-index: 30;
+			display: grid;
+			place-items: center;
+			padding: 16px;
+			font: 15px/1.5 Arial, sans-serif;
+			color: #f7eeee;
+			background: #1d1520;
+		}
+
+		#web-noscript a {
+			color: #f2d7cf;
 		}
 
 		@keyframes web-loading-spin {
@@ -223,18 +260,32 @@ $GODOT_HEAD_INCLUDE
 		</svg>
 	</button>
 
-	<div id='web-loading' aria-hidden='true'>
+	<div id='web-loading'>
 		<div id='web-loading-indicator'>
-			<div id='web-loading-spinner'></div>
-			<div id='web-loading-progress-group'>
+			<div id='web-loading-spinner' aria-hidden='true'></div>
+			<div id='web-loading-progress-group' aria-hidden='true'>
 				<div id='web-loading-progress'><div id='web-loading-progress-inner'></div></div>
 				<div id='web-loading-stats'>
 					<span id='web-loading-bytes'>0 B / —</span>
 					<span id='web-loading-speed'>—/s</span>
 				</div>
 			</div>
+			<p id='web-loading-about'>
+				Strive: Conquest (Strive for Power 2): browser version of the fantasy RPG for adults (18+).<br />
+				Official page: <a href='https://strive4power.itch.io/strive-conquest' target='_blank' rel='noopener'>strive4power.itch.io</a>
+			</p>
 		</div>
 	</div>
+
+	<noscript>
+		<div id='web-noscript'>
+			<p>
+				Strive: Conquest (Strive for Power 2) is a fantasy RPG for adults (18+).<br />
+				This browser version needs JavaScript and WebAssembly.<br />
+				Official page: <a href='https://strive4power.itch.io/strive-conquest'>strive4power.itch.io/strive-conquest</a>
+			</p>
+		</div>
+	</noscript>
 
 	<div id='status'><div id='status-notice' style='display: none;'></div></div>
 
